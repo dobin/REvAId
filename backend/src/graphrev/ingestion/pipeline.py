@@ -98,6 +98,7 @@ async def _ingest_one_binary(
                     assembly=raw_fn.assembly,
                     code_c=raw_fn.code_c,
                     kind=raw_fn.kind,
+                    has_indirect_calls=raw_fn.has_indirect_calls,
                     is_entry_point=raw_fn.is_entry_point,
                 )
             if was_created:

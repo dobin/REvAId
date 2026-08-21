@@ -1,9 +1,10 @@
-"""``GET /functions/{id}`` DTOs (E1) — TAD §3.4 ``FunctionDto``."""
+"""``GET``/``PATCH /functions/{id}`` DTOs (E1, E2c) — TAD §3.4 ``FunctionDto``."""
 
 from __future__ import annotations
 
 import json
 
+from graphrev.db.enums import UtilityOverride
 from graphrev.db.models import Function
 from graphrev.schemas.common import ApiModel
 
@@ -51,10 +52,6 @@ class FunctionDto(ApiModel):
     notes_updated_at: str | None
     callee_count: int
     caller_count: int
-    #: TODO(I4): always `False` until the mock/real Ghidra adapter's
-    #: `RawFunction.has_indirect_calls` is persisted to a column (a known
-    #: I2 gap — see `adapters/ghidra/base.py`). Field kept in the DTO now so
-    #: the frontend contract does not change again in I4.
     has_indirect_calls: bool
 
 
@@ -94,5 +91,17 @@ def function_dto_from_row(fn: Function) -> FunctionDto:
         notes_updated_at=fn.notes_updated_at,
         callee_count=fn.fan_out,
         caller_count=fn.fan_in,
-        has_indirect_calls=False,
+        has_indirect_calls=fn.has_indirect_calls,
     )
+
+
+class FunctionUpdateDto(ApiModel):
+    """``PATCH /functions/{id}`` request body (D36/E2c).
+
+    Every field is optional-and-absent-means-"leave unchanged" (Pydantic v2
+    ``model_fields_set`` is used by the service layer to distinguish "not
+    provided" from "explicitly set to null"). M0 scope is `utility_override`
+    only — `name_analyst`/`notes` are I10.
+    """
+
+    utility_override: UtilityOverride | None = None

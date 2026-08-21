@@ -13,6 +13,6 @@ async def test_health_reports_db_ok_and_revision(client: AsyncClient) -> None:
     body = response.json()
     assert body["status"] == "ok"
     assert body["dbOk"] is True
-    assert body["migrationRevision"] == "0002"
+    assert body["migrationRevision"] == "0003"
     assert body["ghidraAdapter"] == "mock"
     assert body["llmAdapter"] == "mock"

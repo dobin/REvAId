@@ -61,9 +61,8 @@ class RawFunction:
     functions (B17) — there is nothing to decompile.
 
     ``has_indirect_calls`` feeds I4's ``mayBeIncomplete`` neighbour-table
-    footer hint; the I1-locked schema has no persisted column for it yet, so
-    ``ingestion/pipeline.py`` reads but does not store this field until I4
-    adds the column (TODO(I4)).
+    footer hint; persisted to ``functions.has_indirect_calls`` (I4, migration
+    ``0003``).
     """
 
     address: int

@@ -48,6 +48,7 @@ async def upsert_function(
     code_c: str | None = None,
     kind: FunctionKind = "normal",
     placeholder_module: str | None = None,
+    has_indirect_calls: bool = False,
     is_entry_point: bool = False,
 ) -> tuple[int, bool]:
     """Idempotent UPSERT keyed on ``(binary_id, address)`` (``ux_functions_binary_address``).
@@ -82,6 +83,7 @@ async def upsert_function(
         "code_c": code_c,
         "kind": kind,
         "placeholder_module": placeholder_module,
+        "has_indirect_calls": has_indirect_calls,
         "is_entry_point": is_entry_point,
         "created_at": now,
         "updated_at": now,
@@ -155,6 +157,32 @@ async def recompute_fan_in_fan_out_and_utility(
 async def get_function_by_id(session: AsyncSession, function_id: int) -> Function | None:
     """A single `Function` row by id, or `None` if it does not exist (E1)."""
     return await session.get(Function, function_id)
+
+
+async def update_utility_override(
+    session: AsyncSession, *, function_id: int, utility_override: str | None
+) -> Function | None:
+    """D36/E2c: set (or clear, via `None`) the analyst's utility override.
+
+    Returns the updated `Function` row, or `None` if `function_id` does not
+    exist. This is the *only* write path the D36 override goes through —
+    ingestion never touches it (`utility_override` is in
+    `INGESTION_OWNED_COLUMNS`'s complement, guarded by the A3 test).
+    """
+    fn = await session.get(Function, function_id)
+    if fn is None:
+        return None
+    fn.utility_override = utility_override
+    fn.updated_at = utc_now_iso()
+    await session.flush()
+    # `is_utility_effective` is a DB-computed GENERATED column: SQLAlchemy
+    # marks it expired after the UPDATE flush, and a bare attribute access
+    # later (e.g. in `function_dto_from_row`) would trigger an implicit
+    # lazy-load — which raises `MissingGreenlet` under the async driver, since
+    # nothing here awaits it. Refresh eagerly, inside this async context,
+    # instead.
+    await session.refresh(fn, attribute_names=["is_utility_effective"])
+    return fn
 
 
 async def search_functions(

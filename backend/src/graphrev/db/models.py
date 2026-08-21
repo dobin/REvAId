@@ -120,6 +120,10 @@ class Function(Base):
     code_c: Mapped[str | None] = mapped_column(default=None)
     kind: Mapped[str] = mapped_column(default="normal")
     placeholder_module: Mapped[str | None] = mapped_column(default=None)  # D35a
+    #: I4/§5.1: true when Ghidra could not statically resolve every call
+    #: target (indirect/computed calls) — feeds `mayBeIncomplete` on the
+    #: callees neighbour page. Ground-truth/ingestion-owned, like `kind`.
+    has_indirect_calls: Mapped[bool] = mapped_column(default=False)
     fan_in: Mapped[int] = mapped_column(default=0)  # A7a
     fan_out: Mapped[int] = mapped_column(default=0)
     is_utility: Mapped[bool] = mapped_column(default=False)  # derived at ingest/startup (F1b)
@@ -290,6 +294,7 @@ INGESTION_OWNED_COLUMNS: frozenset[str] = frozenset(
         "code_c",
         "kind",
         "placeholder_module",
+        "has_indirect_calls",
         "fan_in",
         "fan_out",
         "is_utility",
