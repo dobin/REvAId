@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { ConfigProvider } from "@/config/ConfigProvider";
 import type { BinaryId, ViewId } from "@/api/types";
+import { useBinariesQuery } from "@/api/queries/binaries";
 import { useViewsQuery } from "@/api/queries/views";
 import { Toolbar } from "@/features/toolbar/Toolbar";
 import { Sidebar } from "@/features/sidebar/Sidebar";
@@ -10,7 +11,15 @@ import { DetailPanel } from "@/features/detail/DetailPanel";
 function AppShell() {
   const [selectedBinaryId, setSelectedBinaryId] = useState<BinaryId | null>(null);
   const [selectedViewId, setSelectedViewId] = useState<ViewId | null>(null);
+  const binaries = useBinariesQuery();
   const views = useViewsQuery(selectedBinaryId);
+
+  // Auto-select the first binary on initial load.
+  useEffect(() => {
+    if (selectedBinaryId !== null) return;
+    const firstBinary = binaries.data?.[0];
+    if (firstBinary) setSelectedBinaryId(firstBinary.id);
+  }, [binaries.data, selectedBinaryId]);
 
   // Default to the binary's first view whenever the binary changes (or on
   // first load) and no view has been explicitly picked yet.
