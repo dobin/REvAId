@@ -31,12 +31,48 @@ export function BinaryPicker({
         <Select.Value placeholder="Select a binary…" />
       </Select.Trigger>
       <Select.Portal>
-        <Select.Content>
-          <Select.Viewport>
+        <Select.Content
+          position="popper"
+          sideOffset={4}
+          style={{
+            background: "#ffffff",
+            border: "1px solid #e5e7eb",
+            borderRadius: "0.375rem",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.12)",
+            minWidth: "var(--radix-select-trigger-width)",
+            zIndex: 9999,
+            overflow: "hidden",
+          }}
+        >
+          <Select.Viewport style={{ padding: "0.25rem" }}>
             {binaries.map((binary) => (
-              <Select.Item key={binary.id} value={String(binary.id)}>
+              <Select.Item
+                key={binary.id}
+                value={String(binary.id)}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "0.375rem 0.625rem",
+                  borderRadius: "0.25rem",
+                  cursor: "pointer",
+                  outline: "none",
+                  userSelect: "none",
+                  fontFamily: "var(--gr-font-mono)",
+                  fontSize: "0.875rem",
+                  color: "var(--gr-color-ground-truth)",
+                }}
+                onMouseEnter={(e) => {
+                  (e.currentTarget as HTMLElement).style.background = "#f3f4f6";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLElement).style.background = "transparent";
+                }}
+              >
                 <Select.ItemText>
-                  {binary.name} ({binary.functionCount} functions)
+                  {binary.name}{" "}
+                  <span style={{ color: "var(--gr-color-muted)", fontSize: "0.8em" }}>
+                    ({binary.functionCount} functions)
+                  </span>
                 </Select.ItemText>
               </Select.Item>
             ))}
