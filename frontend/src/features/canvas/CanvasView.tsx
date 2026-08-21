@@ -248,6 +248,8 @@ function CanvasViewInner({ viewId }: { viewId: ViewId }) {
           edgeTypes={EDGE_TYPES}
           onNodesChange={onNodesChange}
           fitView
+          fitViewOptions={{ maxZoom: 1.0 }}
+          minZoom={0.05}
           nodesDraggable
           defaultViewport={{
             x: view.data.camera.x,
