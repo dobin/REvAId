@@ -1,5 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ReactFlowProvider } from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfigProvider } from "@/config/ConfigProvider";
 import { FunctionCardNode } from "./FunctionCardNode";
@@ -88,7 +89,9 @@ function renderWithProviders() {
   return render(
     <QueryClientProvider client={queryClient}>
       <ConfigProvider fallback={<p>loading</p>}>
-        <FunctionCardNode data={{ functionId: 1, viewId: 1, viewNode }} />
+        <ReactFlowProvider>
+          <FunctionCardNode data={{ functionId: 1, viewId: 1, viewNode }} />
+        </ReactFlowProvider>
       </ConfigProvider>
     </QueryClientProvider>,
   );

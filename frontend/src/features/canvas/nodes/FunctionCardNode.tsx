@@ -6,6 +6,7 @@
  * detail panel, and rendering `CollapsedChip` instead of the full body when
  * `viewNode.collapsed` is true (D14).
  */
+import { Handle, Position } from "@xyflow/react";
 import { useConfig } from "@/config/ConfigProvider";
 import { useFunctionQuery } from "@/api/queries/functions";
 import type { FunctionId, ViewId, ViewNodeDto } from "@/api/types";
@@ -16,6 +17,23 @@ import { useAppStore } from "@/store";
 import { useViewNodeActions } from "../useViewNodeActions";
 import { CollapsedChip } from "./CollapsedChip";
 import { ColorSwatchStrip } from "./ColorSwatchStrip";
+
+/**
+ * A card connects to its provenance parent/children vertically (layout
+ * direction is DOWN, TAD §2.5) via a single unnamed source/target handle
+ * pair — `deriveCanvasEdges` never targets a specific handle id, so every
+ * render path (loading/error/collapsed/full) must render exactly this pair
+ * or React Flow silently drops the edge (`Couldn't create edge for source
+ * handle id: "null"`).
+ */
+function NodeHandles() {
+  return (
+    <>
+      <Handle type="target" position={Position.Top} />
+      <Handle type="source" position={Position.Bottom} />
+    </>
+  );
+}
 
 export interface FunctionCardNodeData extends Record<string, unknown> {
   functionId: FunctionId;
@@ -32,6 +50,7 @@ export function FunctionCardNode({ data }: { data: FunctionCardNodeData }) {
   if (isPending) {
     return (
       <div style={{ width: config.cardWidthPx, background: "white", padding: "0.75rem" }}>
+        <NodeHandles />
         Loading function…
       </div>
     );
@@ -39,6 +58,7 @@ export function FunctionCardNode({ data }: { data: FunctionCardNodeData }) {
   if (isError) {
     return (
       <div style={{ width: config.cardWidthPx, background: "white", padding: "0.75rem" }}>
+        <NodeHandles />
         Could not load function.
       </div>
     );
@@ -46,12 +66,15 @@ export function FunctionCardNode({ data }: { data: FunctionCardNodeData }) {
 
   if (data.viewNode.collapsed) {
     return (
-      <CollapsedChip
-        fn={fn}
-        onExpand={() => {
-          actions.setCollapsed(data.functionId, false);
-        }}
-      />
+      <div style={{ position: "relative" }}>
+        <NodeHandles />
+        <CollapsedChip
+          fn={fn}
+          onExpand={() => {
+            actions.setCollapsed(data.functionId, false);
+          }}
+        />
+      </div>
     );
   }
 
@@ -63,8 +86,10 @@ export function FunctionCardNode({ data }: { data: FunctionCardNodeData }) {
         border: "1px solid #d1d5db",
         borderRadius: "0.375rem",
         boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
+        position: "relative",
       }}
     >
+      <NodeHandles />
       <div style={{ display: "flex", alignItems: "center" }}>
         <div
           style={{ flex: 1, cursor: "pointer" }}

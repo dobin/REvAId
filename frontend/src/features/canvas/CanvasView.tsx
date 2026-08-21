@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
+  useNodesState,
   useReactFlow,
   type Edge,
   type EdgeTypes,
@@ -75,7 +76,7 @@ function CanvasViewInner({ viewId }: { viewId: ViewId }) {
   );
   const canvasEdges = useMemo(() => deriveCanvasEdges(visibleNodes), [visibleNodes]);
 
-  const flowNodes = useMemo<Node<FunctionCardNodeData>[]>(
+  const derivedNodes = useMemo<Node<FunctionCardNodeData>[]>(
     () =>
       visibleNodes.map((n) => {
         const pos = positions[n.functionId];
@@ -95,6 +96,31 @@ function CanvasViewInner({ viewId }: { viewId: ViewId }) {
     [visibleNodes, positions, elkPositions, viewId],
   );
 
+  // Controlled node state via React Flow's own recommended pattern
+  // (`useNodesState` + `onNodesChange`, TAD §2.5's `useNodesInitialized`
+  // sits on top of this same mechanism): this is the ONLY way a node's
+  // measured width/height survives across re-renders. `<ReactFlow>` reports
+  // dimension changes (from its internal `ResizeObserver`) as `NodeChange`
+  // events through `onNodesChange`; those changes must be applied to
+  // *persistent* React state via `applyNodeChanges`, or every re-render
+  // that produces a new `derivedNodes` array (any position/data change)
+  // silently drops the previously-measured `measured.height` back to
+  // `undefined` — which is what caused new, especially tall, cards to be
+  // laid out against a stale/estimated height and visually overlap their
+  // neighbour. Whenever the *derived* node set changes (new node added or
+  // removed, or its position moves), that is merged into the controlled
+  // state while carrying each existing node's `measured` field forward.
+  const [rfNodes, setRfNodes, onNodesChange] = useNodesState<Node<FunctionCardNodeData>>([]);
+  useEffect(() => {
+    setRfNodes((current) => {
+      const measuredById = new Map(current.map((n) => [n.id, n.measured]));
+      return derivedNodes.map((n) => {
+        const measured = measuredById.get(n.id);
+        return measured ? { ...n, measured } : n;
+      });
+    });
+  }, [derivedNodes, setRfNodes]);
+
   const flowEdges = useMemo<Edge[]>(
     () =>
       canvasEdges.map((e) => ({
@@ -107,18 +133,43 @@ function CanvasViewInner({ viewId }: { viewId: ViewId }) {
     [canvasEdges],
   );
 
-  // Re-run layout whenever the set of node ids changes (node added/removed)
-  // — never on a summary arrival (T1), since nothing here reacts to
+  // Re-run ELK layout whenever the set of node ids changes (node
+  // added/removed) using each node's real measured height where React Flow
+  // already has one (a card can easily be 400-600px+ with expanded
+  // tables); a brand-new, not-yet-rendered node falls back to
+  // `ESTIMATED_CARD_HEIGHT_PX` for that first pass, then gets corrected
+  // once `rfNodes` picks up its real `measured.height` from
+  // `onNodesChange` and this effect re-runs (D11/§2.5's two-pass layout).
+  // Never runs on a summary arrival (T1) — nothing here reacts to
   // `summary_status`.
-  const nodeIdsKey = flowNodes.map((n) => n.id).join(",");
+  //
+  // Heights are *bucketed* into `layoutHeightChangeThresholdPx` bands before
+  // going into the key (§2.5's "> 8px" trigger rule): a card grows through
+  // many intermediate heights as its summary/tables stream in, and keying on
+  // the raw pixel value re-runs layout on every one of them, which both
+  // thrashes and makes the cards visibly jitter.
+  const layoutKey = rfNodes
+    .map((n) => {
+      const height = n.measured?.height;
+      const bucket =
+        height === undefined
+          ? ""
+          : Math.round(height / config.layoutHeightChangeThresholdPx);
+      return `${n.id}:${String(bucket)}`;
+    })
+    .join(",");
   useEffect(() => {
-    if (flowNodes.length === 0) return;
+    if (rfNodes.length === 0) return;
     runLayout(
-      flowNodes.map((n) => ({
+      rfNodes.map((n) => ({
         id: n.id,
         width: config.cardWidthPx,
-        height: ESTIMATED_CARD_HEIGHT_PX,
+        height: n.measured?.height ?? ESTIMATED_CARD_HEIGHT_PX,
         pinned: positions[Number(n.id)]?.pinned ?? false,
+        // A pinned node keeps the position it was dragged to; ELK needs it as
+        // an obstacle so the block it lays out doesn't land on top of it.
+        x: n.position.x,
+        y: n.position.y,
       })),
       canvasEdges.map((e) => ({
         id: e.id,
@@ -126,8 +177,8 @@ function CanvasViewInner({ viewId }: { viewId: ViewId }) {
         target: String(e.target),
       })),
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on node id set only, per D11's trigger rules (add/remove/height-change), not every position/edge object identity change.
-  }, [nodeIdsKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on layoutKey (node id set + bucketed measured heights) per D11's trigger rules, not every position/edge object identity change.
+  }, [layoutKey]);
 
   const handleNodeDragStop: OnNodeDrag = (_event, node) => {
     const functionId: FunctionId = Number(node.id);
@@ -165,11 +216,14 @@ function CanvasViewInner({ viewId }: { viewId: ViewId }) {
   };
 
   const focusFunction = (functionId: FunctionId): void => {
-    const pos = positions[functionId];
-    if (!pos) return;
+    const node = rfNodes.find((n) => n.id === String(functionId));
+    if (!node) return;
+    // Centre on the card's real rendered box where we have one — a tall card
+    // centred against the 240px estimate lands well above its own middle.
+    const height = node.measured?.height ?? ESTIMATED_CARD_HEIGHT_PX;
     void reactFlow.setCenter(
-      pos.posX + config.cardWidthPx / 2,
-      pos.posY + ESTIMATED_CARD_HEIGHT_PX / 2,
+      node.position.x + config.cardWidthPx / 2,
+      node.position.y + height / 2,
       { zoom: reactFlow.getZoom() },
     );
   };
@@ -180,7 +234,7 @@ function CanvasViewInner({ viewId }: { viewId: ViewId }) {
   if (view.isError) {
     return <CanvasEmptyState message="Could not load this view." />;
   }
-  if (flowNodes.length === 0) {
+  if (rfNodes.length === 0) {
     return <CanvasEmptyState message="Nothing placed on this view yet. Search for a function to get started." />;
   }
 
@@ -188,10 +242,11 @@ function CanvasViewInner({ viewId }: { viewId: ViewId }) {
     <CanvasActionsProvider value={{ fanOutFunction, focusFunction }}>
       <div style={{ width: "100%", height: "100%" }}>
         <ReactFlow
-          nodes={flowNodes}
+          nodes={rfNodes}
           edges={flowEdges}
           nodeTypes={NODE_TYPES}
           edgeTypes={EDGE_TYPES}
+          onNodesChange={onNodesChange}
           fitView
           nodesDraggable
           defaultViewport={{

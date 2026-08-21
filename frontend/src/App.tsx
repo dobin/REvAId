@@ -34,7 +34,7 @@ function AppShell() {
         onSelectView={setSelectedViewId}
       />
       <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-        <Sidebar viewId={selectedViewId} />
+        <Sidebar binaryId={selectedBinaryId} viewId={selectedViewId} />
         <main style={{ flex: 1, minWidth: 0 }}>
           <CanvasView selectedBinaryId={selectedBinaryId} viewId={selectedViewId} />
         </main>
