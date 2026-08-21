@@ -43,9 +43,9 @@ function positionOf(positions: LayoutPositions, id: string): { x: number; y: num
 }
 
 describe("computeElkLayout", () => {
-  it("separates two chained cards by their real heights, not a default gap", async () => {
-    // Deliberately very tall heights — the reported repro was a ~550px card
-    // followed by a ~600px one.
+  it("separates two chained cards by their real widths, not a default gap", async () => {
+    // Layout direction is RIGHT (a callee sits to the right of its caller,
+    // not below it), so successive layers are separated along x.
     const positions = await computeElkLayout(
       [
         { id: "1", width: CARD_WIDTH, height: 546 },
@@ -57,10 +57,11 @@ describe("computeElkLayout", () => {
     const first = positionOf(positions, "1");
     const second = positionOf(positions, "2");
 
-    // The child must start strictly below the parent's full measured height,
-    // and by the configured inter-layer spacing rather than elkjs's own 20px
-    // default — a regression to the mis-spelled option key makes this 20.
-    expect(second.y - (first.y + 546)).toBeGreaterThanOrEqual(80);
+    // The child must start strictly right of the parent's full measured
+    // width, and by the configured inter-layer spacing rather than elkjs's
+    // own 20px default — a regression to the mis-spelled option key makes
+    // this 20.
+    expect(second.x - (first.x + CARD_WIDTH)).toBeGreaterThanOrEqual(80);
   });
 
   it("never overlaps any pair of cards in a deep chain of mixed heights", async () => {
@@ -95,15 +96,16 @@ describe("computeElkLayout", () => {
   });
 
   it("places the laid-out block clear of a pinned card's rectangle", async () => {
-    // Mirrors the live repro: `main` was dragged (pinned) to (16,24) and is
-    // 546px tall; a fan-out then produced a node ELK placed at its origin.
+    // Mirrors the live repro: `main` was dragged (pinned) to (16,24); a
+    // fan-out then produced a node ELK placed at its origin. With layout
+    // direction RIGHT, the block must clear the obstacle horizontally.
     const positions = await computeElkLayout(
       [{ id: "2", width: CARD_WIDTH, height: 599 }],
       [],
       [{ x: 16, y: 24, width: CARD_WIDTH, height: 546 }],
     );
 
-    expect(positionOf(positions, "2").y).toBeGreaterThanOrEqual(24 + 546);
+    expect(positionOf(positions, "2").x).toBeGreaterThanOrEqual(16 + CARD_WIDTH);
   });
 });
 
@@ -119,34 +121,34 @@ describe("offsetPastObstacles", () => {
   });
 
   it("is a no-op when nothing actually collides", () => {
-    // Obstacle sits far to the right — no horizontal overlap at all.
+    // Obstacle sits far below — no vertical overlap at all.
     const result = offsetPastObstacles(block, sizes, [
-      { x: 5000, y: 0, width: CARD_WIDTH, height: 400 },
+      { x: 0, y: 5000, width: CARD_WIDTH, height: 400 },
     ]);
     expect(result).toEqual(block);
   });
 
   it("shifts the whole block rigidly, preserving relative layering", () => {
     const result = offsetPastObstacles(block, sizes, [
-      { x: 0, y: 0, width: CARD_WIDTH, height: 500 },
+      { x: 0, y: 0, width: 500, height: 400 },
     ]);
 
     // Both nodes moved by the same amount: the layering ELK computed is the
     // whole point of running it, so it must survive the offset pass.
-    const deltaA = positionOf(result, "a").y - positionOf(block, "a").y;
-    const deltaB = positionOf(result, "b").y - positionOf(block, "b").y;
+    const deltaA = positionOf(result, "a").x - positionOf(block, "a").x;
+    const deltaB = positionOf(result, "b").x - positionOf(block, "b").x;
     expect(deltaA).toBe(deltaB);
     expect(deltaA).toBeGreaterThan(0);
-    // Clears the obstacle's bottom edge, and never touches x.
-    expect(positionOf(result, "a").y).toBeGreaterThanOrEqual(500);
-    expect(positionOf(result, "a").x).toBe(0);
+    // Clears the obstacle's right edge, and never touches y.
+    expect(positionOf(result, "a").x).toBeGreaterThanOrEqual(500);
+    expect(positionOf(result, "a").y).toBe(0);
   });
 
   it("clears a second obstacle it slid into while clearing the first", () => {
     const obstacles: LayoutObstacle[] = [
-      { x: 0, y: 0, width: CARD_WIDTH, height: 300 },
+      { x: 0, y: 0, width: 300, height: 400 },
       // Sits just past where clearing the first obstacle lands the block.
-      { x: 0, y: 380, width: CARD_WIDTH, height: 300 },
+      { x: 380, y: 0, width: 300, height: 400 },
     ];
     const result = offsetPastObstacles(block, sizes, obstacles);
 
@@ -166,7 +168,7 @@ describe("offsetPastObstacles", () => {
     const positions: LayoutPositions = { unknown: { x: 0, y: 0 } };
     expect(
       offsetPastObstacles(positions, sizes, [
-        { x: 0, y: 0, width: CARD_WIDTH, height: 400 },
+        { x: 0, y: 0, width: 400, height: 400 },
       ]),
     ).toEqual(positions);
   });

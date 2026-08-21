@@ -39,8 +39,9 @@ export interface LayoutObstacle {
 
 export type LayoutPositions = Record<string, { x: number; y: number }>;
 
-/** ELK's `elk.layered.spacing.nodeNodeBetweenLayers` — vertical gap between
- * successive layers (TAD §2.5). No PRD basis (see docs/adr/0003). */
+/** ELK's `elk.layered.spacing.nodeNodeBetweenLayers` — horizontal gap between
+ * successive layers (TAD §2.5, layout direction RIGHT: a callee sits to the
+ * right of its caller, not below it). No PRD basis (see docs/adr/0003). */
 const LAYER_SPACING_PX = 80;
 /** ELK's `elk.spacing.nodeNode` — gap between siblings within one layer
  * (TAD §2.5). No PRD basis (see docs/adr/0003). */
@@ -49,7 +50,7 @@ const NODE_SPACING_PX = 48;
 const elk = new ELK();
 
 /**
- * Shifts a freshly laid-out block of nodes down until it clears every
+ * Shifts a freshly laid-out block of nodes right until it clears every
  * `obstacle` (D15's pinned nodes).
  *
  * ELK is only ever given the *unpinned* nodes, so it always lays them out
@@ -62,9 +63,10 @@ const elk = new ELK();
  * pinned nodes in as ordinary children would let ELK reposition them, which
  * D15 forbids.
  *
- * A single rigid vertical translation of the whole block (rather than
+ * A single rigid horizontal translation of the whole block (rather than
  * per-node nudging) is deliberate: it preserves ELK's layering exactly, so
- * the call-direction reading order the layout exists to produce survives.
+ * the call-direction reading order the layout exists to produce (a callee to
+ * the right of its caller) survives.
  */
 export function offsetPastObstacles(
   positions: LayoutPositions,
@@ -85,16 +87,16 @@ export function offsetPastObstacles(
     for (const [id, pos] of entries) {
       const size = sizes.get(id);
       if (!size) continue;
-      const top = pos.y + shift;
-      const bottom = top + size.height;
+      const left = pos.x + shift;
+      const right = left + size.width;
       for (const obstacle of obstacles) {
-        const overlapsX =
-          pos.x < obstacle.x + obstacle.width && pos.x + size.width > obstacle.x;
-        const overlapsY = top < obstacle.y + obstacle.height && bottom > obstacle.y;
+        const overlapsX = left < obstacle.x + obstacle.width && right > obstacle.x;
+        const overlapsY =
+          pos.y < obstacle.y + obstacle.height && pos.y + size.height > obstacle.y;
         if (!overlapsX || !overlapsY) continue;
-        // Push this node's top below the obstacle's bottom, plus the normal
-        // inter-layer gap so the result reads like the rest of the layout.
-        worst = Math.max(worst, obstacle.y + obstacle.height + LAYER_SPACING_PX - top);
+        // Push this node's left edge past the obstacle's right edge, plus the
+        // normal inter-layer gap so the result reads like the rest of the layout.
+        worst = Math.max(worst, obstacle.x + obstacle.width + LAYER_SPACING_PX - left);
       }
     }
     if (worst <= 0) break;
@@ -104,7 +106,7 @@ export function offsetPastObstacles(
   if (shift === 0) return positions;
   const shifted: LayoutPositions = {};
   for (const [id, pos] of entries) {
-    shifted[id] = { x: pos.x, y: pos.y + shift };
+    shifted[id] = { x: pos.x + shift, y: pos.y };
   }
   return shifted;
 }
@@ -118,7 +120,11 @@ export async function computeElkLayout(
     id: "root",
     layoutOptions: {
       "elk.algorithm": "layered",
-      "elk.direction": "DOWN",
+      // RIGHT: a callee is laid out to the right of its caller, not below it —
+      // fanning out from a card should grow the graph sideways from the
+      // origin card, matching the analyst's mental model of "this appeared
+      // next to what I clicked", not "appended at the bottom of the canvas".
+      "elk.direction": "RIGHT",
       "elk.layered.layering.strategy": "NETWORK_SIMPLEX",
       // §5.1: cycles must not explode — GREEDY cycle breaking handles
       // back-edges (recursion, mutual recursion) without pathological output.

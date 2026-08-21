@@ -19,18 +19,19 @@ import { CollapsedChip } from "./CollapsedChip";
 import { ColorSwatchStrip } from "./ColorSwatchStrip";
 
 /**
- * A card connects to its provenance parent/children vertically (layout
- * direction is DOWN, TAD §2.5) via a single unnamed source/target handle
- * pair — `deriveCanvasEdges` never targets a specific handle id, so every
- * render path (loading/error/collapsed/full) must render exactly this pair
- * or React Flow silently drops the edge (`Couldn't create edge for source
- * handle id: "null"`).
+ * A card connects to its provenance parent/children horizontally (layout
+ * direction is RIGHT, TAD §2.5 — a callee sits to the right of its caller)
+ * via a single unnamed source/target handle pair — `deriveCanvasEdges`
+ * never targets a specific handle id, so every render path
+ * (loading/error/collapsed/full) must render exactly this pair or React Flow
+ * silently drops the edge (`Couldn't create edge for source handle id:
+ * "null"`).
  */
 function NodeHandles() {
   return (
     <>
-      <Handle type="target" position={Position.Top} />
-      <Handle type="source" position={Position.Bottom} />
+      <Handle type="target" position={Position.Left} />
+      <Handle type="source" position={Position.Right} />
     </>
   );
 }
