@@ -111,6 +111,15 @@ forbidden_modules = ["graphrev.services", "graphrev.summarization"]
 [[tool.importlinter.contracts]]
 name = "Only adapters/*/base may be imported outside their own package"
 type = "forbidden"
+# allow_indirect_imports: callers select a concrete adapter via the factory
+# function in `adapters/ghidra/__init__.py` (`create_adapter`), which is the
+# one sanctioned place that imports `.mock`/`.rest` directly. Every other
+# module reaches `.mock`/`.rest` only indirectly, through that factory —
+# without this flag, import-linter would (correctly, but too strictly for
+# this design) flag `graphrev.cli -> graphrev.adapters.ghidra ->
+# graphrev.adapters.ghidra.mock` as broken even though `cli` never imports
+# `.mock` itself.
+allow_indirect_imports = true
 source_modules = [
   "graphrev.api",
   "graphrev.services",

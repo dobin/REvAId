@@ -72,6 +72,12 @@ class Settings(BaseSettings):
     card_width_px: int = Field(default=380, gt=0, description="AS23: card width is fixed.")
     name_analyst_max_length: int = Field(default=128, gt=0, description="§5.1 stated assumption.")
 
+    #: I3 — `GET /binaries/{id}/functions` search pagination (B11/E1a). Not
+    #: named anywhere in the PRD/TAD payload examples; these are TAD-style
+    #: invented constants, same category as the rest of this section.
+    function_search_default_limit: int = Field(default=50, gt=0, description="I3 / B11 / E1a.")
+    function_search_max_limit: int = Field(default=200, gt=0, description="I3 / B11 / E1a.")
+
     #: Debounce intervals (ms). The PRD requires debouncing in five places but
     #: specifies no millisecond value anywhere — these are TAD choices.
     node_patch_debounce_ms: int = Field(default=250, gt=0, description="E3 node PATCH batching.")

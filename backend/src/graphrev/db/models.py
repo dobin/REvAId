@@ -139,6 +139,12 @@ class Function(Base):
     notes: Mapped[str] = mapped_column(default="")
     notes_updated_at: Mapped[str | None] = mapped_column(default=None)
     utility_override: Mapped[str | None] = mapped_column(default=None)  # D36
+    # I3: "is this an entry point" (E1b suggestions). Analyst-owned by
+    # construction — ingestion supplies an initial value only on first
+    # INSERT (e.g. the mock adapter flags `main`/module roots) and never
+    # overwrites it on re-ingest, exactly like `utility_override`; a future
+    # PATCH (I4) lets the analyst toggle it directly.
+    is_entry_point: Mapped[bool] = mapped_column(default=False)
 
     created_at: Mapped[str] = mapped_column()
     updated_at: Mapped[str] = mapped_column()
@@ -172,6 +178,7 @@ class Function(Base):
         Index("ix_functions_status", "summary_status"),  # C5b sweep
         Index("ix_functions_fanin", "binary_id", "fan_in"),  # E1b entry points
         Index("ix_functions_utility_eff", "binary_id", "is_utility_effective"),
+        Index("ix_functions_binary_entrypoint", "binary_id", "is_entry_point"),  # E1b
     )
 
 

@@ -5,13 +5,11 @@ only mock implementations; this document is the contract a real adapter must
 satisfy, so M1 (`I12`, `I13`) can be implemented with zero changes to
 `services/`, `repositories/`, or the API surface.
 
-> Status: this file is a stub in M1 (project setup). It will be filled in
-> when `adapters/ghidra/base.py` and `adapters/llm/base.py` are implemented
-> in Increments I2 and I7 respectively.
-
 ## Ghidra adapter
 
-Implement `graphrev.adapters.ghidra.base.GhidraAdapter`:
+Implemented as of Increment I2. The authoritative Protocol and DTOs live in
+`graphrev.adapters.ghidra.base` — this section is a summary, not a
+substitute for reading that module:
 
 ```python
 class GhidraAdapter(Protocol):
@@ -20,6 +18,55 @@ class GhidraAdapter(Protocol):
     def iter_edges(self, binary: RawBinaryRef) -> Iterator[RawEdge]: ...
     def get_function(self, binary: RawBinaryRef, address: int) -> RawFunction | None: ...
 ```
+
+`RawFunction.has_indirect_calls` is part of the contract (it feeds I4's
+`mayBeIncomplete` neighbour-table hint) but the I1-locked schema has no
+persisted column for it yet — `ingestion/pipeline.py` reads the field and
+discards it until I4 adds the column via a new Alembic migration.
+
+**Selecting an implementation.** Callers never import
+`graphrev.adapters.ghidra.mock` or `.rest` directly — only
+`graphrev/adapters/ghidra/__init__.py` may do so, per the `import-linter`
+"Only adapters/*/base may be imported outside their own package" contract.
+Use the factory instead:
+
+```python
+from graphrev.adapters.ghidra import create_adapter
+
+adapter = create_adapter("mock", seed=1337)
+```
+
+`create_adapter("rest", ...)` raises `GhidraAdapterNotImplementedError` until
+`RestGhidraAdapter` ships in Increment I12 (M1).
+
+**`MockGhidraAdapter` (M0).** Given the same `seed`, every method returns
+byte-identical output. It generates two binaries — `acme.exe` (~350
+functions, to structurally host the required fan-out/fan-in shapes below)
+and `libparse.dll` (~60 functions) — with:
+
+- A shallow entry region (`main` → 12 callees) and four 4-deep parser chains.
+- One function with 34 callees and one "dispatcher" with 300+ callees.
+- At least three fan-in hubs with `fan_in > 50`, one with ≈291 callers
+  (exercises D7's `CALLER_SUPPRESS_THRESHOLD`).
+- A self-recursive function and a mutual-recursion pair.
+- Several orphans (no callers, no callees).
+- One function of each non-placeholder `kind` (`normal`, `import`, `thunk`,
+  `external`); `placeholder` rows are never emitted directly by the adapter —
+  they arise in `ingestion/pipeline.py` from unresolved cross-binary edges
+  (see below).
+- Unresolved edges from `acme.exe` into `libparse.dll` addresses that do not
+  exist in either binary's own function list, with `callee_module` set —
+  this is what a real adapter's `RawEdge.callee_module` is for.
+
+**Placeholder materialisation (B17).** When `ingestion/pipeline.py` cannot
+resolve a `RawEdge.callee_address` within the binary currently being
+ingested, it creates a `kind='placeholder'` `functions` row under the
+*same* `binary_id`, named `{module}!FUN_{address:08x}` (or bare
+`FUN_{address:08x}` if `callee_module` is `None`). A later ingestion run of
+the same binary that supplies a real `RawFunction` for that address upgrades
+the row in place via the ordinary `(binary_id, address)` UPSERT — a real
+adapter does not need to do anything special to support this; it only needs
+to report `callee_module` accurately on `RawEdge` when it can.
 
 ## LLM adapter
 

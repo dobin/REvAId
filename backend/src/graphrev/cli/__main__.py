@@ -5,6 +5,7 @@ from __future__ import annotations
 import typer
 
 from graphrev.cli import dbtools
+from graphrev.cli import ingest as ingest_module
 
 app = typer.Typer(help="GraphRev command-line tools.")
 app.add_typer(dbtools.app, name="db")
@@ -18,13 +19,8 @@ def ingest(
         None, help="Binary name to ingest (mock adapter default set)."
     ),
 ) -> None:
-    """Ingest a binary. Not implemented until Increment I2."""
-    typer.echo(
-        "graphrev ingest is not implemented yet — it arrives in TAD Increment I2 "
-        "(mock Ghidra adapter + ingestion pipeline).",
-        err=True,
-    )
-    raise typer.Exit(code=1)
+    """Ingest a binary (A1)."""
+    ingest_module.run(adapter=adapter, seed=seed, binary=binary)
 
 
 if __name__ == "__main__":
