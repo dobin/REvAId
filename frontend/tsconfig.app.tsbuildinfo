@@ -1,0 +1,1 @@
+{"root":["./src/App.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/api/client.ts","./src/api/generated.ts","./src/api/types.ts","./src/components/HealthPanel.test.tsx","./src/components/HealthPanel.tsx","./src/config/ConfigProvider.tsx","./src/lib/glyphs.test.ts","./src/lib/glyphs.ts","./src/lib/hex.test.ts","./src/lib/hex.ts","./src/test/setup.ts"],"version":"5.9.3"}

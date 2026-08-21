@@ -1,0 +1,33 @@
+/*
+ * Three-tier truthfulness typography (PRD §4.4):
+ *   - Ground truth (names, addresses, code) renders in monospace, plain.
+ *   - LLM output (summaries) is marked with the ✨ glyph and a distinct tone.
+ *   - Analyst input (renames, notes) is marked with the ✎ glyph and a
+ *     distinct tone, visually different from both ground truth and LLM output.
+ */
+
+:root {
+  --gr-font-mono: "SFMono-Regular", "Consolas", "Liberation Mono", monospace;
+  --gr-font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --gr-color-ground-truth: #1f2933;
+  --gr-color-llm: #4c51bf;
+  --gr-color-analyst: #1a7f5a;
+  --gr-color-muted: #6b7280;
+}
+
+.gr-ground-truth {
+  font-family: var(--gr-font-mono);
+  color: var(--gr-color-ground-truth);
+}
+
+.gr-llm-output {
+  font-family: var(--gr-font-sans);
+  color: var(--gr-color-llm);
+  font-style: italic;
+}
+
+.gr-analyst-input {
+  font-family: var(--gr-font-sans);
+  color: var(--gr-color-analyst);
+}

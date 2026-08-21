@@ -1,0 +1,49 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "dev:all",
+      "dependsOn": ["api", "web"],
+      "dependsOrder": "parallel",
+      "group": { "kind": "build", "isDefault": true },
+      "isBackground": true
+    },
+    {
+      "label": "api",
+      "type": "shell",
+      "isBackground": true,
+      "command": "uv run uvicorn graphrev.main:app --reload --host 127.0.0.1 --port 8000",
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "problemMatcher": []
+    },
+    {
+      "label": "web",
+      "type": "shell",
+      "isBackground": true,
+      "command": "npm run dev",
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "problemMatcher": []
+    },
+    {
+      "label": "ingest:mock",
+      "type": "shell",
+      "command": "uv run graphrev ingest --adapter mock --seed 1337",
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "problemMatcher": []
+    },
+    {
+      "label": "test",
+      "type": "shell",
+      "command": "just test",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    },
+    {
+      "label": "migrate",
+      "type": "shell",
+      "command": "just migrate",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": []
+    }
+  ]
+}

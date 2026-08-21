@@ -1,0 +1,36 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "API (uvicorn debug)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["graphrev.main:app", "--reload", "--host", "127.0.0.1", "--port", "8000"],
+      "cwd": "${workspaceFolder}/backend",
+      "justMyCode": false
+    },
+    {
+      "name": "Ingest (mock)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "graphrev.cli.__main__",
+      "args": ["ingest", "--adapter", "mock", "--seed", "1337"],
+      "cwd": "${workspaceFolder}/backend",
+      "justMyCode": false
+    },
+    {
+      "name": "Chrome (frontend)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://127.0.0.1:5173",
+      "webRoot": "${workspaceFolder}/frontend/src"
+    }
+  ],
+  "compounds": [
+    {
+      "name": "API + Chrome",
+      "configurations": ["API (uvicorn debug)", "Chrome (frontend)"]
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+# --- Python / backend ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+coverage/
+htmlcov/
+backend/.venv/
+
+# --- Node / frontend ---
+node_modules/
+dist/
+frontend/dist/
+frontend/node_modules/
+.vite/
+playwright-report/
+test-results/
+
+# --- Database ---
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+
+# --- Env / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Editor / OS ---
+.DS_Store
+*.swp
+
+# --- Logs ---
+*.log
