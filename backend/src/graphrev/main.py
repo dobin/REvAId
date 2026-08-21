@@ -23,6 +23,7 @@ from graphrev.api.routers import config as config_router
 from graphrev.api.routers import functions as functions_router
 from graphrev.api.routers import health as health_router
 from graphrev.api.routers import neighbours as neighbours_router
+from graphrev.api.routers import views as views_router
 from graphrev.core.config import Settings, get_settings
 from graphrev.core.errors import (
     AppError,
@@ -129,6 +130,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(binaries_router.router, prefix="/api/v1")
     app.include_router(functions_router.router, prefix="/api/v1")
     app.include_router(neighbours_router.router, prefix="/api/v1")
+    app.include_router(views_router.router, prefix="/api/v1")
 
     return app
 

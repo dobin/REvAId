@@ -133,6 +133,33 @@ export interface ViewDto {
   updatedAt: string;
 }
 
+/**
+ * Narrow, read-only view record (I5 — pulled forward from I6's full
+ * `ViewDto` just far enough to resolve a `viewId` for the neighbours
+ * endpoint). No `camera`, no `nodes[]` — those arrive with I6's full CRUD.
+ */
+export interface ViewSummaryDto {
+  id: ViewId;
+  binaryId: BinaryId;
+  name: string;
+  rootFunctionId: FunctionId | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** One entry-point suggestion (E1b) for an empty canvas. */
+export interface EntryPointDto {
+  id: FunctionId;
+  address: number;
+  displayName: string;
+  fanOut: number;
+  fanIn: number;
+}
+
+export interface EntryPointsDto {
+  entryPoints: EntryPointDto[];
+}
+
 /** Derived client-side from ViewNodeDto only — never from the edges table (D8b). */
 export interface CanvasEdge {
   id: string;

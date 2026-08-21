@@ -49,3 +49,32 @@ export const M0_GLYPHS: readonly (keyof typeof GLYPHS)[] = [
 ];
 
 export type GlyphKey = keyof typeof GLYPHS;
+
+/**
+ * Short human-readable labels for each glyph — the single source for both
+ * the sidebar `GlyphLegend` and any `title="…"` tooltip a row/card renders
+ * (docs/glyphs.md mirrors this wording; keep them in sync).
+ */
+export const GLYPH_LABELS: Record<GlyphKey, string> = {
+  fanOut: "Fan out — promote to canvas node",
+  onCanvas: "Already on canvas — click to pan/focus",
+  generating: "Summary generating",
+  recursive: "Recursive / part of a cycle",
+  utility: "Utility (high fan-in)",
+  placeholder: "Outside the ingested module",
+  hasNotes: "Has analyst notes",
+  renamed: "Renamed by analyst",
+  error: "Summary error",
+  llmMarker: "LLM-generated output",
+  menu: "More actions",
+  close: "Close",
+  collapse: "Collapse",
+  expand: "Expand",
+  expandCollapsed: "Expand collapsed group",
+  sort: "Sort",
+  settings: "Settings",
+  color: "Color",
+  search: "Search",
+  resolved: "Resolved",
+  warning: "Warning",
+};
