@@ -23,6 +23,9 @@ export function usePatchViewNodesMutation(viewId: ViewId) {
       queryClient.setQueryData<ViewDto>(["view", viewId], (view) =>
         view ? { ...view, nodes: response.nodes } : view,
       );
+      // Invalidate neighbours queries for this view so that `onCanvas` flags
+      // reflect the updated node list without requiring a page reload.
+      void queryClient.invalidateQueries({ queryKey: ["neighbours"] });
     },
   });
 }

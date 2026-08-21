@@ -81,10 +81,17 @@ function CanvasViewInner({ viewId }: { viewId: ViewId }) {
       visibleNodes.map((n) => {
         const pos = positions[n.functionId];
         const elkPos = elkPositions[String(n.functionId)];
+        // A node mid-drag (or already pinned) must keep following its live
+        // store position — falling back to `elkPos` here (which never
+        // changes during a drag gesture) is what froze "virgin" unpinned
+        // cards in place for their very first drag: the effect below
+        // re-derives `rfNodes` from this on every `setDragPosition` frame,
+        // stomping React Flow's own optimistic move with the same stale
+        // ELK coordinate until `pinned` flips true on drag-stop.
         const position =
-          !pos?.pinned && elkPos
-            ? elkPos
-            : { x: pos?.posX ?? n.posX, y: pos?.posY ?? n.posY };
+          pos?.dragging || pos?.pinned
+            ? { x: pos.posX, y: pos.posY }
+            : elkPos ?? { x: pos?.posX ?? n.posX, y: pos?.posY ?? n.posY };
         return {
           id: String(n.functionId),
           type: "functionCard",
