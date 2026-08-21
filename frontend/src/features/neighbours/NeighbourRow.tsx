@@ -1,14 +1,35 @@
 /**
- * One row in a card's caller/callee table (TAD §2.3). FanOut (⤢) / Focus
- * (◎) buttons are rendered but inert in I5 — the behavior they trigger
- * (view_nodes persistence) is I6 scope.
+ * One row in a card's caller/callee table (TAD §2.3). FanOut (⤢) promotes
+ * the row's function onto the canvas via `useCanvasActions` (D8); Focus (◎)
+ * pans to it if it's already placed (D9). `isSelf` (recursion) keeps the
+ * button inert, matching the existing glyph-only affordance.
  */
 import { Glyph } from "@/components/Glyph";
 import { toHex } from "@/lib/hex";
 import type { NeighbourRowDto } from "@/api/types";
+import { useCanvasActions } from "@/features/canvas/CanvasActions";
 import { SummaryCell } from "./SummaryCell";
 
-export function NeighbourRow({ row }: { row: NeighbourRowDto }) {
+export function NeighbourRow({
+  row,
+  originFunctionId,
+}: {
+  row: NeighbourRowDto;
+  /** The card this row's table belongs to — the fan-out provenance parent
+   * (D8b). Optional so isolated row rendering (e.g. in a test) still works. */
+  originFunctionId?: number | undefined;
+}) {
+  const canvasActions = useCanvasActions();
+
+  const handleClick = () => {
+    if (row.isSelf || !canvasActions) return;
+    if (row.onCanvas) {
+      canvasActions.focusFunction(row.id);
+    } else if (originFunctionId !== undefined) {
+      canvasActions.fanOutFunction(originFunctionId, row.id);
+    }
+  };
+
   return (
     <div
       role="row"
@@ -42,7 +63,13 @@ export function NeighbourRow({ row }: { row: NeighbourRowDto }) {
         summaryShort={row.summaryShort}
         lowConfidence={row.summaryLowConfidence}
       />
-      <button type="button" disabled title="Coming soon (I6)" aria-label="fan-out-or-focus">
+      <button
+        type="button"
+        disabled={row.isSelf || !canvasActions}
+        title={row.isSelf ? "Recursive call — cannot fan out" : undefined}
+        aria-label="fan-out-or-focus"
+        onClick={handleClick}
+      >
         <Glyph name={row.onCanvas ? "onCanvas" : "fanOut"} />
       </button>
     </div>

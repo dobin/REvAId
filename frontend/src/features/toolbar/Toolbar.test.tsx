@@ -19,7 +19,12 @@ describe("Toolbar", () => {
     const queryClient = new QueryClient();
     render(
       <QueryClientProvider client={queryClient}>
-        <Toolbar selectedBinaryId={null} onSelectBinary={vi.fn()} />
+        <Toolbar
+          selectedBinaryId={null}
+          onSelectBinary={vi.fn()}
+          selectedViewId={null}
+          onSelectView={vi.fn()}
+        />
       </QueryClientProvider>,
     );
 

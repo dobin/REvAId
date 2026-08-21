@@ -1,57 +1,209 @@
 /**
- * The canvas (TAD §2.3). I5 scope: resolve the binary's first view and its
- * top entry point, then render exactly one `FunctionCardNode` at a fixed
- * position. No ELK layout (single node), no fan-out, no persistence — all
- * of that is I6.
+ * The canvas (TAD §2.3, I6). Renders every `visible` node of the given
+ * `viewId` as a draggable `FunctionCardNode`, persists positions/camera,
+ * derives edges from provenance only (D8b), and runs ELK layout for
+ * newly-added, non-pinned nodes (D11, D15).
  */
-import { useMemo } from "react";
-import { ReactFlow, type Node, type NodeTypes } from "@xyflow/react";
+import { useEffect, useMemo, useRef } from "react";
+import {
+  ReactFlow,
+  ReactFlowProvider,
+  useReactFlow,
+  type Edge,
+  type EdgeTypes,
+  type Node,
+  type NodeTypes,
+  type OnNodeDrag,
+} from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useEntryPointsQuery } from "@/api/queries/binaries";
-import { useViewsQuery } from "@/api/queries/views";
-import type { BinaryId } from "@/api/types";
+import { useConfig } from "@/config/ConfigProvider";
+import { usePatchViewMutation, useViewQuery } from "@/api/queries/views";
+import { usePatchViewNodesMutation } from "@/api/queries/viewNodes";
+import type { BinaryId, FunctionId, ViewId } from "@/api/types";
+import { useAppStore } from "@/store";
+import { CanvasActionsProvider } from "./CanvasActions";
 import { CanvasEmptyState } from "./CanvasEmptyState";
+import { useElkLayout } from "./layout/useElkLayout";
+import { ProvenanceEdge } from "./edges/ProvenanceEdge";
 import { FunctionCardNode, type FunctionCardNodeData } from "./nodes/FunctionCardNode";
+import { deriveCanvasEdges } from "./selectors/deriveCanvasEdges";
 
 const NODE_TYPES: NodeTypes = { functionCard: FunctionCardNode };
+const EDGE_TYPES: EdgeTypes = { provenance: ProvenanceEdge };
 
-export function CanvasView({ selectedBinaryId }: { selectedBinaryId: BinaryId | null }) {
-  const entryPoints = useEntryPointsQuery(selectedBinaryId);
-  const views = useViewsQuery(selectedBinaryId);
+/** Approximate card height before React Flow measures the real one —
+ * only used as ELK's initial input for a node not yet rendered. */
+const ESTIMATED_CARD_HEIGHT_PX = 240;
 
-  const nodes = useMemo<Node<FunctionCardNodeData>[]>(() => {
-    const topEntryPoint = entryPoints.data?.entryPoints[0];
-    const firstView = views.data?.[0];
-    if (!topEntryPoint || !firstView) return [];
-    return [
-      {
-        id: String(topEntryPoint.id),
-        type: "functionCard",
-        position: { x: 0, y: 0 },
-        data: { functionId: topEntryPoint.id, viewId: firstView.id },
-      },
-    ];
-  }, [entryPoints.data, views.data]);
-
-  if (selectedBinaryId === null) {
+export function CanvasView({
+  selectedBinaryId,
+  viewId,
+}: {
+  selectedBinaryId: BinaryId | null;
+  viewId: ViewId | null;
+}) {
+  if (selectedBinaryId === null || viewId === null) {
     return <CanvasEmptyState message="Pick a binary from the toolbar to get started." />;
   }
+  return (
+    <ReactFlowProvider>
+      <CanvasViewInner viewId={viewId} />
+    </ReactFlowProvider>
+  );
+}
 
-  if (entryPoints.isPending || views.isPending) {
+function CanvasViewInner({ viewId }: { viewId: ViewId }) {
+  const config = useConfig();
+  const view = useViewQuery(viewId);
+  const patchNodes = usePatchViewNodesMutation(viewId);
+  const patchView = usePatchViewMutation(viewId);
+  const { positions, hydrateFromView, setDragPosition, commitDragAsPinned, upsertPosition } =
+    useAppStore();
+  const { runLayout, positions: elkPositions } = useElkLayout();
+  const reactFlow = useReactFlow();
+  const hydratedForViewId = useRef<ViewId | null>(null);
+
+  useEffect(() => {
+    if (!view.data || hydratedForViewId.current === viewId) return;
+    hydrateFromView(view.data.nodes);
+    hydratedForViewId.current = viewId;
+  }, [view.data, viewId, hydrateFromView]);
+
+  const visibleNodes = useMemo(
+    () => (view.data ? view.data.nodes.filter((n) => n.visible) : []),
+    [view.data],
+  );
+  const canvasEdges = useMemo(() => deriveCanvasEdges(visibleNodes), [visibleNodes]);
+
+  const flowNodes = useMemo<Node<FunctionCardNodeData>[]>(
+    () =>
+      visibleNodes.map((n) => {
+        const pos = positions[n.functionId];
+        const elkPos = elkPositions[String(n.functionId)];
+        const position =
+          !pos?.pinned && elkPos
+            ? elkPos
+            : { x: pos?.posX ?? n.posX, y: pos?.posY ?? n.posY };
+        return {
+          id: String(n.functionId),
+          type: "functionCard",
+          position,
+          draggable: true,
+          data: { functionId: n.functionId, viewId, viewNode: n },
+        };
+      }),
+    [visibleNodes, positions, elkPositions, viewId],
+  );
+
+  const flowEdges = useMemo<Edge[]>(
+    () =>
+      canvasEdges.map((e) => ({
+        id: e.id,
+        source: String(e.source),
+        target: String(e.target),
+        type: "provenance",
+        data: { implied: e.implied },
+      })),
+    [canvasEdges],
+  );
+
+  // Re-run layout whenever the set of node ids changes (node added/removed)
+  // — never on a summary arrival (T1), since nothing here reacts to
+  // `summary_status`.
+  const nodeIdsKey = flowNodes.map((n) => n.id).join(",");
+  useEffect(() => {
+    if (flowNodes.length === 0) return;
+    runLayout(
+      flowNodes.map((n) => ({
+        id: n.id,
+        width: config.cardWidthPx,
+        height: ESTIMATED_CARD_HEIGHT_PX,
+        pinned: positions[Number(n.id)]?.pinned ?? false,
+      })),
+      canvasEdges.map((e) => ({
+        id: e.id,
+        source: String(e.source),
+        target: String(e.target),
+      })),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on node id set only, per D11's trigger rules (add/remove/height-change), not every position/edge object identity change.
+  }, [nodeIdsKey]);
+
+  const handleNodeDragStop: OnNodeDrag = (_event, node) => {
+    const functionId: FunctionId = Number(node.id);
+    commitDragAsPinned(functionId, node.position.x, node.position.y);
+    patchNodes.mutate({
+      upsert: [{ functionId, posX: node.position.x, posY: node.position.y, pinned: true }],
+    });
+  };
+
+  const handleNodeDrag: OnNodeDrag = (_event, node) => {
+    const functionId: FunctionId = Number(node.id);
+    setDragPosition(functionId, node.position.x, node.position.y);
+  };
+
+  const handleMoveEnd = (): void => {
+    const { x, y, zoom } = reactFlow.getViewport();
+    patchView.mutate({ camera: { x, y, zoom } });
+  };
+
+  const fanOutFunction = (originFunctionId: FunctionId, functionId: FunctionId) => {
+    const alreadyPresent = visibleNodes.some((n) => n.functionId === functionId);
+    if (alreadyPresent) return;
+    upsertPosition(functionId, 0, 0, false);
+    patchNodes.mutate({
+      upsert: [
+        {
+          functionId,
+          visible: true,
+          originFunctionId,
+          originKind: "fanout",
+          originImplied: false,
+        },
+      ],
+    });
+  };
+
+  const focusFunction = (functionId: FunctionId): void => {
+    const pos = positions[functionId];
+    if (!pos) return;
+    void reactFlow.setCenter(
+      pos.posX + config.cardWidthPx / 2,
+      pos.posY + ESTIMATED_CARD_HEIGHT_PX / 2,
+      { zoom: reactFlow.getZoom() },
+    );
+  };
+
+  if (view.isPending) {
     return <CanvasEmptyState message="Loading…" />;
   }
-
-  if (entryPoints.isError || views.isError) {
-    return <CanvasEmptyState message="Could not load this binary's canvas." />;
+  if (view.isError) {
+    return <CanvasEmptyState message="Could not load this view." />;
   }
-
-  if (nodes.length === 0) {
-    return <CanvasEmptyState message="This binary has no entry-point suggestions yet." />;
+  if (flowNodes.length === 0) {
+    return <CanvasEmptyState message="Nothing placed on this view yet. Search for a function to get started." />;
   }
 
   return (
-    <div style={{ width: "100%", height: "100%" }}>
-      <ReactFlow nodes={nodes} edges={[]} nodeTypes={NODE_TYPES} fitView nodesDraggable={false} />
-    </div>
+    <CanvasActionsProvider value={{ fanOutFunction, focusFunction }}>
+      <div style={{ width: "100%", height: "100%" }}>
+        <ReactFlow
+          nodes={flowNodes}
+          edges={flowEdges}
+          nodeTypes={NODE_TYPES}
+          edgeTypes={EDGE_TYPES}
+          fitView
+          nodesDraggable
+          defaultViewport={{
+            x: view.data.camera.x,
+            y: view.data.camera.y,
+            zoom: view.data.camera.zoom,
+          }}
+          onNodeDrag={handleNodeDrag}
+          onNodeDragStop={handleNodeDragStop}
+          onMoveEnd={handleMoveEnd}
+        />
+      </div>
+    </CanvasActionsProvider>
   );
 }

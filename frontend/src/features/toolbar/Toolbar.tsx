@@ -1,16 +1,21 @@
 /**
- * Toolbar (TAD §2.3) — I5 hosts only `BinaryPicker`. `ViewPicker` (I6) and
- * `QueueChip` (I7) are added when their backing features land.
+ * Toolbar (TAD §2.3) — `BinaryPicker` (I5) + `ViewPicker` (I6). `QueueChip`
+ * (I7) is added when the summary queue lands.
  */
-import type { BinaryId } from "@/api/types";
+import type { BinaryId, ViewId } from "@/api/types";
 import { BinaryPicker } from "./BinaryPicker";
+import { ViewPicker } from "./ViewPicker";
 
 export function Toolbar({
   selectedBinaryId,
   onSelectBinary,
+  selectedViewId,
+  onSelectView,
 }: {
   selectedBinaryId: BinaryId | null;
   onSelectBinary: (binaryId: BinaryId) => void;
+  selectedViewId: ViewId | null;
+  onSelectView: (viewId: ViewId) => void;
 }) {
   return (
     <div
@@ -24,6 +29,9 @@ export function Toolbar({
     >
       <strong>GraphRev</strong>
       <BinaryPicker value={selectedBinaryId} onChange={onSelectBinary} />
+      {selectedBinaryId !== null && (
+        <ViewPicker binaryId={selectedBinaryId} value={selectedViewId} onChange={onSelectView} />
+      )}
     </div>
   );
 }

@@ -89,6 +89,21 @@ class Settings(BaseSettings):
         default=250, gt=0, description="§5.1 fast-scroll guard for row-summary demand."
     )
 
+    #: I6/D11/§4.3 layout re-run trigger + animation duration. Neither value
+    #: is PRD/TAD-specified numerically; the TAD's own prose names "8 px"
+    #: and "400 ms" (§2.5) but never lifts them into `Settings` — done here
+    #: so no component hard-codes either literal (F1a).
+    layout_height_change_threshold_px: int = Field(
+        default=8,
+        gt=0,
+        description="D11/§2.5: re-run ELK when a card's measured height changes by more than this.",
+    )
+    layout_animation_ms: int = Field(
+        default=400,
+        gt=0,
+        description="D11/§2.5: max duration of the position-change CSS transition.",
+    )
+
     #: SSE / SQLite operational tuning (no PRD value given anywhere).
     sse_keepalive_seconds: int = Field(default=15, gt=0)
     sse_subscriber_queue_size: int = Field(default=256, gt=0)

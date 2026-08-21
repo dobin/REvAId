@@ -146,7 +146,49 @@ export interface ViewSummaryDto {
   createdAt: string;
   updatedAt: string;
 }
+/** `POST /binaries/{id}/views` request body (I6). */
+export interface ViewCreateRequest {
+  name: string;
+}
 
+/** `PATCH /views/{id}` request body (I6/E3a) — every field optional. */
+export interface ViewPatchRequest {
+  name?: string;
+  rootFunctionId?: FunctionId | null;
+  camera?: { x: number; y: number; zoom: number };
+}
+
+/** One entry in a `PATCH /views/{id}/nodes` upsert array (I6/E3). Every
+ * field but `functionId` is optional — omitted fields are left untouched on
+ * an existing row, or take repository-level defaults on a brand-new one. */
+export interface ViewNodeUpsertRequest {
+  functionId: FunctionId;
+  visible?: boolean;
+  collapsed?: boolean;
+  color?: NodeColor | null;
+  posX?: number;
+  posY?: number;
+  pinned?: boolean;
+  originFunctionId?: FunctionId | null;
+  originKind?: OriginKind;
+  originImplied?: boolean;
+}
+
+export interface ViewNodesPatchRequest {
+  upsert?: ViewNodeUpsertRequest[];
+  remove?: FunctionId[];
+}
+
+/** The full post-state of every node in the view, so the client can
+ * reconcile (TAD §4.3 #12). */
+export interface ViewNodesPatchResponse {
+  nodes: ViewNodeDto[];
+}
+
+/** `POST /binaries/{id}/last-view` request body (B16, I6). */
+export interface SetLastViewRequest {
+  viewId: ViewId;
+}
 /** One entry-point suggestion (E1b) for an empty canvas. */
 export interface EntryPointDto {
   id: FunctionId;
@@ -184,6 +226,12 @@ export interface AppConfigDto {
   nodeCountSoftWarning: number;
   cardWidthPx: number;
   summaryConcurrency: number;
+  // I6/D11/§2.5: ELK re-layout trigger threshold + animation duration. Not
+  // in the TAD's original §3.4 sketch (its own prose names "8 px"/"400 ms"
+  // but never lifts them into the config object) — added here so no
+  // component hard-codes either literal (F1a).
+  layoutHeightChangeThresholdPx: number;
+  layoutAnimationMs: number;
   nodeColorPalette: NodeColor[];
   adapters: AdapterIdentityDto;
 }

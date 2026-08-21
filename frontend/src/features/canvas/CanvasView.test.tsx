@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfigProvider } from "@/config/ConfigProvider";
 import { CanvasView } from "./CanvasView";
-import type { AppConfigDto, EntryPointsDto, FunctionDto, NeighbourPageDto, ViewSummaryDto } from "@/api/types";
+import type { AppConfigDto, FunctionDto, NeighbourPageDto, ViewDto } from "@/api/types";
 
 const config: AppConfigDto = {
   tableRowCap: 16,
@@ -13,24 +13,35 @@ const config: AppConfigDto = {
   nodeCountSoftWarning: 150,
   cardWidthPx: 380,
   summaryConcurrency: 4,
+  layoutHeightChangeThresholdPx: 8,
+  layoutAnimationMs: 400,
   nodeColorPalette: ["slate"],
   adapters: { ghidra: "mock", llm: "mock", llmModel: "mock-llm-v1" },
 };
 
-const entryPoints: EntryPointsDto = {
-  entryPoints: [{ id: 1, address: 0x401000, displayName: "main", fanOut: 16, fanIn: 0 }],
+const view: ViewDto = {
+  id: 5,
+  binaryId: 1,
+  name: "Default",
+  rootFunctionId: 1,
+  camera: { x: 0, y: 0, zoom: 1 },
+  nodes: [
+    {
+      functionId: 1,
+      visible: true,
+      collapsed: false,
+      color: null,
+      posX: 0,
+      posY: 0,
+      pinned: false,
+      originFunctionId: null,
+      originKind: "root",
+      originImplied: false,
+    },
+  ],
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
 };
-
-const views: ViewSummaryDto[] = [
-  {
-    id: 5,
-    binaryId: 1,
-    name: "Default",
-    rootFunctionId: null,
-    createdAt: "2026-01-01T00:00:00Z",
-    updatedAt: "2026-01-01T00:00:00Z",
-  },
-];
 
 const mainFn: FunctionDto = {
   id: 1,
@@ -83,12 +94,12 @@ function emptyPage(direction: "callees" | "callers"): NeighbourPageDto {
   };
 }
 
-function renderWithProviders(selectedBinaryId: number | null) {
+function renderWithProviders(selectedBinaryId: number | null, viewId: number | null) {
   const queryClient = new QueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
       <ConfigProvider fallback={<p>loading</p>}>
-        <CanvasView selectedBinaryId={selectedBinaryId} />
+        <CanvasView selectedBinaryId={selectedBinaryId} viewId={viewId} />
       </ConfigProvider>
     </QueryClientProvider>,
   );
@@ -103,11 +114,8 @@ describe("CanvasView", () => {
         if (url.endsWith("/api/v1/config")) {
           return Promise.resolve(new Response(JSON.stringify(config), { status: 200 }));
         }
-        if (url.endsWith("/api/v1/binaries/1/entry-points")) {
-          return Promise.resolve(new Response(JSON.stringify(entryPoints), { status: 200 }));
-        }
-        if (url.endsWith("/api/v1/binaries/1/views")) {
-          return Promise.resolve(new Response(JSON.stringify(views), { status: 200 }));
+        if (url.endsWith("/api/v1/views/5")) {
+          return Promise.resolve(new Response(JSON.stringify(view), { status: 200 }));
         }
         if (url.includes("/api/v1/functions/1/neighbours")) {
           const direction = url.includes("direction=callers") ? "callers" : "callees";
@@ -127,15 +135,15 @@ describe("CanvasView", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows an empty state when no binary is selected", async () => {
-    renderWithProviders(null);
+  it("shows an empty state when no binary/view is selected", async () => {
+    renderWithProviders(null, null);
     await waitFor(() => {
       expect(screen.getByText(/pick a binary from the toolbar/i)).toBeInTheDocument();
     });
   });
 
-  it("renders the top entry point's card once the binary, entry points, and view resolve", async () => {
-    renderWithProviders(1);
+  it("renders a card for every visible node once the view resolves", async () => {
+    renderWithProviders(1, 5);
     await waitFor(() => {
       expect(screen.getByText("main")).toBeInTheDocument();
     });

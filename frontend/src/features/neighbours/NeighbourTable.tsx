@@ -41,6 +41,11 @@ export function NeighbourTable({
   });
 
   const label = direction === "callees" ? "Callees" : "Callers";
+  // Fan-out provenance (D8): a *callee* row's parent is this card's own
+  // function. A *caller* row's parent would be the caller itself, which
+  // this card does not know how to place meaningfully, so callers rows
+  // never offer fan-out provenance from here.
+  const originFunctionId: number | undefined = direction === "callees" ? functionId : undefined;
 
   if (isPending) return <p style={{ fontSize: "0.8125rem" }}>Loading {label.toLowerCase()}…</p>;
   if (isError) {
@@ -71,7 +76,7 @@ export function NeighbourTable({
           />
         </div>
       </div>
-      <VirtualRowList rows={data.rows} />
+      <VirtualRowList rows={data.rows} originFunctionId={originFunctionId} />
       <UtilityGroup
         functionId={functionId}
         viewId={viewId}

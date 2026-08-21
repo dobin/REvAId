@@ -20,6 +20,7 @@ export function UtilityGroup({
   direction: "callees" | "callers";
   totalUtility: number;
 }) {
+  const originFunctionId: number | undefined = direction === "callees" ? functionId : undefined;
   const [expanded, setExpanded] = useState(false);
 
   if (totalUtility === 0) return null;
@@ -47,7 +48,12 @@ export function UtilityGroup({
         <Glyph name="utility" /> utility calls ({totalUtility})
       </button>
       {expanded && (
-        <UtilityGroupRows functionId={functionId} viewId={viewId} direction={direction} />
+        <UtilityGroupRows
+          functionId={functionId}
+          viewId={viewId}
+          direction={direction}
+          originFunctionId={originFunctionId}
+        />
       )}
     </div>
   );
@@ -57,10 +63,12 @@ function UtilityGroupRows({
   functionId,
   viewId,
   direction,
+  originFunctionId,
 }: {
   functionId: FunctionId;
   viewId: ViewId;
   direction: "callees" | "callers";
+  originFunctionId?: number | undefined;
 }) {
   const { data, isPending, isError } = useNeighboursQuery({
     functionId,
@@ -71,5 +79,5 @@ function UtilityGroupRows({
 
   if (isPending) return <p style={{ fontSize: "0.75rem" }}>Loading…</p>;
   if (isError) return <p style={{ fontSize: "0.75rem" }}>Could not load utility calls.</p>;
-  return <VirtualRowList rows={data.rows} />;
+  return <VirtualRowList rows={data.rows} originFunctionId={originFunctionId} />;
 }

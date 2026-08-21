@@ -25,6 +25,8 @@ class AppConfigDto(ApiModel):
     node_count_soft_warning: int
     card_width_px: int
     summary_concurrency: int
+    layout_height_change_threshold_px: int
+    layout_animation_ms: int
     node_color_palette: list[str]
     adapters: AdapterIdentityDto
 
@@ -44,6 +46,8 @@ def app_config_from_settings(settings: Settings) -> AppConfigDto:
         node_count_soft_warning=settings.node_count_soft_warning,
         card_width_px=settings.card_width_px,
         summary_concurrency=settings.summary_concurrency,
+        layout_height_change_threshold_px=settings.layout_height_change_threshold_px,
+        layout_animation_ms=settings.layout_animation_ms,
         node_color_palette=list(NODE_COLOR_PALETTE),
         adapters=AdapterIdentityDto(
             ghidra=settings.ghidra_adapter,

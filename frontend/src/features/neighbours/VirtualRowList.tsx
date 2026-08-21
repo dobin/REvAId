@@ -11,7 +11,13 @@ import { NeighbourRow } from "./NeighbourRow";
 const ROW_HEIGHT_PX = 32;
 const MAX_LIST_HEIGHT_PX = 320;
 
-export function VirtualRowList({ rows }: { rows: NeighbourRowDto[] }) {
+export function VirtualRowList({
+  rows,
+  originFunctionId,
+}: {
+  rows: NeighbourRowDto[];
+  originFunctionId?: number | undefined;
+}) {
   const parentRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
     count: rows.length,
@@ -45,7 +51,7 @@ export function VirtualRowList({ rows }: { rows: NeighbourRowDto[] }) {
                 transform: `translateY(${String(virtualRow.start)}px)`,
               }}
             >
-              <NeighbourRow row={row} />
+              <NeighbourRow row={row} originFunctionId={originFunctionId} />
             </div>
           );
         })}

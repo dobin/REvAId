@@ -3,7 +3,20 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfigProvider } from "@/config/ConfigProvider";
 import { FunctionCardNode } from "./FunctionCardNode";
-import type { AppConfigDto, FunctionDto, NeighbourPageDto } from "@/api/types";
+import type { AppConfigDto, FunctionDto, NeighbourPageDto, ViewNodeDto } from "@/api/types";
+
+const viewNode: ViewNodeDto = {
+  functionId: 1,
+  visible: true,
+  collapsed: false,
+  color: null,
+  posX: 0,
+  posY: 0,
+  pinned: false,
+  originFunctionId: null,
+  originKind: "root",
+  originImplied: false,
+};
 
 const config: AppConfigDto = {
   tableRowCap: 16,
@@ -13,6 +26,8 @@ const config: AppConfigDto = {
   nodeCountSoftWarning: 150,
   cardWidthPx: 380,
   summaryConcurrency: 4,
+  layoutHeightChangeThresholdPx: 8,
+  layoutAnimationMs: 400,
   nodeColorPalette: ["slate"],
   adapters: { ghidra: "mock", llm: "mock", llmModel: "mock-llm-v1" },
 };
@@ -73,7 +88,7 @@ function renderWithProviders() {
   return render(
     <QueryClientProvider client={queryClient}>
       <ConfigProvider fallback={<p>loading</p>}>
-        <FunctionCardNode data={{ functionId: 1, viewId: 1 }} />
+        <FunctionCardNode data={{ functionId: 1, viewId: 1, viewNode }} />
       </ConfigProvider>
     </QueryClientProvider>,
   );

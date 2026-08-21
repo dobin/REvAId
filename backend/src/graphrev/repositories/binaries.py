@@ -97,3 +97,14 @@ async def delete_binary(session: AsyncSession, binary: Binary) -> None:
     child row itself)."""
     await session.delete(binary)
     await session.flush()
+
+
+async def update_last_view_id(session: AsyncSession, *, binary_id: int, view_id: int) -> None:
+    """B16: record the last-used view for `binary_id`. Written only by the
+    dedicated `POST /binaries/{id}/last-view` endpoint (I6) — never as a
+    side effect of a GET, and never touched by ingestion."""
+    binary = await session.get(Binary, binary_id)
+    if binary is not None:
+        binary.last_view_id = view_id
+        binary.updated_at = utc_now_iso()
+        await session.flush()
