@@ -15,6 +15,9 @@ Topology built (TAD §6.3 mock spec):
     ~291 callers (A7a) — deliberately chosen to exercise `D7` caller
     suppression (`CALLER_SUPPRESS_THRESHOLD` default 32) at exactly the
     wireframed number.
+  * A shared helper (``check_config``) called by ``main`` directly *and* by
+    two ``entry_child_*`` functions — exercising the "multiple callers at
+    different depths" pattern (fan_in = 3, callers at depth 0 and depth 1).
   * A self-recursive function and a mutual-recursion pair.
   * A handful of orphans (no callers, no callees).
   * One function of each non-placeholder `kind` (`normal`, `import`,
@@ -116,6 +119,21 @@ def _build_acme_exe(rng: random.Random) -> tuple[list[RawFunction], list[RawEdge
         functions.append(fn)
         entry_children.append(fn)
         edges.append(RawEdge(caller_address=main_addr, callee_address=addr))
+
+    # -- 1b. shared helper called by main directly AND by some entry children --
+    # This exercises the "multiple callers at different depths" pattern:
+    # main -> check_config, and also main -> entry_child_04 -> check_config.
+    shared_helper_addr = alloc.take()
+    functions.append(_make_function("check_config", shared_helper_addr))
+    edges.append(RawEdge(caller_address=main_addr, callee_address=shared_helper_addr))
+    # entry_child_04 and entry_child_07 also call it, giving fan_in = 3
+    for child_idx in (4, 7):
+        edges.append(
+            RawEdge(
+                caller_address=entry_children[child_idx].address,
+                callee_address=shared_helper_addr,
+            )
+        )
 
     # -- 2. four 4-deep parser chains -----------------------------------------
     for c in range(4):
