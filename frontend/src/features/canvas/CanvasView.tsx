@@ -22,7 +22,7 @@ import { usePatchViewMutation, useViewQuery } from "@/api/queries/views";
 import { usePatchViewNodesMutation } from "@/api/queries/viewNodes";
 import type { BinaryId, FunctionId, ViewId } from "@/api/types";
 import { useAppStore } from "@/store";
-import { CanvasActionsProvider } from "./CanvasActions";
+import { CanvasActionsProvider, type FanOutOrigin } from "./CanvasActions";
 import { CanvasEmptyState } from "./CanvasEmptyState";
 import { useElkLayout } from "./layout/useElkLayout";
 import { ProvenanceEdge } from "./edges/ProvenanceEdge";
@@ -205,17 +205,21 @@ function CanvasViewInner({ viewId }: { viewId: ViewId }) {
     patchView.mutate({ camera: { x, y, zoom } });
   };
 
-  const fanOutFunction = (originFunctionId: FunctionId, functionId: FunctionId) => {
+  const fanOutFunction = (origin: FanOutOrigin, functionId: FunctionId) => {
     const alreadyPresent = visibleNodes.some((n) => n.functionId === functionId);
     if (alreadyPresent) return;
     upsertPosition(functionId, 0, 0, false);
+    // A row in the origin card's *callers* table spawns the new node as the
+    // caller (`fanin`) — deriveCanvasEdges orients its edge so ELK lays it to
+    // the left. A *callees* row spawns it as the callee (`fanout`, right).
+    const originKind = origin.direction === "callers" ? "fanin" : "fanout";
     patchNodes.mutate({
       upsert: [
         {
           functionId,
           visible: true,
-          originFunctionId,
-          originKind: "fanout",
+          originFunctionId: origin.functionId,
+          originKind,
           originImplied: false,
         },
       ],

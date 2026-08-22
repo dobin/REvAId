@@ -6,6 +6,7 @@
 import { useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { NeighbourRowDto } from "@/api/types";
+import type { FanOutOrigin } from "@/features/canvas/CanvasActions";
 import { NeighbourRow } from "./NeighbourRow";
 
 const ROW_HEIGHT_PX = 32;
@@ -20,10 +21,12 @@ const SCROLLBAR_GUTTER_PX = 14;
 
 export function VirtualRowList({
   rows,
-  originFunctionId,
+  origin,
 }: {
   rows: NeighbourRowDto[];
-  originFunctionId?: number | undefined;
+  /** Fan-out provenance for every row in this list (the card + which table).
+   * Optional so isolated row rendering (e.g. in a test) still works. */
+  origin?: FanOutOrigin | undefined;
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
@@ -78,7 +81,7 @@ export function VirtualRowList({
                 transform: `translateY(${String(virtualRow.start)}px)`,
               }}
             >
-              <NeighbourRow row={row} originFunctionId={originFunctionId} />
+              <NeighbourRow row={row} origin={origin} />
             </div>
           );
         })}

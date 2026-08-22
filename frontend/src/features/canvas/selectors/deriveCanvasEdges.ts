@@ -21,10 +21,23 @@ export function deriveCanvasEdges(nodes: ViewNodeDto[]): CanvasEdge[] {
     if (node.originFunctionId === null) continue;
     if (!presentFunctionIds.has(node.originFunctionId)) continue;
 
+    // Orientation, not existence, decides left/right (D8b). Every provenance
+    // node still records exactly one origin, but a `fanin` node (a fanned-out
+    // *caller*) is the *source* of the call, so its edge points from itself
+    // *to* the card it was spawned from — ELK (direction RIGHT) then lays a
+    // source to the left of its target, placing the caller on the left. Every
+    // other kind (`fanout`, `callstack`) points origin -> node, growing right.
+    const grewFromCaller = node.originKind === "fanin";
+    const source = grewFromCaller ? node.functionId : node.originFunctionId;
+    const target = grewFromCaller ? node.originFunctionId : node.functionId;
+
     edges.push({
+      // Keyed on the owning node's pairing (origin + function), not the
+      // oriented (source, target), so the id is unique by construction — one
+      // provenance row per (view, function) — regardless of orientation.
       id: `${String(node.originFunctionId)}->${String(node.functionId)}`,
-      source: node.originFunctionId,
-      target: node.functionId,
+      source,
+      target,
       implied: node.originImplied,
       kind: node.originKind,
     });

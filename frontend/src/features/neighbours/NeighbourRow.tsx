@@ -7,17 +7,19 @@
 import { Glyph } from "@/components/Glyph";
 import { toHex } from "@/lib/hex";
 import type { NeighbourRowDto } from "@/api/types";
-import { useCanvasActions } from "@/features/canvas/CanvasActions";
+import { useCanvasActions, type FanOutOrigin } from "@/features/canvas/CanvasActions";
 import { SummaryCell } from "./SummaryCell";
 
 export function NeighbourRow({
   row,
-  originFunctionId,
+  origin,
 }: {
   row: NeighbourRowDto;
-  /** The card this row's table belongs to — the fan-out provenance parent
-   * (D8b). Optional so isolated row rendering (e.g. in a test) still works. */
-  originFunctionId?: number | undefined;
+  /** Fan-out provenance for this row — the card its table belongs to and
+   * which table (callees -> right, callers -> left) (D8b). Optional so
+   * isolated row rendering (e.g. in a test) still works; a row with no
+   * origin renders an inert fan-out button. */
+  origin?: FanOutOrigin | undefined;
 }) {
   const canvasActions = useCanvasActions();
 
@@ -25,10 +27,17 @@ export function NeighbourRow({
     if (row.isSelf || !canvasActions) return;
     if (row.onCanvas) {
       canvasActions.hideFunction(row.id);
-    } else if (originFunctionId !== undefined) {
-      canvasActions.fanOutFunction(originFunctionId, row.id);
+    } else if (origin !== undefined) {
+      canvasActions.fanOutFunction(origin, row.id);
     }
   };
+
+  // The fan-out control does nothing for a self-row (recursion), outside a
+  // CanvasView (no actions), or — for a not-yet-placed row — with no origin
+  // to attribute the new node to. An on-canvas row only ever hides, so it
+  // stays live even without an origin. Disable rather than silently no-op:
+  // an enabled-but-inert button was the original caller fan-out bug.
+  const disabled = row.isSelf || !canvasActions || (!row.onCanvas && origin === undefined);
 
   return (
     <div
@@ -65,13 +74,15 @@ export function NeighbourRow({
       />
       <button
         type="button"
-        disabled={row.isSelf || !canvasActions}
+        disabled={disabled}
         title={
           row.isSelf
             ? "Recursive call — cannot fan out"
             : row.onCanvas
               ? "Hide — remove from canvas"
-              : "Fan out — add to canvas"
+              : origin?.direction === "callers"
+                ? "Fan out caller — add to canvas (left)"
+                : "Fan out — add to canvas"
         }
         aria-label="fan-out-or-focus"
         onClick={handleClick}
@@ -79,13 +90,13 @@ export function NeighbourRow({
           border: "none",
           background: "none",
           padding: "0.125rem 0.25rem",
-          cursor: row.isSelf || !canvasActions ? "default" : "pointer",
+          cursor: disabled ? "default" : "pointer",
           borderRadius: "0.25rem",
           transition: "background 0.15s",
           lineHeight: 1,
         }}
         onMouseEnter={(e) => {
-          if (!row.isSelf && canvasActions) {
+          if (!disabled) {
             (e.currentTarget as HTMLButtonElement).style.background = "#f3f4f6";
           }
         }}

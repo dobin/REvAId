@@ -17,7 +17,10 @@ export type FunctionKind = "normal" | "import" | "thunk" | "external" | "placeho
 // here to match the DB CHECK constraint. Widen in the A10 migration.
 export type EdgeKind = "call";
 export type SummaryStatus = "none" | "pending" | "ready" | "error" | "stale";
-export type OriginKind = "root" | "fanout" | "callstack";
+// `fanin` is like `fanout` but the derived canvas edge is oriented from the
+// new node to the card it was spawned from, so ELK (direction RIGHT) places a
+// fanned-out *caller* to the left (deriveCanvasEdges).
+export type OriginKind = "root" | "fanout" | "callstack" | "fanin";
 export type UtilitySource = "computed" | "analyst";
 export type UtilityOverride = "always" | "never" | null;
 // D16: "a small palette of named tokens, not free-form hex". No PRD-specified

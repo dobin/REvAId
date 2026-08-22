@@ -41,11 +41,11 @@ export function NeighbourTable({
   });
 
   const label = direction === "callees" ? "Callees" : "Callers";
-  // Fan-out provenance (D8): a *callee* row's parent is this card's own
-  // function. A *caller* row's parent would be the caller itself, which
-  // this card does not know how to place meaningfully, so callers rows
-  // never offer fan-out provenance from here.
-  const originFunctionId: number | undefined = direction === "callees" ? functionId : undefined;
+  // Fan-out provenance (D8): every row fans out from *this* card's function.
+  // `direction` decides orientation — a callees row grows the canvas right
+  // (`fanout`), a callers row grows it left (`fanin`) — resolved downstream
+  // in `fanOutFunction`. Both share this same origin.
+  const origin = { functionId, direction };
 
   if (isPending) return <p style={{ fontSize: "0.8125rem" }}>Loading {label.toLowerCase()}…</p>;
   if (isError) {
@@ -76,7 +76,7 @@ export function NeighbourTable({
           />
         </div>
       </div>
-      <VirtualRowList rows={data.rows} originFunctionId={originFunctionId} />
+      <VirtualRowList rows={data.rows} origin={origin} />
       <UtilityGroup
         functionId={functionId}
         viewId={viewId}

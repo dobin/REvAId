@@ -242,6 +242,52 @@ async def test_patch_view_nodes_upsert_and_remove_full_post_state(
 
 
 @pytest.mark.asyncio
+async def test_patch_view_nodes_fanin_round_trips(
+    client: AsyncClient, ingested: None
+) -> None:
+    """A `fanin` node (leftward caller fan-out, D8b) persists like `fanout`."""
+    binary_id = await _get_binary_id(client, "acme.exe")
+    view_id = await _get_default_view_id(client, binary_id)
+    root_fn_id, caller_fn_id = await _get_two_entry_point_function_ids(client, binary_id)
+
+    response = await client.patch(
+        f"/api/v1/views/{view_id}/nodes",
+        json={
+            "upsert": [
+                {"functionId": root_fn_id, "originKind": "root"},
+                {
+                    "functionId": caller_fn_id,
+                    "visible": True,
+                    "originFunctionId": root_fn_id,
+                    "originKind": "fanin",
+                    "originImplied": False,
+                },
+            ]
+        },
+    )
+    assert response.status_code == 200
+    nodes = {n["functionId"]: n for n in response.json()["nodes"]}
+    assert nodes[caller_fn_id]["originKind"] == "fanin"
+    assert nodes[caller_fn_id]["originFunctionId"] == root_fn_id
+
+
+@pytest.mark.asyncio
+async def test_patch_view_nodes_rejects_fanin_without_origin_function_id(
+    client: AsyncClient, ingested: None
+) -> None:
+    binary_id = await _get_binary_id(client, "acme.exe")
+    view_id = await _get_default_view_id(client, binary_id)
+    fn_id, _ = await _get_two_entry_point_function_ids(client, binary_id)
+
+    response = await client.patch(
+        f"/api/v1/views/{view_id}/nodes",
+        json={"upsert": [{"functionId": fn_id, "originKind": "fanin"}]},
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+@pytest.mark.asyncio
 async def test_patch_view_nodes_rejects_fanout_without_origin_function_id(
     client: AsyncClient, ingested: None
 ) -> None:

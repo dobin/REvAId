@@ -64,6 +64,31 @@ describe("computeElkLayout", () => {
     expect(second.x - (first.x + CARD_WIDTH)).toBeGreaterThanOrEqual(80);
   });
 
+  it("lays a caller (fanin) left and a callee (fanout) right of the centre", async () => {
+    // The oriented edges deriveCanvasEdges produces for a centre card (id 1)
+    // with a fanned-out caller (id 2, fanin -> edge 2->1) and a fanned-out
+    // callee (id 3, fanout -> edge 1->3). ELK direction RIGHT lays each
+    // source left of its target, so: caller.x < centre.x < callee.x.
+    const positions = await computeElkLayout(
+      [
+        { id: "1", width: CARD_WIDTH, height: 240 },
+        { id: "2", width: CARD_WIDTH, height: 240 },
+        { id: "3", width: CARD_WIDTH, height: 240 },
+      ],
+      [
+        { id: "1->2", source: "2", target: "1" }, // fanin caller
+        { id: "1->3", source: "1", target: "3" }, // fanout callee
+      ],
+    );
+
+    const caller = positionOf(positions, "2");
+    const centre = positionOf(positions, "1");
+    const callee = positionOf(positions, "3");
+
+    expect(caller.x).toBeLessThan(centre.x);
+    expect(centre.x).toBeLessThan(callee.x);
+  });
+
   it("never overlaps any pair of cards in a deep chain of mixed heights", async () => {
     const heights = [546, 1197, 240, 880, 96];
     const nodes = heights.map((height, i) => ({

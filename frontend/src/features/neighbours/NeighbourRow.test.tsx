@@ -1,6 +1,11 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { NeighbourRow } from "./NeighbourRow";
+import {
+  CanvasActionsProvider,
+  type CanvasActions,
+  type FanOutOrigin,
+} from "@/features/canvas/CanvasActions";
 import type { NeighbourRowDto } from "@/api/types";
 
 const baseRow: NeighbourRowDto = {
@@ -36,5 +41,40 @@ describe("NeighbourRow", () => {
   it("shows the on-canvas glyph when already placed", () => {
     render(<NeighbourRow row={{ ...baseRow, onCanvas: true }} />);
     expect(screen.getByRole("img", { name: /already on canvas/i })).toBeInTheDocument();
+  });
+
+  function makeActions(): CanvasActions {
+    return {
+      fanOutFunction: vi.fn(),
+      focusFunction: vi.fn(),
+      hideFunction: vi.fn(),
+    };
+  }
+
+  function renderWithActions(
+    row: NeighbourRowDto,
+    origin: FanOutOrigin | undefined,
+    actions: CanvasActions,
+  ) {
+    return render(
+      <CanvasActionsProvider value={actions}>
+        <NeighbourRow row={row} origin={origin} />
+      </CanvasActionsProvider>,
+    );
+  }
+
+  it("fans out a caller row with the callers direction so it grows left", () => {
+    const actions = makeActions();
+    const origin: FanOutOrigin = { functionId: 1, direction: "callers" };
+    renderWithActions(baseRow, origin, actions);
+    screen.getByRole("button", { name: "fan-out-or-focus" }).click();
+    expect(actions.fanOutFunction).toHaveBeenCalledWith(origin, baseRow.id);
+  });
+
+  it("disables the fan-out button when a placeable row has no origin", () => {
+    // The original caller-fan-out bug: an enabled button that silently does
+    // nothing. A row that isn't on-canvas and has no origin must be disabled.
+    renderWithActions(baseRow, undefined, makeActions());
+    expect(screen.getByRole("button", { name: "fan-out-or-focus" })).toBeDisabled();
   });
 });

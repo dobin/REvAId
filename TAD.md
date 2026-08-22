@@ -349,7 +349,7 @@ useElkLayout(nodes, edges)
   ├─ input: only nodes with pinned === false   (pinned nodes are fixed obstacles)
   ├─ node width  = CARD_WIDTH (constant, AS23)
   ├─ node height = React Flow measured height (post-render, useNodesInitialized)
-  ├─ elk options: algorithm=layered, direction=DOWN,
+  ├─ elk options: algorithm=layered, direction=RIGHT,
   │               layering.strategy=NETWORK_SIMPLEX,
   │               cycleBreaking.strategy=GREEDY,        ← §5.1 cycles
   │               nodePlacement.strategy=BRANDES_KOEPF,
@@ -359,6 +359,8 @@ useElkLayout(nodes, edges)
 ```
 
 **Trigger rules.** Layout runs on: node added, node removed, or a card's measured height changing by > 8 px (table expand/collapse — `§4.3` "must handle cards changing height"). Layout **never** runs on a summary arrival (T1) and **never** moves a `pinned` node. A manual drag sets `pinned = true` permanently (`D15`).
+
+**Growth direction is edge orientation, not a layout option.** `direction=RIGHT` lays every ELK source to the left of its target. Callee fan-out (`origin_kind = fanout`) emits `origin → node`, so the new callee lands right; caller fan-out (`origin_kind = fanin`) emits `node → origin` (`deriveCanvasEdges`), so the new caller lands left. The graph therefore grows in both directions from any card with a single, unchanged ELK configuration — the orientation lives entirely in `deriveCanvasEdges`, keeping the layout subsystem direction-agnostic.
 
 ### 2.6 Summary demand subsystem (`C2c`, `C5`, `C8`, `Q23`)
 
@@ -652,7 +654,10 @@ CREATE TABLE view_nodes (
     -- B4b / D8b: sole source of canvas edges
     origin_function_id  INTEGER REFERENCES functions(id) ON DELETE SET NULL,
     origin_kind         TEXT    NOT NULL DEFAULT 'root'
-                            CHECK (origin_kind IN ('root','fanout','callstack')),
+                            -- fanin = caller fan-out; edge is oriented
+                            -- node->origin so it lays out LEFT (see §2.5).
+                            -- Widened by migration 0004.
+                            CHECK (origin_kind IN ('root','fanout','callstack','fanin')),
     origin_implied      INTEGER NOT NULL DEFAULT 0,      -- dashed edge
     created_at          TEXT    NOT NULL,
     updated_at          TEXT    NOT NULL
@@ -692,7 +697,7 @@ export type ViewId = number;
 export type FunctionKind = 'normal' | 'import' | 'thunk' | 'external' | 'placeholder';
 export type EdgeKind = 'call' | 'data_xref' | 'string_ref';
 export type SummaryStatus = 'none' | 'pending' | 'ready' | 'error' | 'stale';
-export type OriginKind = 'root' | 'fanout' | 'callstack';
+export type OriginKind = 'root' | 'fanout' | 'callstack' | 'fanin';
 export type UtilitySource = 'computed' | 'analyst';
 export type UtilityOverride = 'always' | 'never' | null;
 export type NodeColor =
@@ -784,7 +789,9 @@ export interface ViewDto {
   createdAt: string; updatedAt: string;
 }
 
-/** Derived client-side from ViewNodeDto only — never from the edges table (D8b). */
+/** Derived client-side from ViewNodeDto only — never from the edges table (D8b).
+ *  `kind` also sets orientation: `fanin` points source=node -> target=origin
+ *  (grows left), every other kind points origin -> node (grows right). */
 export interface CanvasEdge {
   id: string; source: FunctionId; target: FunctionId;
   implied: boolean; kind: OriginKind;

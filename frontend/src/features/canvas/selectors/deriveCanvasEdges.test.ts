@@ -68,6 +68,39 @@ describe("deriveCanvasEdges", () => {
     ]);
   });
 
+  it("orients a fanin edge from the new node TO its origin (grows left)", () => {
+    // A fanned-out *caller* (fanin) is the source of the call, so its edge
+    // points new-node -> origin-card. ELK (direction RIGHT) then lays the
+    // source (node 2) to the left of its target (node 1). The id stays keyed
+    // on the owning node's (origin -> function) pairing so it's unique.
+    const nodes = [
+      makeNode({ functionId: 1, originKind: "root", originFunctionId: null }),
+      makeNode({ functionId: 2, originKind: "fanin", originFunctionId: 1 }),
+    ];
+    expect(deriveCanvasEdges(nodes)).toEqual([
+      { id: "1->2", source: 2, target: 1, implied: false, kind: "fanin" },
+    ]);
+  });
+
+  it("orients callers left and callees right around one centre node", () => {
+    // node 1 is the centre; node 2 was fanned out as a caller (fanin, left),
+    // node 3 as a callee (fanout, right).
+    const nodes = [
+      makeNode({ functionId: 1, originKind: "root", originFunctionId: null }),
+      makeNode({ functionId: 2, originKind: "fanin", originFunctionId: 1 }),
+      makeNode({ functionId: 3, originKind: "fanout", originFunctionId: 1 }),
+    ];
+    const edges = deriveCanvasEdges(nodes);
+    expect(edges).toEqual(
+      expect.arrayContaining([
+        { id: "1->2", source: 2, target: 1, implied: false, kind: "fanin" },
+        { id: "1->3", source: 1, target: 3, implied: false, kind: "fanout" },
+      ]),
+    );
+    // ids are unique despite differing orientations.
+    expect(new Set(edges.map((e) => e.id)).size).toBe(edges.length);
+  });
+
   it("builds one edge per node with a present origin, in a multi-node chain", () => {
     const nodes = [
       makeNode({ functionId: 1, originKind: "root", originFunctionId: null }),

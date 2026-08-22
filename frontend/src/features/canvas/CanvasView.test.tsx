@@ -94,6 +94,34 @@ function emptyPage(direction: "callees" | "callers"): NeighbourPageDto {
   };
 }
 
+/** A callers page with one fannable row (function 7), so the ✕ card's
+ * "Called by" table renders a live fan-out button. */
+function callerPageWithOneRow(): NeighbourPageDto {
+  return {
+    ...emptyPage("callers"),
+    rows: [
+      {
+        id: 7,
+        address: 0x402000,
+        displayName: "the_caller",
+        isRenamed: false,
+        summaryShort: null,
+        summaryStatus: "none",
+        summaryLowConfidence: false,
+        kind: "normal",
+        onCanvas: false,
+        isUtility: false,
+        utilitySource: "computed",
+        fanIn: 1,
+        isSelf: false,
+        hasNotes: false,
+      },
+    ],
+    total: 1,
+    totalPrimary: 1,
+  };
+}
+
 function renderWithProviders(selectedBinaryId: number | null, viewId: number | null) {
   const queryClient = new QueryClient();
   return render(
@@ -146,6 +174,101 @@ describe("CanvasView", () => {
     renderWithProviders(1, 5);
     await waitFor(() => {
       expect(screen.getByText("main")).toBeInTheDocument();
+    });
+  });
+
+  it("fans out a caller with originKind 'fanin' (grows the canvas left)", async () => {
+    const patchBodies: unknown[] = [];
+    vi.unstubAllGlobals();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL | Request, init?: RequestInit) => {
+        const url = input instanceof Request ? input.url : String(input);
+        if (url.endsWith("/api/v1/config")) {
+          return Promise.resolve(new Response(JSON.stringify(config), { status: 200 }));
+        }
+        if (url.endsWith("/api/v1/views/5/nodes") && init?.method === "PATCH") {
+          patchBodies.push(JSON.parse(String(init.body)));
+          // Echo back the post-state: the original root plus the new caller.
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                nodes: [
+                  ...view.nodes,
+                  {
+                    functionId: 7,
+                    visible: true,
+                    collapsed: false,
+                    color: null,
+                    posX: 0,
+                    posY: 0,
+                    pinned: false,
+                    originFunctionId: 1,
+                    originKind: "fanin",
+                    originImplied: false,
+                  },
+                ],
+              }),
+              { status: 200 },
+            ),
+          );
+        }
+        if (url.endsWith("/api/v1/views/5")) {
+          return Promise.resolve(new Response(JSON.stringify(view), { status: 200 }));
+        }
+        if (url.includes("/api/v1/functions/1/neighbours")) {
+          const isCallers = url.includes("direction=callers");
+          const page = isCallers ? callerPageWithOneRow() : emptyPage("callees");
+          return Promise.resolve(new Response(JSON.stringify(page), { status: 200 }));
+        }
+        if (url.includes("/api/v1/functions/7/neighbours")) {
+          const direction = url.includes("direction=callers") ? "callers" : "callees";
+          return Promise.resolve(
+            new Response(JSON.stringify({ ...emptyPage(direction), functionId: 7 }), {
+              status: 200,
+            }),
+          );
+        }
+        if (url.endsWith("/api/v1/functions/1")) {
+          return Promise.resolve(new Response(JSON.stringify(mainFn), { status: 200 }));
+        }
+        if (url.endsWith("/api/v1/functions/7")) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({ ...mainFn, id: 7, displayName: "the_caller" }),
+              { status: 200 },
+            ),
+          );
+        }
+        return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+      }),
+    );
+
+    renderWithProviders(1, 5);
+    // Wait for the caller row to render, then click its fan-out button. React
+    // Flow marks the node subtree aria-hidden, so it's excluded from role
+    // queries; find the row and reach its (enabled) fan-out button directly.
+    const callerRow = (await screen.findByText("the_caller")).closest("[role='row']");
+    const fanOutButton = callerRow?.querySelector<HTMLButtonElement>(
+      "button[aria-label='fan-out-or-focus']",
+    );
+    expect(fanOutButton).not.toBeNull();
+    expect(fanOutButton?.disabled).toBe(false);
+    fanOutButton?.click();
+
+    await waitFor(() => {
+      expect(patchBodies).toHaveLength(1);
+    });
+    expect(patchBodies[0]).toEqual({
+      upsert: [
+        {
+          functionId: 7,
+          visible: true,
+          originFunctionId: 1,
+          originKind: "fanin",
+          originImplied: false,
+        },
+      ],
     });
   });
 });

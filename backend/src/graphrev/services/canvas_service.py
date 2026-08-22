@@ -12,6 +12,7 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from graphrev.core.errors import AppError, ErrorCode
+from graphrev.db.enums import PROVENANCE_ORIGIN_KIND_VALUES
 from graphrev.repositories.view_nodes import remove_view_nodes, upsert_view_nodes
 from graphrev.repositories.views import get_view_by_id
 from graphrev.schemas.view import (
@@ -46,7 +47,7 @@ def _validate_provenance(upsert_dto: ViewNodeUpsertDto) -> None:
                 "A root node must not have an originFunctionId.",
                 details={"functionId": upsert_dto.function_id},
             )
-        if origin_kind in ("fanout", "callstack") and (
+        if origin_kind in PROVENANCE_ORIGIN_KIND_VALUES and (
             "origin_function_id" not in fields_set or origin_function_id is None
         ):
             raise AppError(
@@ -62,8 +63,8 @@ def _validate_provenance(upsert_dto: ViewNodeUpsertDto) -> None:
         # would violate the invariant, so this combination is rejected too.
         raise AppError(
             ErrorCode.VALIDATION_ERROR,
-            "originFunctionId requires originKind to be 'fanout' or"
-            " 'callstack' in the same request.",
+            "originFunctionId requires originKind to be a non-root provenance"
+            " kind (fanout, callstack, or fanin) in the same request.",
             details={"functionId": upsert_dto.function_id},
         )
 

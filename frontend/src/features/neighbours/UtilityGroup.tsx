@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Glyph } from "@/components/Glyph";
 import { useNeighboursQuery } from "@/api/queries/neighbours";
 import type { FunctionId, ViewId } from "@/api/types";
+import type { FanOutOrigin } from "@/features/canvas/CanvasActions";
 import { VirtualRowList } from "./VirtualRowList";
 
 export function UtilityGroup({
@@ -20,7 +21,9 @@ export function UtilityGroup({
   direction: "callees" | "callers";
   totalUtility: number;
 }) {
-  const originFunctionId: number | undefined = direction === "callees" ? functionId : undefined;
+  // Utility rows fan out exactly like primary rows: from this card, oriented
+  // by direction (callees -> right, callers -> left). Resolved downstream.
+  const origin: FanOutOrigin = { functionId, direction };
   const [expanded, setExpanded] = useState(false);
 
   if (totalUtility === 0) return null;
@@ -52,7 +55,7 @@ export function UtilityGroup({
           functionId={functionId}
           viewId={viewId}
           direction={direction}
-          originFunctionId={originFunctionId}
+          origin={origin}
         />
       )}
     </div>
@@ -63,12 +66,12 @@ function UtilityGroupRows({
   functionId,
   viewId,
   direction,
-  originFunctionId,
+  origin,
 }: {
   functionId: FunctionId;
   viewId: ViewId;
   direction: "callees" | "callers";
-  originFunctionId?: number | undefined;
+  origin?: FanOutOrigin | undefined;
 }) {
   const { data, isPending, isError } = useNeighboursQuery({
     functionId,
@@ -79,5 +82,5 @@ function UtilityGroupRows({
 
   if (isPending) return <p style={{ fontSize: "0.75rem" }}>Loading…</p>;
   if (isError) return <p style={{ fontSize: "0.75rem" }}>Could not load utility calls.</p>;
-  return <VirtualRowList rows={data.rows} originFunctionId={originFunctionId} />;
+  return <VirtualRowList rows={data.rows} origin={origin} />;
 }

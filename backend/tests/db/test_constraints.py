@@ -140,6 +140,30 @@ async def test_origin_kind_rejects_garbage(session: AsyncSession) -> None:
 
 
 @pytest.mark.asyncio
+async def test_origin_kind_accepts_fanin(session: AsyncSession) -> None:
+    """0004 widened the CHECK to admit `fanin` (leftward caller fan-out)."""
+    binary = await _make_binary(session)
+    fn = await _make_function(session, binary, 0x1000, "a")
+    origin = await _make_function(session, binary, 0x2000, "b")
+    view = View(binary_id=binary.id, name="Default", created_at=_now(), updated_at=_now())
+    session.add(view)
+    await session.flush()
+
+    session.add(
+        ViewNode(
+            view_id=view.id,
+            function_id=fn.id,
+            origin_function_id=origin.id,
+            origin_kind="fanin",
+            created_at=_now(),
+            updated_at=_now(),
+        )
+    )
+    # No IntegrityError — the widened CHECK admits it.
+    await session.flush()
+
+
+@pytest.mark.asyncio
 async def test_deleting_binary_cascades_to_children(session: AsyncSession) -> None:
     binary = await _make_binary(session)
     fn_a = await _make_function(session, binary, 0x1000, "a")

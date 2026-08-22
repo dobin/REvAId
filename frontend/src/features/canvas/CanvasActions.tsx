@@ -8,11 +8,22 @@
 import { createContext, useContext } from "react";
 import type { FunctionId } from "@/api/types";
 
+/** Where a fanned-out row came from: the card whose table it sits in, plus
+ * which of that card's tables (its callees, or its callers). `callers` grows
+ * the canvas leftward (provenance kind `fanin`), `callees` rightward
+ * (`fanout`). */
+export interface FanOutOrigin {
+  functionId: FunctionId;
+  direction: "callees" | "callers";
+}
+
 export interface CanvasActions {
-  /** Promote `functionId` onto the canvas, with provenance pointing back at
-   * `originFunctionId` (D8/D8b). No-op if the function is already on the
+  /** Promote `functionId` onto the canvas, recording provenance back to
+   * `origin.functionId` (D8/D8b). `origin.direction` decides orientation: a
+   * `callers` row places the new node to the *left* of the origin card, a
+   * `callees` row to the *right*. No-op if the function is already on the
    * canvas — callers should prefer {@link hideFunction} in that case. */
-  fanOutFunction: (originFunctionId: FunctionId, functionId: FunctionId) => void;
+  fanOutFunction: (origin: FanOutOrigin, functionId: FunctionId) => void;
   /** Pan/center the canvas on an already-placed node (sidebar D9). */
   focusFunction: (functionId: FunctionId) => void;
   /** Hide (set visible:false) an already-placed node — toggling it off the
