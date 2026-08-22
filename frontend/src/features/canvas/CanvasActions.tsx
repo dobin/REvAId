@@ -11,10 +11,13 @@ import type { FunctionId } from "@/api/types";
 export interface CanvasActions {
   /** Promote `functionId` onto the canvas, with provenance pointing back at
    * `originFunctionId` (D8/D8b). No-op if the function is already on the
-   * canvas — callers should prefer {@link focusFunction} in that case. */
+   * canvas — callers should prefer {@link hideFunction} in that case. */
   fanOutFunction: (originFunctionId: FunctionId, functionId: FunctionId) => void;
-  /** Pan/center the canvas on an already-placed node (D9's ◎ affordance). */
+  /** Pan/center the canvas on an already-placed node (sidebar D9). */
   focusFunction: (functionId: FunctionId) => void;
+  /** Hide (set visible:false) an already-placed node — toggling it off the
+   * canvas from the neighbour row ◎ button. */
+  hideFunction: (functionId: FunctionId) => void;
 }
 
 const CanvasActionsContext = createContext<CanvasActions | null>(null);

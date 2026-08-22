@@ -1,8 +1,8 @@
 /**
  * One row in a card's caller/callee table (TAD §2.3). FanOut (⤢) promotes
- * the row's function onto the canvas via `useCanvasActions` (D8); Focus (◎)
- * pans to it if it's already placed (D9). `isSelf` (recursion) keeps the
- * button inert, matching the existing glyph-only affordance.
+ * the row's function onto the canvas via `useCanvasActions` (D8); when the
+ * function is already placed (◎), clicking again hides it (toggles it off).
+ * `isSelf` (recursion) keeps the button inert.
  */
 import { Glyph } from "@/components/Glyph";
 import { toHex } from "@/lib/hex";
@@ -24,7 +24,7 @@ export function NeighbourRow({
   const handleClick = () => {
     if (row.isSelf || !canvasActions) return;
     if (row.onCanvas) {
-      canvasActions.focusFunction(row.id);
+      canvasActions.hideFunction(row.id);
     } else if (originFunctionId !== undefined) {
       canvasActions.fanOutFunction(originFunctionId, row.id);
     }
@@ -66,9 +66,32 @@ export function NeighbourRow({
       <button
         type="button"
         disabled={row.isSelf || !canvasActions}
-        title={row.isSelf ? "Recursive call — cannot fan out" : undefined}
+        title={
+          row.isSelf
+            ? "Recursive call — cannot fan out"
+            : row.onCanvas
+              ? "Hide — remove from canvas"
+              : "Fan out — add to canvas"
+        }
         aria-label="fan-out-or-focus"
         onClick={handleClick}
+        style={{
+          border: "none",
+          background: "none",
+          padding: "0.125rem 0.25rem",
+          cursor: row.isSelf || !canvasActions ? "default" : "pointer",
+          borderRadius: "0.25rem",
+          transition: "background 0.15s",
+          lineHeight: 1,
+        }}
+        onMouseEnter={(e) => {
+          if (!row.isSelf && canvasActions) {
+            (e.currentTarget as HTMLButtonElement).style.background = "#f3f4f6";
+          }
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.background = "none";
+        }}
       >
         <Glyph name={row.onCanvas ? "onCanvas" : "fanOut"} />
       </button>

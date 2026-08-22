@@ -235,6 +235,10 @@ function CanvasViewInner({ viewId }: { viewId: ViewId }) {
     );
   };
 
+  const hideFunction = (functionId: FunctionId): void => {
+    patchNodes.mutate({ upsert: [{ functionId, visible: false }] });
+  };
+
   if (view.isPending) {
     return <CanvasEmptyState message="Loading…" />;
   }
@@ -246,7 +250,7 @@ function CanvasViewInner({ viewId }: { viewId: ViewId }) {
   }
 
   return (
-    <CanvasActionsProvider value={{ fanOutFunction, focusFunction }}>
+    <CanvasActionsProvider value={{ fanOutFunction, focusFunction, hideFunction }}>
       <div style={{ width: "100%", height: "100%" }}>
         <ReactFlow
           nodes={rfNodes}
