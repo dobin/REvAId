@@ -36,10 +36,13 @@ export function PlaceEntryPointButton({
         });
       }}
       style={{
-        width: "100%",
-        padding: "0.375rem 0.5rem",
-        marginBottom: "0.75rem",
+        display: "block",
+        padding: "0.125rem 0",
+        marginBottom: "0.25rem",
         fontSize: "0.8125rem",
+        textAlign: "left",
+        background: "none",
+        border: "none",
         cursor: topEntryPoint ? "pointer" : "not-allowed",
       }}
       title={

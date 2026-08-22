@@ -39,21 +39,29 @@ const ESTIMATED_CARD_HEIGHT_PX = 240;
 export function CanvasView({
   selectedBinaryId,
   viewId,
+  actionsRegistry,
 }: {
   selectedBinaryId: BinaryId | null;
   viewId: ViewId | null;
+  actionsRegistry: React.MutableRefObject<import("./CanvasActions").CanvasActions | null>;
 }) {
   if (selectedBinaryId === null || viewId === null) {
     return <CanvasEmptyState message="Pick a binary from the toolbar to get started." />;
   }
   return (
     <ReactFlowProvider>
-      <CanvasViewInner viewId={viewId} />
+      <CanvasViewInner viewId={viewId} actionsRegistry={actionsRegistry} />
     </ReactFlowProvider>
   );
 }
 
-function CanvasViewInner({ viewId }: { viewId: ViewId }) {
+function CanvasViewInner({
+  viewId,
+  actionsRegistry,
+}: {
+  viewId: ViewId;
+  actionsRegistry: React.MutableRefObject<import("./CanvasActions").CanvasActions | null>;
+}) {
   const config = useConfig();
   const view = useViewQuery(viewId);
   const patchNodes = usePatchViewNodesMutation(viewId);
@@ -229,19 +237,26 @@ function CanvasViewInner({ viewId }: { viewId: ViewId }) {
   const focusFunction = (functionId: FunctionId): void => {
     const node = rfNodes.find((n) => n.id === String(functionId));
     if (!node) return;
-    // Centre on the card's real rendered box where we have one — a tall card
-    // centred against the 240px estimate lands well above its own middle.
+    const width = node.measured?.width ?? config.cardWidthPx;
     const height = node.measured?.height ?? ESTIMATED_CARD_HEIGHT_PX;
-    void reactFlow.setCenter(
-      node.position.x + config.cardWidthPx / 2,
-      node.position.y + height / 2,
-      { zoom: reactFlow.getZoom() },
+    void reactFlow.fitBounds(
+      {
+        x: node.position.x,
+        y: node.position.y,
+        width,
+        height,
+      },
+      { duration: 400, padding: 0.3 },
     );
   };
 
   const hideFunction = (functionId: FunctionId): void => {
     patchNodes.mutate({ upsert: [{ functionId, visible: false }] });
   };
+
+  // Register current actions into the stable ref so components outside this
+  // provider tree (e.g. Sidebar) can call them via useCanvasActionsFromRegistry.
+  actionsRegistry.current = { fanOutFunction, focusFunction, hideFunction };
 
   if (view.isPending) {
     return <CanvasEmptyState message="Loading…" />;

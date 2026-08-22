@@ -56,8 +56,8 @@ export type GlyphKey = keyof typeof GLYPHS;
  * (docs/glyphs.md mirrors this wording; keep them in sync).
  */
 export const GLYPH_LABELS: Record<GlyphKey, string> = {
-  fanOut: "Fan out — promote to canvas node",
-  onCanvas: "Already on canvas — click to hide",
+  fanOut: "Fan out",
+  onCanvas: "Hide",
   generating: "Summary generating",
   recursive: "Recursive / part of a cycle",
   utility: "Utility (high fan-in)",

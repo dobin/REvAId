@@ -6,13 +6,13 @@
  */
 import { useViewQuery } from "@/api/queries/views";
 import type { ViewId } from "@/api/types";
-import { useCanvasActions } from "@/features/canvas/CanvasActions";
+import { useCanvasActionsFromRegistry } from "@/features/canvas/CanvasActions";
 import { useViewNodeActions } from "@/features/canvas/useViewNodeActions";
 import { useFunctionQuery } from "@/api/queries/functions";
 
 export function OnCanvasList({ viewId }: { viewId: ViewId | null }) {
   const view = useViewQuery(viewId);
-  const canvasActions = useCanvasActions();
+  const canvasActions = useCanvasActionsFromRegistry();
   const nodeActions = useViewNodeActions(viewId ?? 0);
 
   if (viewId === null) return null;
@@ -24,7 +24,6 @@ export function OnCanvasList({ viewId }: { viewId: ViewId | null }) {
 
   return (
     <div>
-      <h3 style={{ fontSize: "0.8125rem", fontWeight: 600 }}>On canvas</h3>
       <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
         {visible.map((node) => (
           <OnCanvasRow
@@ -39,7 +38,7 @@ export function OnCanvasList({ viewId }: { viewId: ViewId | null }) {
       </ul>
       {hidden.length > 0 && (
         <>
-          <h3 style={{ fontSize: "0.8125rem", fontWeight: 600 }}>Hidden</h3>
+          <p style={{ fontSize: "0.75rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", color: "#6b7280", margin: "0.5rem 0 0.25rem" }}>Hidden</p>
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {hidden.map((node) => (
               <li key={node.functionId} style={{ display: "flex", gap: "0.375rem" }}>

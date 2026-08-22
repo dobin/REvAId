@@ -7,8 +7,10 @@ import { Toolbar } from "@/features/toolbar/Toolbar";
 import { Sidebar } from "@/features/sidebar/Sidebar";
 import { CanvasView } from "@/features/canvas/CanvasView";
 import { DetailPanel } from "@/features/detail/DetailPanel";
+import { CanvasActionsRegistryProvider, useCreateCanvasActionsRegistry } from "@/features/canvas/CanvasActions";
 
 function AppShell() {
+  const actionsRegistry = useCreateCanvasActionsRegistry();
   const [selectedBinaryId, setSelectedBinaryId] = useState<BinaryId | null>(null);
   const [selectedViewId, setSelectedViewId] = useState<ViewId | null>(null);
   const binaries = useBinariesQuery();
@@ -42,13 +44,15 @@ function AppShell() {
         selectedViewId={selectedViewId}
         onSelectView={setSelectedViewId}
       />
-      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-        <Sidebar binaryId={selectedBinaryId} viewId={selectedViewId} />
-        <main style={{ flex: 1, minWidth: 0 }}>
-          <CanvasView selectedBinaryId={selectedBinaryId} viewId={selectedViewId} />
-        </main>
-        <DetailPanel />
-      </div>
+      <CanvasActionsRegistryProvider value={actionsRegistry}>
+        <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+          <Sidebar binaryId={selectedBinaryId} viewId={selectedViewId} />
+          <main style={{ flex: 1, minWidth: 0 }}>
+            <CanvasView selectedBinaryId={selectedBinaryId} viewId={selectedViewId} actionsRegistry={actionsRegistry} />
+          </main>
+          <DetailPanel />
+        </div>
+      </CanvasActionsRegistryProvider>
     </div>
   );
 }

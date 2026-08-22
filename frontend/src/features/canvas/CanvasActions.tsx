@@ -5,7 +5,7 @@
  * tables. Provided by `CanvasView`; consumed by anything that needs to
  * promote a function onto the canvas or pan to an existing node.
  */
-import { createContext, useContext } from "react";
+import { createContext, useContext, useRef, type MutableRefObject } from "react";
 import type { FunctionId } from "@/api/types";
 
 /** Where a fanned-out row came from: the card whose table it sits in, plus
@@ -39,4 +39,27 @@ export const CanvasActionsProvider = CanvasActionsContext.Provider;
  * rather than throwing — callers render inert controls in that case. */
 export function useCanvasActions(): CanvasActions | null {
   return useContext(CanvasActionsContext);
+}
+
+/**
+ * A stable ref-based registry so components outside the `CanvasActionsProvider`
+ * tree (e.g. the sidebar) can still call canvas actions. `CanvasViewInner`
+ * writes its actions into this ref; consumers call through it.
+ */
+const CanvasActionsRegistryContext = createContext<MutableRefObject<CanvasActions | null> | null>(null);
+
+export const CanvasActionsRegistryProvider = CanvasActionsRegistryContext.Provider;
+
+/** Creates the stable ref to pass to `CanvasActionsRegistryProvider`. */
+export function useCreateCanvasActionsRegistry() {
+  return useRef<CanvasActions | null>(null);
+}
+
+/** Reads canvas actions from the registry ref — works from anywhere inside
+ * `CanvasActionsRegistryProvider`, including the sidebar. Falls back to the
+ * direct context value (for tests / in-tree consumers). */
+export function useCanvasActionsFromRegistry(): CanvasActions | null {
+  const direct = useContext(CanvasActionsContext);
+  const registry = useContext(CanvasActionsRegistryContext);
+  return direct ?? registry?.current ?? null;
 }
