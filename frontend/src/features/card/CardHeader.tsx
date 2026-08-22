@@ -66,7 +66,6 @@ export function CardHeader({
       <span className="gr-ground-truth" style={{ fontSize: "0.75rem", color: "#6b7280" }}>
         {toHex(fn.address)}
       </span>
-      <span style={{ fontSize: "0.6875rem", color: "#6b7280" }}>{fn.kind}</span>
       {fn.hasNotes && <Glyph name="hasNotes" />}
       {canColor && paletteOpen && (
         <div
