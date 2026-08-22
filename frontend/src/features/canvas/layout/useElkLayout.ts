@@ -26,11 +26,27 @@ export type ElkLayoutFn = typeof computeElkLayout;
 export function useElkLayout(layoutFn: ElkLayoutFn = computeElkLayout) {
   const requestIdRef = useRef(0);
   const [positions, setPositions] = useState<LayoutPositions>({});
+  // True while the most recently issued request has not resolved yet. The
+  // canvas uses this to avoid revealing a brand-new node against a position
+  // that a still-in-flight pass is about to correct (the leftover ~48px
+  // jump after the (0,0) frame was already suppressed).
+  //
+  // Deliberately a REF as well as state. A consumer's reveal effect runs in
+  // the same commit as the effect that calls `runLayout`, so the `state`
+  // copy it closed over during render is still `false` at that moment and it
+  // would reveal against a position the queued pass is about to change
+  // (confirmed live: node revealed at y=154, corrected to y=106 ~21ms
+  // later). The ref reflects the call that just happened; the state exists
+  // only to re-trigger the effect when the flag flips back.
+  const isLayoutPendingRef = useRef(false);
+  const [isLayoutPending, setIsLayoutPending] = useState(false);
 
   const runLayout = useCallback(
     (nodes: ElkLayoutNode[], edges: LayoutInputEdge[]) => {
       const requestId = requestIdRef.current + 1;
       requestIdRef.current = requestId;
+      isLayoutPendingRef.current = true;
+      setIsLayoutPending(true);
 
       const unpinned = nodes.filter((n) => !n.pinned);
       const unpinnedIds = new Set(unpinned.map((n) => n.id));
@@ -56,10 +72,12 @@ export function useElkLayout(layoutFn: ElkLayoutFn = computeElkLayout) {
         // recently issued one (a superseded, in-flight call resolving late).
         if (requestId !== requestIdRef.current) return;
         setPositions(result);
+        isLayoutPendingRef.current = false;
+        setIsLayoutPending(false);
       });
     },
     [layoutFn],
   );
 
-  return { positions, runLayout };
+  return { positions, runLayout, isLayoutPending, isLayoutPendingRef };
 }

@@ -3,7 +3,7 @@
  * Side-effect free by construction (C2c) — this is a plain GET, no
  * summary-demand wiring in I5 (that arrives with I9).
  */
-import { useQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/api/client";
 import type { FunctionId, NeighbourPageDto, ViewId } from "@/api/types";
 
@@ -39,9 +39,12 @@ async function fetchNeighbours(params: NeighbourQueryParams): Promise<NeighbourP
  * Query key includes every param that affects the response so that changing
  * `filter`/`sort`/`order`/`group`/`offset` triggers a real refetch rather
  * than serving a stale cached page.
+ *
+ * Exported as options (not just a hook) so `CanvasView.fanOutFunction` can
+ * prefetch the exact entry a freshly-mounted `NeighbourTable` will read.
  */
-export function useNeighboursQuery(params: NeighbourQueryParams) {
-  return useQuery({
+export function neighbourQueryOptions(params: NeighbourQueryParams) {
+  return queryOptions({
     queryKey: [
       "neighbours",
       params.functionId,
@@ -56,4 +59,8 @@ export function useNeighboursQuery(params: NeighbourQueryParams) {
     ],
     queryFn: () => fetchNeighbours(params),
   });
+}
+
+export function useNeighboursQuery(params: NeighbourQueryParams) {
+  return useQuery(neighbourQueryOptions(params));
 }
