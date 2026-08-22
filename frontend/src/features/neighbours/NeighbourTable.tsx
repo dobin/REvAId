@@ -13,7 +13,7 @@ import type { FunctionId, ViewId } from "@/api/types";
 import { FilterInput } from "./FilterInput";
 import { SortControl, type SortKey, type SortOrder } from "./SortControl";
 import { SuppressedNotice } from "./SuppressedNotice";
-import { TableFooter } from "./TableFooter";
+
 import { UtilityGroup } from "./UtilityGroup";
 import { VirtualRowList } from "./VirtualRowList";
 
@@ -55,6 +55,7 @@ export function NeighbourTable({
   if (direction === "callers" && data.callersSuppressed) {
     return (
       <section>
+        <hr style={{ border: "none", borderTop: "1px solid #e5e7eb", margin: "0.5rem 0" }} />
         <h3 style={{ fontSize: "0.8125rem", margin: "0.5rem 0 0.25rem" }}>{label}</h3>
         <SuppressedNotice total={data.total} />
       </section>
@@ -63,6 +64,7 @@ export function NeighbourTable({
 
   return (
     <section>
+      <hr style={{ border: "none", borderTop: "1px solid #e5e7eb", margin: "0.5rem 0" }} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
         <h3 style={{ fontSize: "0.8125rem", margin: "0.5rem 0 0.25rem" }}>{label}</h3>
         <div style={{ display: "flex", gap: "0.375rem" }}>
@@ -83,7 +85,6 @@ export function NeighbourTable({
         direction={direction}
         totalUtility={data.totalUtility}
       />
-      <TableFooter shown={data.rows.length} total={data.total} />
       {data.mayBeIncomplete && (
         <p style={{ fontSize: "0.6875rem", color: "#9ca3af", margin: "0.25rem 0 0" }}>
           List may be incomplete (indirect calls).
