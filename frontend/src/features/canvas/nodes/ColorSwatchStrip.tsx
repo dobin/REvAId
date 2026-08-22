@@ -5,7 +5,7 @@
  */
 import type { NodeColor } from "@/api/types";
 
-const SWATCH_HEX: Record<NodeColor, string> = {
+export const SWATCH_HEX: Record<NodeColor, string> = {
   slate: "#64748b",
   red: "#ef4444",
   amber: "#f59e0b",

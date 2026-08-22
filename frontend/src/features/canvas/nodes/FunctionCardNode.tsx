@@ -16,7 +16,6 @@ import { NeighbourTable } from "@/features/neighbours/NeighbourTable";
 import { useAppStore } from "@/store";
 import { useViewNodeActions } from "../useViewNodeActions";
 import { CollapsedChip } from "./CollapsedChip";
-import { ColorSwatchStrip } from "./ColorSwatchStrip";
 
 /**
  * A card connects to its provenance parent/children horizontally (layout
@@ -98,7 +97,14 @@ export function FunctionCardNode({ data }: { data: FunctionCardNodeData }) {
             selectFunction(data.functionId);
           }}
         >
-          <CardHeader fn={fn} />
+          <CardHeader
+            fn={fn}
+            color={data.viewNode.color}
+            palette={config.nodeColorPalette}
+            onColorSelect={(color) => {
+              actions.setColor(data.functionId, color);
+            }}
+          />
         </div>
         <button
           type="button"
@@ -117,13 +123,6 @@ export function FunctionCardNode({ data }: { data: FunctionCardNodeData }) {
           ✕
         </button>
       </div>
-      <ColorSwatchStrip
-        palette={config.nodeColorPalette}
-        selected={data.viewNode.color}
-        onSelect={(color) => {
-          actions.setColor(data.functionId, color);
-        }}
-      />
       <CardSummary fn={fn} />
       <div style={{ padding: "0 0.75rem 0.75rem" }}>
         <NeighbourTable functionId={data.functionId} viewId={data.viewId} direction="callees" />
