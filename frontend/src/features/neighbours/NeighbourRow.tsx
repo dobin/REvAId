@@ -62,7 +62,6 @@ export function NeighbourRow({
         {toHex(row.address)}
       </span>
       <span style={{ display: "flex", alignItems: "center", gap: "0.375rem", minWidth: 0 }}>
-        {row.kind === "placeholder" && <Glyph name="placeholder" />}
         {row.isSelf && <Glyph name="recursive" />}
         {row.isUtility && <Glyph name="utility" />}
         {row.hasNotes && <Glyph name="hasNotes" />}
