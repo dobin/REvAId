@@ -26,11 +26,10 @@ const baseRow: NeighbourRowDto = {
 };
 
 describe("NeighbourRow", () => {
-  it("renders address, name, and summary", () => {
+  it("renders address and name", () => {
     render(<NeighbourRow row={baseRow} />);
     expect(screen.getByText("0x401020")).toBeInTheDocument();
     expect(screen.getByText("open_file")).toBeInTheDocument();
-    expect(screen.getByText("—")).toBeInTheDocument();
   });
 
   it("shows the recursion glyph for self-calls and disables fan-out", () => {

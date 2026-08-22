@@ -39,9 +39,9 @@ const baseFn: FunctionDto = {
 };
 
 describe("CardSummary", () => {
-  it("renders a dash when no summary exists yet", () => {
-    render(<CardSummary fn={baseFn} />);
-    expect(screen.getByText("—")).toBeInTheDocument();
+  it("renders nothing when no summary exists yet", () => {
+    const { container } = render(<CardSummary fn={baseFn} />);
+    expect(container).toBeEmptyDOMElement();
   });
 
   it("renders the short summary when ready", () => {
@@ -51,5 +51,12 @@ describe("CardSummary", () => {
       />,
     );
     expect(screen.getByText(/entry point/i)).toBeInTheDocument();
+  });
+
+  it("renders a generating message when pending", () => {
+    render(
+      <CardSummary fn={{ ...baseFn, summary: { ...baseFn.summary, status: "pending" } }} />,
+    );
+    expect(screen.getByText(/generating/i)).toBeInTheDocument();
   });
 });

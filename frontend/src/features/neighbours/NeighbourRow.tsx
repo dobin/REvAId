@@ -8,7 +8,6 @@ import { Glyph } from "@/components/Glyph";
 import { toHex } from "@/lib/hex";
 import type { NeighbourRowDto } from "@/api/types";
 import { useCanvasActions, type FanOutOrigin } from "@/features/canvas/CanvasActions";
-import { SummaryCell } from "./SummaryCell";
 
 export function NeighbourRow({
   row,
@@ -44,7 +43,7 @@ export function NeighbourRow({
       role="row"
       style={{
         display: "grid",
-        gridTemplateColumns: "auto 1fr auto auto",
+        gridTemplateColumns: "auto 1fr auto",
         gap: "0.5rem",
         alignItems: "center",
         padding: "0.25rem 0",
@@ -67,11 +66,6 @@ export function NeighbourRow({
           {row.displayName}
         </span>
       </span>
-      <SummaryCell
-        status={row.summaryStatus}
-        summaryShort={row.summaryShort}
-        lowConfidence={row.summaryLowConfidence}
-      />
       <button
         type="button"
         disabled={disabled}

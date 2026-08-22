@@ -13,6 +13,7 @@ import asyncio
 import typer
 
 from graphrev.adapters.ghidra import GhidraAdapterNotImplementedError, create_adapter
+from graphrev.adapters.ghidra.mock import seed_mock_summaries
 from graphrev.core.config import GhidraAdapterName, get_settings
 from graphrev.db.engine import create_engine, create_session_factory, dispose_engine
 from graphrev.ingestion.pipeline import run_ingestion
@@ -45,6 +46,9 @@ def run(adapter: str, seed: int, binary: str | None) -> None:
             reports = await run_ingestion(
                 session_factory, ghidra_adapter, settings, binary_filter=binary
             )
+            if adapter == "mock":
+                n = await seed_mock_summaries(session_factory)
+                typer.echo(f"Seeded {n} mock summaries.")
         finally:
             await dispose_engine(engine)
         print_report(reports)
