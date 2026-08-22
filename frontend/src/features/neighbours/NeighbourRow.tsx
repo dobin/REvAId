@@ -43,14 +43,22 @@ export function NeighbourRow({
       role="row"
       style={{
         display: "grid",
-        gridTemplateColumns: "auto 1fr auto",
+        gridTemplateColumns: "4.5rem 1fr auto",
         gap: "0.5rem",
         alignItems: "center",
         padding: "0.25rem 0",
         borderBottom: "1px solid #f3f4f6",
       }}
     >
-      <span className="gr-ground-truth" style={{ fontSize: "0.75rem", color: "#6b7280" }}>
+      <span
+        className="gr-ground-truth"
+        style={{
+          fontSize: "0.75rem",
+          color: "#6b7280",
+          textAlign: "right",
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
         {toHex(row.address)}
       </span>
       <span style={{ display: "flex", alignItems: "center", gap: "0.375rem", minWidth: 0 }}>
