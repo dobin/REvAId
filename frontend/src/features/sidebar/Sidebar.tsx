@@ -6,6 +6,7 @@ import type { BinaryId, ViewId } from "@/api/types";
 import { GlyphLegend } from "./GlyphLegend";
 import { OnCanvasList } from "./OnCanvasList";
 import { PlaceEntryPointButton } from "./PlaceEntryPointButton";
+import { RebalanceButton } from "./RebalanceButton";
 import { ResetCanvasButton } from "./ResetCanvasButton";
 
 export function Sidebar({
@@ -20,6 +21,7 @@ export function Sidebar({
       {binaryId !== null && viewId !== null && (
         <PlaceEntryPointButton binaryId={binaryId} viewId={viewId} />
       )}
+      {viewId !== null && <RebalanceButton viewId={viewId} />}
       {viewId !== null && <ResetCanvasButton viewId={viewId} />}
       <OnCanvasList viewId={viewId} />
       <h2 style={{ fontSize: "0.875rem", fontWeight: 600 }}>Legend</h2>

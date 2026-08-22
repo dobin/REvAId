@@ -41,6 +41,10 @@ export interface CanvasSlice {
   /** Wipe all local position state — call after a full canvas reset so
    * stale pinned/dragging entries do not bleed into the blank canvas. */
   clearPositions: () => void;
+  /** Unpin every node so the next ELK layout pass repositions them all from
+   * scratch (rebalance / "forget manual moves"). Does not touch the server —
+   * the caller must persist the change via `usePatchViewNodesMutation`. */
+  unpinAll: () => void;
 }
 
 export const createCanvasSlice: StateCreator<CanvasSlice, [], [], CanvasSlice> = (set) => ({
@@ -87,4 +91,12 @@ export const createCanvasSlice: StateCreator<CanvasSlice, [], [], CanvasSlice> =
     }));
   },
   clearPositions: () => set({ positions: {} }),
+  unpinAll: () =>
+    set((state) => {
+      const updated: Record<FunctionId, CanvasNodePosition> = {};
+      for (const [id, pos] of Object.entries(state.positions)) {
+        updated[id as FunctionId] = { ...pos, pinned: false, dragging: false };
+      }
+      return { positions: updated };
+    }),
 });
