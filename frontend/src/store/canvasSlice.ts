@@ -38,6 +38,9 @@ export interface CanvasSlice {
    * defaults, not inherited state) — unpinned, so the next ELK layout
    * pass positions it properly once the server round trip lands. */
   upsertPosition: (functionId: FunctionId, posX: number, posY: number, pinned: boolean) => void;
+  /** Wipe all local position state — call after a full canvas reset so
+   * stale pinned/dragging entries do not bleed into the blank canvas. */
+  clearPositions: () => void;
 }
 
 export const createCanvasSlice: StateCreator<CanvasSlice, [], [], CanvasSlice> = (set) => ({
@@ -83,4 +86,5 @@ export const createCanvasSlice: StateCreator<CanvasSlice, [], [], CanvasSlice> =
       },
     }));
   },
+  clearPositions: () => set({ positions: {} }),
 });
