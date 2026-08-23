@@ -1,4 +1,7 @@
-# GraphRev
+# Revealm - reverse + realm, mapping an unknown world
+
+**I cant code but i must reverse**
+
 
 GraphRev is a semantic function graph explorer for binary reverse
 engineering: it renders a binary's call graph as interactive cards, lazily
