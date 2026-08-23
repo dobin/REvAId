@@ -80,11 +80,17 @@ function CanvasViewInner({
   } = useElkLayout();
   const reactFlow = useReactFlow();
   const hydratedForViewId = useRef<ViewId | null>(null);
+  /** Once-per-view flag: has the initial camera been positioned yet? On the
+   * first paint we anchor the root card near the top-left of the canvas
+   * rather than trusting the persisted camera (which, in existing data, is a
+   * stale auto-fit value that dead-centres the card). */
+  const initialCameraPositionedRef = useRef(false);
 
   useEffect(() => {
     if (!view.data || hydratedForViewId.current === viewId) return;
     hydrateFromView(view.data.nodes);
     hydratedForViewId.current = viewId;
+    initialCameraPositionedRef.current = false;
   }, [view.data, viewId, hydrateFromView]);
 
   const visibleNodes = useMemo(
@@ -297,6 +303,32 @@ function CanvasViewInner({
     });
   }, [elkPositions, measuredIds, isLayoutPending, isLayoutPendingRef]);
 
+  // One-time initial camera placement: anchor the root card (or, failing
+  // that, the first node) near the top-left of the canvas at zoom 1, so a
+  // reload/first-visit always lands the same, readable way instead of behind
+  // the stale auto-fit camera that dead-centres the card. Runs once the first
+  // node has been laid out & measured (so its flow position is trustworthy).
+  const rootFunctionId = view.data?.rootFunctionId ?? null;
+  useEffect(() => {
+    if (initialCameraPositionedRef.current) return;
+    if (rfNodes.length === 0) return;
+    const anchor =
+      (rootFunctionId !== null
+        ? rfNodes.find((n) => n.id === String(rootFunctionId))
+        : undefined) ?? rfNodes[0];
+    if (anchor?.measured?.height === undefined) return;
+    initialCameraPositionedRef.current = true;
+    // Pad from the top-left edges so the card isn't jammed into the corner.
+    const PAD = 80;
+    // viewport = screen position of flow origin, so to put the anchor's
+    // top-left corner at (PAD, PAD) we translate by PAD − anchorFlowPos.
+    reactFlow.setViewport({
+      x: PAD - anchor.position.x,
+      y: PAD - anchor.position.y,
+      zoom: 1.0,
+    });
+  }, [rfNodes, rootFunctionId, reactFlow]);
+
   const handleNodeDragStop: OnNodeDrag = (_event, node) => {
     const functionId: FunctionId = Number(node.id);
     commitDragAsPinned(functionId, node.position.x, node.position.y);
@@ -423,8 +455,6 @@ function CanvasViewInner({
           nodeTypes={NODE_TYPES}
           edgeTypes={EDGE_TYPES}
           onNodesChange={onNodesChange}
-          fitView
-          fitViewOptions={{ maxZoom: 1.0 }}
           minZoom={0.05}
           nodesDraggable
           defaultViewport={{
