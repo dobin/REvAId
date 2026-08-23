@@ -2,12 +2,12 @@
 
 **I cant code but i must reverse**
 
-
-GraphRev is a semantic function graph explorer for binary reverse
+Revealm is a semantic function graph explorer for binary reverse
 engineering: it renders a binary's call graph as interactive cards, lazily
 summarizes functions with an LLM, and lets an analyst annotate what they
-find. See `PRD.md` for the product spec and `TAD.md` for the technical
-architecture; this file only covers running the code.
+find. 
+
+This is 100% vibe coded. Claude 5. See `IDEA.md`, `PRD.md`, `TAD.md`.
 
 Ghidra and LLM integrations ship as deterministic **mocks** in M0/M1 of this
 milestone — see `docs/adapters.md` for the real-adapter contract.
@@ -49,8 +49,8 @@ wired together end to end.
 All tunable thresholds (`TABLE_ROW_CAP`, `CALLER_SUPPRESS_THRESHOLD`,
 `UTILITY_FANIN_THRESHOLD`, `FAN_OUT_ALL_HARD_CAP`, `NODE_COUNT_SOFT_WARNING`,
 plus adapter selection and everything else) live in
-`backend/src/graphrev/core/config.py` and are set via environment variables
-(prefix `GRAPHREV_`) or a `.env` file — see `.env.example`. They are exposed
+`backend/src/Revealm/core/config.py` and are set via environment variables
+(prefix `Revealm_`) or a `.env` file — see `.env.example`. They are exposed
 to the frontend as a single payload from `GET /api/v1/config`; no component
 may hard-code a threshold (enforced by `scripts/check-magic-numbers.sh`,
 which also runs in CI).
@@ -59,7 +59,7 @@ which also runs in CI).
 
 The database schema is created **exclusively** through Alembic — there is no
 `create_all()` path, even in tests (see `docs/adr/0002-alembic-in-v0.md`).
-After changing `backend/src/graphrev/db/models.py`:
+After changing `backend/src/Revealm/db/models.py`:
 
 ```sh
 just revision name="describe your change"
