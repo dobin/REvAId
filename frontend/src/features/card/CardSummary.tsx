@@ -39,12 +39,13 @@ export function CardSummary({ fn }: { fn: FunctionDto }) {
     <div
       title={text}
       style={{
-        padding: "0 0.75rem 0.5rem",
+        padding: "0.375rem 0.75rem 0.25rem",
         fontSize: "0.75rem",
         color,
         overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap",
+        display: "-webkit-box",
+        WebkitLineClamp: 2,
+        WebkitBoxOrient: "vertical",
       }}
     >
       {text}
