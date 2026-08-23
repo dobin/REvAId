@@ -8,6 +8,7 @@ import { Glyph } from "@/components/Glyph";
 import { toHex } from "@/lib/hex";
 import type { NeighbourRowDto } from "@/api/types";
 import { useCanvasActions, type FanOutOrigin } from "@/features/canvas/CanvasActions";
+import { FunctionInfoTooltip } from "./FunctionInfoTooltip";
 
 export function NeighbourRow({
   row,
@@ -66,12 +67,14 @@ export function NeighbourRow({
         {row.isUtility && <Glyph name="utility" />}
         {row.hasNotes && <Glyph name="hasNotes" />}
         {row.isRenamed && <Glyph name="renamed" />}
-        <span
-          className="gr-ground-truth"
-          style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-        >
-          {row.displayName}
-        </span>
+        <FunctionInfoTooltip functionId={row.id}>
+          <span
+            className="gr-ground-truth"
+            style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+          >
+            {row.displayName}
+          </span>
+        </FunctionInfoTooltip>
       </span>
       <button
         type="button"
