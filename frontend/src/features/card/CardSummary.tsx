@@ -37,7 +37,7 @@ export function CardSummary({ fn }: { fn: FunctionDto }) {
 
   return (
     <div
-      title={text}
+      title={fn.summary.long ?? text ?? undefined}
       style={{
         padding: "0.375rem 0.75rem 0.25rem",
         fontSize: "0.75rem",
@@ -50,6 +50,26 @@ export function CardSummary({ fn }: { fn: FunctionDto }) {
     >
       {text}
       {status === "ready" && lowConfidence && " (low confidence)"}
+      {fn.summary.long && (
+        <span
+          style={{
+            display: "inline-block",
+            marginLeft: "0.25rem",
+            fontSize: "0.65rem",
+            lineHeight: 1,
+            color: "#9ca3af",
+            border: "1px solid #9ca3af",
+            borderRadius: "50%",
+            width: "0.9rem",
+            height: "0.9rem",
+            textAlign: "center",
+            verticalAlign: "middle",
+            flexShrink: 0,
+          }}
+        >
+          i
+        </span>
+      )}
     </div>
   );
 }
