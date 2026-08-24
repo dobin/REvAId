@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from graphrev.api.deps import SessionDep, SummaryQueueDep
+from graphrev.api.deps import EventBusDep, SessionDep, SummaryQueueDep
 from graphrev.schemas.summary import CancelPendingResponseDto, QueueSnapshotDto
 from graphrev.services import queue_service
 
@@ -18,6 +18,6 @@ async def get_queue(session: SessionDep, queue: SummaryQueueDep) -> QueueSnapsho
 
 
 @router.post("/queue/cancel-pending", response_model=CancelPendingResponseDto)
-async def cancel_pending(queue: SummaryQueueDep) -> CancelPendingResponseDto:
+async def cancel_pending(queue: SummaryQueueDep, event_bus: EventBusDep) -> CancelPendingResponseDto:
     """Drop all queued-unstarted items (endpoint 21)."""
-    return await queue_service.cancel_all_pending(queue)
+    return await queue_service.cancel_all_pending(queue, event_bus)

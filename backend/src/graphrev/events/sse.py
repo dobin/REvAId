@@ -42,12 +42,12 @@ async def sse_event_stream(
             except TimeoutError:
                 yield _KEEPALIVE_COMMENT
                 continue
-            if event is None:
-                # Overflow close sentinel (bus._force_reconcile_and_close) —
-                # the reconcile event itself was already enqueued right
-                # before this sentinel, so it has already been yielded by a
-                # prior loop iteration by the time we get here.
-                return
             yield format_sse(event)
+            if bus.consume_close(subscriber_id):
+                # Overflow (bus._force_reconcile_and_close): the reconcile
+                # event just yielded above is this subscriber's last one —
+                # end the stream so the client's own reconnect logic takes
+                # over (TAD §2.7).
+                return
     finally:
         bus.unsubscribe(subscriber_id)

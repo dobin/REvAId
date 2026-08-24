@@ -1,9 +1,9 @@
 /**
- * Toolbar (TAD §2.3) — `BinaryPicker` (I5) + `ViewPicker` (I6). `QueueChip`
- * (I7) is added when the summary queue lands.
+ * Toolbar (TAD §2.3) — `BinaryPicker` (I5), `ViewPicker` (I6), `QueueChip` (I8).
  */
 import type { BinaryId, ViewId } from "@/api/types";
 import { BinaryPicker } from "./BinaryPicker";
+import { QueueChip } from "./QueueChip";
 import { ViewPicker } from "./ViewPicker";
 
 export function Toolbar({
@@ -32,6 +32,9 @@ export function Toolbar({
       {selectedBinaryId !== null && (
         <ViewPicker binaryId={selectedBinaryId} value={selectedViewId} onChange={onSelectView} />
       )}
+      <div style={{ marginLeft: "auto" }}>
+        <QueueChip />
+      </div>
     </div>
   );
 }

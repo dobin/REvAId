@@ -21,6 +21,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from graphrev.adapters.llm import create_adapter as create_llm_adapter
 from graphrev.api.routers import binaries as binaries_router
 from graphrev.api.routers import config as config_router
+from graphrev.api.routers import events as events_router
 from graphrev.api.routers import functions as functions_router
 from graphrev.api.routers import health as health_router
 from graphrev.api.routers import neighbours as neighbours_router
@@ -44,6 +45,7 @@ from graphrev.core.logging import (
 )
 from graphrev.db.engine import create_engine, create_session_factory, dispose_engine
 from graphrev.db.startup import recompute_utility_if_threshold_changed, recover_pending_summaries
+from graphrev.events.bus import InProcessEventBus
 from graphrev.summarization.queue import SummaryQueue
 from graphrev.summarization.worker import SummaryWorkerPool
 
@@ -91,6 +93,36 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await recover_pending_summaries(session)
         await recompute_utility_if_threshold_changed(session, settings)
 
+    # I8: the event bus. Constructed before the worker pool so the pool's
+    # `result_listener` can publish `summary` events (E5a) the moment a
+    # worker persists a result — every SSE subscriber sees it in-flight.
+    event_bus = InProcessEventBus(subscriber_queue_size=settings.sse_subscriber_queue_size)
+    app.state.event_bus = event_bus
+
+    async def _publish_summary_event(
+        *,
+        function_id: int,
+        binary_id: int,  # noqa: ARG001 - not part of the E5a payload; kept for future use
+        summary_status: str,
+        summary_short: str | None,
+        summary_model: str | None,
+        low_confidence: bool,
+        generated_at: str | None,
+        error_code: str | None,
+    ) -> None:
+        event_bus.publish(
+            "summary",
+            {
+                "functionId": function_id,
+                "summaryStatus": summary_status,
+                "summaryShort": summary_short,
+                "summaryModel": summary_model,
+                "lowConfidence": low_confidence,
+                "generatedAt": generated_at,
+                "errorCode": error_code,
+            },
+        )
+
     # I7: the summarization plane. Constructed here (not at import time) so
     # each `create_app()` call — including one per test — gets its own queue
     # and worker pool rather than sharing process-wide singletons.
@@ -101,6 +133,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         adapter=llm_adapter,
         session_factory=session_factory,
         concurrency=settings.summary_concurrency,
+        result_listener=_publish_summary_event,
     )
     app.state.summary_queue = summary_queue
     app.state.summary_worker_pool = worker_pool
@@ -166,6 +199,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(view_nodes_router.router, prefix="/api/v1")
     app.include_router(summaries_router.router, prefix="/api/v1")
     app.include_router(queue_router.router, prefix="/api/v1")
+    app.include_router(events_router.router, prefix="/api/v1")
 
     return app
 

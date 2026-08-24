@@ -323,3 +323,76 @@ export interface ErrorEnvelope {
     details?: Record<string, unknown> | null;
   };
 }
+
+// -- I7/I8: summary demand + queue -----------------------------------------
+
+/** `POST /functions/{id}/summary` request body (endpoint 17). */
+export interface SummaryDemandRequest {
+  priority: Priority;
+  reason?: string;
+}
+
+/** `POST /functions/{id}/summary` / `.../regenerate` response. */
+export interface SummaryDemandResponseDto {
+  functionId: FunctionId;
+  summaryStatus: SummaryStatus;
+  queuePosition: number | null;
+  summaryShort: string | null;
+}
+
+export interface QueuedItemDto {
+  functionId: FunctionId;
+  displayName: string;
+  priority: Priority;
+}
+
+export interface InFlightItemDto {
+  functionId: FunctionId;
+  displayName: string;
+  startedAt: string | null;
+}
+
+/** `GET /queue` (endpoint 20) — the toolbar chip's data source. */
+export interface QueueSnapshotDto {
+  inFlight: InFlightItemDto[];
+  queued: QueuedItemDto[];
+  inFlightCount: number;
+  queuedCount: number;
+  pausedUntil: string | null;
+}
+
+export interface CancelPendingResponseDto {
+  cancelledCount: number;
+}
+
+// -- I8: SSE events (`GET /events`, TAD §4.2 #22, E5/E5a/E5b) --------------
+
+export interface SummaryEvent {
+  type: "summary";
+  functionId: FunctionId;
+  summaryStatus: SummaryStatus;
+  summaryShort: string | null;
+  summaryModel: string | null;
+  lowConfidence: boolean;
+  generatedAt: string | null;
+  errorCode: string | null;
+}
+
+export interface QueueEvent {
+  type: "queue";
+  inFlightCount: number;
+  queuedCount: number;
+  pausedUntil: string | null;
+}
+
+export interface BinaryEvent {
+  type: "binary";
+  binaryId: BinaryId;
+  kind: "imported" | "deleted";
+}
+
+export interface ReconcileEvent {
+  type: "reconcile";
+}
+
+export type ServerEvent = SummaryEvent | QueueEvent | BinaryEvent | ReconcileEvent;

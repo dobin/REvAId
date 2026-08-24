@@ -8,6 +8,7 @@ import { Sidebar } from "@/features/sidebar/Sidebar";
 import { CanvasView } from "@/features/canvas/CanvasView";
 import { DetailPanel } from "@/features/detail/DetailPanel";
 import { CanvasActionsRegistryProvider, useCreateCanvasActionsRegistry } from "@/features/canvas/CanvasActions";
+import { SseProvider } from "@/realtime/SseProvider";
 
 function AppShell() {
   const actionsRegistry = useCreateCanvasActionsRegistry();
@@ -64,7 +65,9 @@ function AppShell() {
 export default function App() {
   return (
     <ConfigProvider fallback={<p style={{ padding: "1rem" }}>Loading configuration…</p>}>
-      <AppShell />
+      <SseProvider>
+        <AppShell />
+      </SseProvider>
     </ConfigProvider>
   );
 }

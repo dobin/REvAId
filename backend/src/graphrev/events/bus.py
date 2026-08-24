@@ -48,13 +48,9 @@ class EventBus(Protocol):
 
 @dataclass(slots=True)
 class _Subscriber:
-    """One live SSE connection's mailbox.
+    """One live SSE connection's mailbox."""
 
-    ``queue`` yields :class:`ServerEvent` values; a ``None`` sentinel tells
-    the SSE generator to close the connection (used only on overflow).
-    """
-
-    queue: asyncio.Queue[ServerEvent | None] = field(default_factory=lambda: asyncio.Queue())
+    queue: asyncio.Queue[ServerEvent] = field(default_factory=lambda: asyncio.Queue())
 
 
 class InProcessEventBus:
@@ -64,6 +60,11 @@ class InProcessEventBus:
     def __init__(self, *, subscriber_queue_size: int) -> None:
         self._subscriber_queue_size = subscriber_queue_size
         self._subscribers: dict[int, _Subscriber] = {}
+        #: Subscriber ids the SSE generator must close *after* it has
+        #: yielded the reconcile event already sitting in that subscriber's
+        #: queue (see :meth:`consume_close`). Kept separate from
+        #: ``_subscribers`` itself, which is used only for future publishes.
+        self._closing: set[int] = set()
         self._next_subscriber_id = itertools.count(1)
         self._next_event_id = itertools.count(1)
 
@@ -75,9 +76,10 @@ class InProcessEventBus:
             except asyncio.QueueFull:
                 self._force_reconcile_and_close(subscriber_id, subscriber)
 
-    def subscribe(self) -> tuple[int, asyncio.Queue[ServerEvent | None]]:
+    def subscribe(self) -> tuple[int, asyncio.Queue[ServerEvent]]:
         """Register a new SSE connection. Returns an opaque id (for
-        :meth:`unsubscribe`) and the queue the caller should read from."""
+        :meth:`unsubscribe`/:meth:`consume_close`) and the queue the caller
+        should read from."""
         subscriber_id = next(self._next_subscriber_id)
         subscriber = _Subscriber(queue=asyncio.Queue(maxsize=self._subscriber_queue_size))
         self._subscribers[subscriber_id] = subscriber
@@ -85,6 +87,17 @@ class InProcessEventBus:
 
     def unsubscribe(self, subscriber_id: int) -> None:
         self._subscribers.pop(subscriber_id, None)
+        self._closing.discard(subscriber_id)
+
+    def consume_close(self, subscriber_id: int) -> bool:
+        """Called by :func:`graphrev.events.sse.sse_event_stream` right
+        after yielding an event: returns ``True`` exactly once if this
+        subscriber was marked for close-after-reconcile (overflow), telling
+        the generator to end the stream rather than keep looping."""
+        if subscriber_id in self._closing:
+            self._closing.discard(subscriber_id)
+            return True
+        return False
 
     @property
     def subscriber_count(self) -> int:
@@ -93,19 +106,21 @@ class InProcessEventBus:
 
     def _force_reconcile_and_close(self, subscriber_id: int, subscriber: _Subscriber) -> None:
         """Overflow handling (TAD §2.7): drop everything already queued for
-        this subscriber, hand it exactly one ``reconcile`` event, then a
-        close sentinel. The subscriber is removed from ``_subscribers``
-        immediately — a stuck client must not keep absorbing future
-        `put_nowait` attempts (`QueueFull` on every subsequent publish is
-        pure waste once we've already decided to close it)."""
+        this subscriber and hand it exactly one ``reconcile`` event. The
+        subscriber is removed from ``_subscribers`` immediately — a stuck
+        client must not keep absorbing future `put_nowait` attempts
+        (`QueueFull` on every subsequent publish is pure waste once we've
+        already decided to close it) — but ``consume_close`` still reports
+        `True` for it once the SSE generator has drained the reconcile
+        event, telling that generator to end the stream."""
         while not subscriber.queue.empty():
             try:
                 subscriber.queue.get_nowait()
             except asyncio.QueueEmpty:  # pragma: no cover - race is harmless
                 break
         reconcile_event = ServerEvent(id=next(self._next_event_id), event="reconcile", data={})
-        # Both puts are safe: the queue was just drained above, and a queue
-        # of size >= 1 always has room for these two immediately after.
+        # Safe: the queue was just drained above, and a queue of size >= 1
+        # always has room for one item immediately after being emptied.
         subscriber.queue.put_nowait(reconcile_event)
-        subscriber.queue.put_nowait(None)
         self._subscribers.pop(subscriber_id, None)
+        self._closing.add(subscriber_id)
