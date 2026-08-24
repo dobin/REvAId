@@ -37,9 +37,9 @@ describe("NeighbourRow", () => {
     expect(screen.getByRole("button", { name: "fan-out-or-focus" })).toBeDisabled();
   });
 
-  it("shows the on-canvas glyph when already placed", () => {
+  it("shows the hide glyph when already placed", () => {
     render(<NeighbourRow row={{ ...baseRow, onCanvas: true }} />);
-    expect(screen.getByRole("img", { name: /already on canvas/i })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /^hide$/i })).toBeInTheDocument();
   });
 
   function makeActions(): CanvasActions {

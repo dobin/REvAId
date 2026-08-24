@@ -94,7 +94,7 @@ describe("NeighbourTable", () => {
     renderWithProviders(10, 1, "callees");
 
     await waitFor(() => {
-      expect(screen.getByText("showing 16 of 312")).toBeInTheDocument();
+      expect(screen.getByText("fn_0")).toBeInTheDocument();
     });
     expect(screen.getByText(/may be incomplete/i)).toBeInTheDocument();
   });

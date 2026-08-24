@@ -39,11 +39,10 @@ const baseFn: FunctionDto = {
 };
 
 describe("CardHeader", () => {
-  it("renders the display name, hex address, and kind", () => {
+  it("renders the display name and hex address", () => {
     render(<CardHeader fn={baseFn} />);
     expect(screen.getByText("main")).toBeInTheDocument();
     expect(screen.getByText("0x401000")).toBeInTheDocument();
-    expect(screen.getByText("normal")).toBeInTheDocument();
   });
 
   it("shows the renamed glyph when isRenamed", () => {

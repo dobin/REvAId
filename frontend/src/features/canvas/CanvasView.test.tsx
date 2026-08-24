@@ -2,6 +2,10 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfigProvider } from "@/config/ConfigProvider";
+import {
+  CanvasActionsRegistryProvider,
+  useCreateCanvasActionsRegistry,
+} from "./CanvasActions";
 import { CanvasView } from "./CanvasView";
 import type { AppConfigDto, FunctionDto, NeighbourPageDto, ViewDto } from "@/api/types";
 
@@ -125,10 +129,18 @@ function callerPageWithOneRow(): NeighbourPageDto {
 
 function renderWithProviders(selectedBinaryId: number | null, viewId: number | null) {
   const queryClient = new QueryClient();
+  function Tree() {
+    const actionsRegistry = useCreateCanvasActionsRegistry();
+    return (
+      <CanvasActionsRegistryProvider value={actionsRegistry}>
+        <CanvasView selectedBinaryId={selectedBinaryId} viewId={viewId} actionsRegistry={actionsRegistry} />
+      </CanvasActionsRegistryProvider>
+    );
+  }
   return render(
     <QueryClientProvider client={queryClient}>
       <ConfigProvider fallback={<p>loading</p>}>
-        <CanvasView selectedBinaryId={selectedBinaryId} viewId={viewId} />
+        <Tree />
       </ConfigProvider>
     </QueryClientProvider>,
   );
