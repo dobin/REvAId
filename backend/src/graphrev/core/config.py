@@ -16,7 +16,10 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 GhidraAdapterName = Literal["mock", "rest"]
-LlmAdapterName = Literal["mock", "anthropic"]
+#: AM3 (docs/specs/PLAN-I7-I8-I9-I13.md): "anthropic" was declared but never
+#: implemented; replaced with the two real I13 adapters rather than
+#: accumulating a dead variant (closed-enum discipline, docs/adr/0004).
+LlmAdapterName = Literal["mock", "litellm", "opencode"]
 
 #: D16 — "a small palette of named tokens, not free-form hex". Only `red` is
 #: PRD-hinted (J2); the rest are a TAD invention (docs/adr/0003).

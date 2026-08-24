@@ -135,5 +135,6 @@ forbidden_modules = [
   "graphrev.adapters.ghidra.mock",
   "graphrev.adapters.ghidra.rest",
   "graphrev.adapters.llm.mock",
-  "graphrev.adapters.llm.anthropic",
+  "graphrev.adapters.llm.litellm_adapter",
+  "graphrev.adapters.llm.opencode_adapter",
 ]
