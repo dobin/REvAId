@@ -4,17 +4,15 @@
  * function is already placed (◎), clicking again hides it (toggles it off).
  * `isSelf` (recursion) keeps the button inert.
  *
- * I9 §5.3: a second thin line renders `SummaryCell` under the name, once the
- * row has a non-`none` summary status — this is what actually surfaces the
- * demand system's results in the table (the demand hook only ever fetches;
- * this is what displays what it fetched).
+ * The row itself shows only the name — the summary lives in the
+ * `FunctionInfoTooltip` hover popup (short + long), not as an inline second
+ * line.
  */
 import { Glyph } from "@/components/Glyph";
 import { toHex } from "@/lib/hex";
 import type { NeighbourRowDto } from "@/api/types";
 import { useCanvasActions, type FanOutOrigin } from "@/features/canvas/CanvasActions";
 import { FunctionInfoTooltip } from "./FunctionInfoTooltip";
-import { SummaryCell } from "./SummaryCell";
 
 export function NeighbourRow({
   row,
@@ -83,16 +81,6 @@ export function NeighbourRow({
             </span>
           </FunctionInfoTooltip>
         </span>
-        {row.summaryStatus !== "none" && (
-          <span style={{ fontSize: "0.6875rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            <SummaryCell
-              status={row.summaryStatus}
-              summaryShort={row.summaryShort}
-              lowConfidence={row.summaryLowConfidence}
-              functionId={row.id}
-            />
-          </span>
-        )}
       </span>
       <button
         type="button"
