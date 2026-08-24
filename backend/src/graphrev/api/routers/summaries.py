@@ -51,6 +51,20 @@ async def release_summary(
     summary_service.release_summary_demand(queue, function_id=function_id, event_bus=event_bus)
 
 
+@router.delete(
+    "/binaries/{binary_id}/summaries",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def clear_binary_summaries(
+    binary_id: int, session: SessionDep, queue: SummaryQueueDep, event_bus: EventBusDep
+) -> None:
+    """TESTING affordance: wipe every LLM summary (`summary_short`/
+    `summary_long` and friends) for all functions of the binary."""
+    await summary_service.clear_binary_summaries(
+        session, queue, binary_id=binary_id, event_bus=event_bus
+    )
+
+
 @router.post(
     "/functions/{function_id}/summary/regenerate",
     response_model=SummaryDemandResponseDto,

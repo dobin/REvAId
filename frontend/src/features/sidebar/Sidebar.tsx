@@ -63,7 +63,6 @@ export function Sidebar({
     >
       <SidebarSection title="Binary">
         <ImportBinaryButton onImported={onImported} />
-        {binaryId !== null && <ResetSummariesButton binaryId={binaryId} />}
       </SidebarSection>
       {binaryId !== null && (
         <SidebarSection title="Add Function">
@@ -77,6 +76,7 @@ export function Sidebar({
           )}
           <RebalanceButton viewId={viewId} />
           <ResetCanvasButton viewId={viewId} />
+          {binaryId !== null && <ResetSummariesButton binaryId={binaryId} />}
         </SidebarSection>
       ) : null}
       <SidebarSection title="Find Function">

@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from graphrev.core.errors import AppError, ErrorCode
 from graphrev.events.bus import EventBus
+from graphrev.repositories.binaries import get_binary_by_id
 from graphrev.repositories.functions import get_function_by_id
 from graphrev.schemas.summary import SummaryDemandResponseDto
 from graphrev.services.queue_service import queue_event_payload
@@ -135,6 +136,82 @@ async def regenerate_summary(
         function_id=function_id,
         summary_status="pending",
         queue_position=position,
+    )
+
+
+async def clear_binary_summaries(
+    session: AsyncSession,
+    queue: SummaryQueue,
+    *,
+    binary_id: int,
+    event_bus: EventBus | None = None,
+) -> int:
+    """``DELETE /binaries/{id}/summaries`` — TESTING affordance: null every
+    LLM-owned summary column on every function of the binary and drop any
+    queued (not in-flight) demand for them. Returns the affected row count.
+
+    In-flight generations are NOT interrupted (C8 spirit): the worker will
+    re-write a summary for that one function after this wipe; everything
+    else stays clean until re-demanded."""
+    binary = await get_binary_by_id(session, binary_id)
+    if binary is None:
+        raise AppError(
+            ErrorCode.BINARY_NOT_FOUND,
+            f"No binary {binary_id}.",
+            details={"binaryId": binary_id},
+        )
+
+    result = await session.execute(
+        text(
+            """
+            UPDATE functions SET
+                summary_short = NULL,
+                summary_long = NULL,
+                summary_status = 'none',
+                summary_model = NULL,
+                summary_error_code = NULL,
+                summary_low_confidence = 0,
+                summary_generated_at = NULL,
+                summary_input_hash = NULL
+            WHERE binary_id = :binary_id
+            """
+        ),
+        {"binary_id": binary_id},
+    )
+    await session.commit()
+
+    affected_ids = [
+        row[0]
+        for row in (
+            await session.execute(
+                text("SELECT id FROM functions WHERE binary_id = :binary_id"),
+                {"binary_id": binary_id},
+            )
+        ).all()
+    ]
+    for function_id in affected_ids:
+        queue.release(function_id)
+        _publish_cleared_event(event_bus, function_id)
+    _publish_queue_event(event_bus, queue)
+    return len(affected_ids)
+
+
+def _publish_cleared_event(event_bus: EventBus | None, function_id: int) -> None:
+    """`summary` event for the ->none wipe, same shape as
+    `_publish_pending_event` so `applySummaryEvent` needs no changes."""
+    if event_bus is None:
+        return
+    event_bus.publish(
+        "summary",
+        {
+            "functionId": function_id,
+            "summaryStatus": "none",
+            "summaryShort": None,
+            "summaryModel": None,
+            "lowConfidence": False,
+            "generatedAt": None,
+            "errorCode": None,
+        },
     )
 
 

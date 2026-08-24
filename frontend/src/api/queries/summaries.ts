@@ -12,7 +12,12 @@
  */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/api/client";
-import type { FunctionId, SummaryDemandRequest, SummaryDemandResponseDto } from "@/api/types";
+import type {
+  BinaryId,
+  FunctionId,
+  SummaryDemandRequest,
+  SummaryDemandResponseDto,
+} from "@/api/types";
 import { QUEUE_QUERY_KEY } from "./queue";
 
 async function demandSummary(
@@ -56,6 +61,24 @@ export function useRegenerateSummaryMutation() {
       ),
     onSuccess: (_result, functionId) => {
       void queryClient.invalidateQueries({ queryKey: ["function", functionId] });
+      void queryClient.invalidateQueries({ queryKey: QUEUE_QUERY_KEY });
+    },
+  });
+}
+
+/**
+ * `DELETE /binaries/{id}/summaries` — TESTING affordance: nulls every
+ * `summary_short`/`summary_long` (and status/model/... metadata) on every
+ * function of the binary. Invalidates all function queries broadly since
+ * every function of the binary is affected.
+ */
+export function useClearBinarySummariesMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (binaryId: BinaryId) =>
+      apiClient.delete(`/binaries/${String(binaryId)}/summaries`),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["function"] });
       void queryClient.invalidateQueries({ queryKey: QUEUE_QUERY_KEY });
     },
   });
