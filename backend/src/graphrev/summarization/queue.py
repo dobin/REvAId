@@ -203,6 +203,31 @@ class SummaryQueue:
         self._inflight.discard(function_id)
         self._index.pop(function_id, None)
 
+    def requeue_inflight(self, function_id: int, priority: int | None = None) -> None:
+        """Move an in-flight item back onto the queue, preserving its demand
+        refcount (used when a :class:`RateLimitError` means the *work itself*
+        was never actually done — the item must be retried, not treated as
+        completed or failed). ``priority`` defaults to the item's own
+        priority; no-op if the function is not currently in-flight."""
+        if function_id not in self._inflight:
+            return
+        current = self._index.get(function_id)
+        demand = current.demand if current is not None else 1
+        effective_priority = priority if priority is not None else (
+            current.priority if current is not None else MAX_PRIORITY
+        )
+        if current is not None:
+            current.superseded = True
+        self._inflight.discard(function_id)
+        replacement = QueueItem(
+            priority=effective_priority,
+            seq=next(self._seq_counter),
+            function_id=function_id,
+            demand=demand,
+        )
+        self._index[function_id] = replacement
+        self._pq.put_nowait(replacement)
+
     def pause(self, retry_after_seconds: float) -> None:
         """Queue-wide rate-limit backoff (§5.1) — one banner, not N errors."""
         self._paused_until = time.monotonic() + max(0.0, retry_after_seconds)

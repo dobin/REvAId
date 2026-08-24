@@ -18,11 +18,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from graphrev.adapters.llm import create_adapter as create_llm_adapter
 from graphrev.api.routers import binaries as binaries_router
 from graphrev.api.routers import config as config_router
 from graphrev.api.routers import functions as functions_router
 from graphrev.api.routers import health as health_router
 from graphrev.api.routers import neighbours as neighbours_router
+from graphrev.api.routers import queue as queue_router
+from graphrev.api.routers import summaries as summaries_router
 from graphrev.api.routers import view_nodes as view_nodes_router
 from graphrev.api.routers import views as views_router
 from graphrev.core.config import Settings, get_settings
@@ -41,6 +44,8 @@ from graphrev.core.logging import (
 )
 from graphrev.db.engine import create_engine, create_session_factory, dispose_engine
 from graphrev.db.startup import recompute_utility_if_threshold_changed, recover_pending_summaries
+from graphrev.summarization.queue import SummaryQueue
+from graphrev.summarization.worker import SummaryWorkerPool
 
 logger = get_logger(__name__)
 
@@ -79,13 +84,39 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 "Database has no applied migration. Run `just migrate` first."
             )
 
+        # C5b: no function may display "Analyzing..." with no worker behind
+        # it. Must run BEFORE the worker pool starts, or an orphaned
+        # `pending` row from the recovery scan itself could race with a
+        # fresh worker starting to process it.
         await recover_pending_summaries(session)
         await recompute_utility_if_threshold_changed(session, settings)
 
-    logger.info("startup.ready", db_path=settings.db_path, revision=revision)
+    # I7: the summarization plane. Constructed here (not at import time) so
+    # each `create_app()` call — including one per test — gets its own queue
+    # and worker pool rather than sharing process-wide singletons.
+    summary_queue = SummaryQueue(max_depth=settings.queue_max_depth)
+    llm_adapter = create_llm_adapter(settings.llm_adapter, settings)
+    worker_pool = SummaryWorkerPool(
+        queue=summary_queue,
+        adapter=llm_adapter,
+        session_factory=session_factory,
+        concurrency=settings.summary_concurrency,
+    )
+    app.state.summary_queue = summary_queue
+    app.state.summary_worker_pool = worker_pool
+    worker_pool.start()
+
+    logger.info(
+        "startup.ready",
+        db_path=settings.db_path,
+        revision=revision,
+        llm_adapter=llm_adapter.name,
+        summary_worker_concurrency=worker_pool.concurrency,
+    )
 
     yield
 
+    await worker_pool.stop()
     await dispose_engine(engine)
 
 
@@ -133,6 +164,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(neighbours_router.router, prefix="/api/v1")
     app.include_router(views_router.router, prefix="/api/v1")
     app.include_router(view_nodes_router.router, prefix="/api/v1")
+    app.include_router(summaries_router.router, prefix="/api/v1")
+    app.include_router(queue_router.router, prefix="/api/v1")
 
     return app
 

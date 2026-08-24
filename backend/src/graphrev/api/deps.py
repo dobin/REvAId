@@ -13,6 +13,7 @@ from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from graphrev.core.config import Settings, get_settings
+from graphrev.summarization.queue import SummaryQueue
 
 
 def get_settings_dep() -> Settings:
@@ -35,6 +36,14 @@ def get_session_factory(request: Request) -> async_sessionmaker[AsyncSession]:
     return factory
 
 
+def get_summary_queue(request: Request) -> SummaryQueue:
+    """The process-wide `SummaryQueue` (I7), constructed once in the lifespan
+    and shared by every router and the worker pool."""
+    queue: SummaryQueue = request.app.state.summary_queue
+    return queue
+
+
 SettingsDep = Annotated[Settings, Depends(get_settings_dep)]
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 SessionFactoryDep = Annotated[async_sessionmaker[AsyncSession], Depends(get_session_factory)]
+SummaryQueueDep = Annotated[SummaryQueue, Depends(get_summary_queue)]
