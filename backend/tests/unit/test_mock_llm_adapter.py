@@ -69,7 +69,26 @@ async def test_successful_summary_shape() -> None:
     assert result.summary_short
     assert len(result.summary_short) <= 120
     assert result.summary_long
+
+
+async def test_corpus_hit_uses_hand_written_text_and_is_never_low_confidence() -> None:
+    """A function name present in `adapters/mock_summaries.MOCK_SUMMARIES` (e.g.
+    'main') must return that exact corpus text, deterministically not
+    low-confidence, regardless of the seeded RNG draw."""
+    adapter = MockLlmAdapter(seed=99, simulate_latency=False, failure_rate=0.0)
+    result = await adapter.summarize(_req(name="main"))
     assert result.low_confidence is False
+    assert "entry point" in result.summary_short
+
+
+async def test_corpus_miss_uses_fallback_and_can_be_low_confidence() -> None:
+    """An unknown function name falls back to `mock_summaries.fallback_summary`
+    rather than the corpus, and may be marked low-confidence."""
+    adapter = MockLlmAdapter(seed=1, simulate_latency=False, failure_rate=0.0)
+    result = await adapter.summarize(_req(name="totally_unknown_function"))
+    assert result.summary_short
+    assert result.summary_long
+    assert isinstance(result.low_confidence, bool)
 
 
 async def test_fail_on_forces_specific_error_type() -> None:
@@ -99,6 +118,8 @@ async def test_fail_on_rate_limit_carries_retry_after() -> None:
 
 
 async def test_callee_summaries_reflected_in_long_summary() -> None:
+    """`parent_fn` has no corpus entry, so the fallback text is used; the
+    fallback long-form prose reports the observed callee count."""
     adapter = MockLlmAdapter(seed=1, simulate_latency=False, failure_rate=0.0)
     req = SummaryRequest(
         address=0x1234,
@@ -114,4 +135,4 @@ async def test_callee_summaries_reflected_in_long_summary() -> None:
         source_path=None,
     )
     result = await adapter.summarize(req)
-    assert "1 callee summary" in result.summary_long
+    assert "exactly one other function" in result.summary_long

@@ -51,6 +51,26 @@ async def test_demand_summary_validation_error_for_bad_priority(
 
 
 @pytest.mark.asyncio
+async def test_demand_summary_validation_error_for_out_of_range_priority(
+    client: AsyncClient, ingested: None
+) -> None:
+    """B4: an out-of-range priority must be rejected by request validation
+    (422) *before* the row is ever flipped to `pending` — previously this
+    reached `SummaryQueue.enqueue`'s own `ValueError` as an unhandled 500,
+    after the DB write had already happened."""
+    function_id = await _get_main_function_id(client)
+    response = await client.post(
+        f"/api/v1/functions/{function_id}/summary", json={"priority": 99}
+    )
+    assert response.status_code == 422
+
+    # The row must not have been left dangling at `pending` by the rejected
+    # request (it was never `demand_summary`'d successfully at all).
+    detail = (await client.get(f"/api/v1/functions/{function_id}")).json()
+    assert detail["summary"]["status"] != "pending"
+
+
+@pytest.mark.asyncio
 async def test_release_summary_demand_returns_204(client: AsyncClient, ingested: None) -> None:
     function_id = await _get_main_function_id(client)
     await client.post(f"/api/v1/functions/{function_id}/summary", json={"priority": 3})

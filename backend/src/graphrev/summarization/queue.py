@@ -32,6 +32,8 @@ import itertools
 import time
 from dataclasses import dataclass, field
 
+from graphrev.core.clock import utc_now_iso
+
 #: TAD §2.6 priority ladder — lower wins. 0 is the selected card's own
 #: summary; 3 is off-screen/lookahead. Keep in sync with
 #: `frontend/src/api/types.ts`'s `Priority` union (hand-mirrored, AM per repo
@@ -69,6 +71,10 @@ class QueueSnapshot:
     queued: tuple[QueueItem, ...]
     inflight_function_ids: tuple[int, ...]
     paused_until: float | None
+    #: function_id -> ISO-8601 UTC timestamp the item was popped and marked
+    #: in-flight. Lets `InFlightItemDto.started_at` show elapsed time in the
+    #: queue chip instead of always being `None`.
+    inflight_started_at: dict[int, str] = field(default_factory=dict)
 
 
 class QueueFullError(Exception):
@@ -94,6 +100,10 @@ class SummaryQueue:
         #: completed by the worker).
         self._index: dict[int, QueueItem] = {}
         self._inflight: set[int] = set()
+        #: function_id -> ISO-8601 UTC timestamp set when `pop()` marks it
+        #: in-flight, cleared by `complete()`/`requeue_inflight()`. Feeds
+        #: `InFlightItemDto.started_at` (queue chip elapsed-time display).
+        self._inflight_started_at: dict[int, str] = {}
         self._seq_counter = itertools.count()
         self._paused_until: float | None = None
 
@@ -118,6 +128,19 @@ class SummaryQueue:
             self._paused_until = None
         return self._paused_until
 
+    def paused_until_iso(self) -> str | None:
+        """`paused_until()` rendered for the wire (`GET /queue`, `queue` SSE
+        events). `SummaryQueue.paused_until()` is a monotonic-clock deadline,
+        not a wall timestamp, so this only signals *presence* ("queue is
+        currently paused") via "now" in ISO form — the exact wall-clock value
+        is not meaningful across the monotonic clock. Both
+        `queue_service.get_queue_snapshot` and `summary_service`'s queue-event
+        publisher must use this one implementation rather than each
+        hand-rolling their own conversion."""
+        if self.paused_until() is None:
+            return None
+        return utc_now_iso()
+
     def snapshot(self) -> QueueSnapshot:
         queued = tuple(
             sorted(
@@ -129,6 +152,7 @@ class SummaryQueue:
             queued=queued,
             inflight_function_ids=tuple(self._inflight),
             paused_until=self.paused_until(),
+            inflight_started_at=dict(self._inflight_started_at),
         )
 
     # -- mutation ------------------------------------------------------------
@@ -196,11 +220,13 @@ class SummaryQueue:
                 self._index.pop(item.function_id, None)
                 continue
             self._inflight.add(item.function_id)
+            self._inflight_started_at[item.function_id] = utc_now_iso()
             return item
 
     def complete(self, function_id: int) -> None:
         """Worker calls this after persisting a result (success or failure)."""
         self._inflight.discard(function_id)
+        self._inflight_started_at.pop(function_id, None)
         self._index.pop(function_id, None)
 
     def requeue_inflight(self, function_id: int, priority: int | None = None) -> None:
@@ -219,6 +245,7 @@ class SummaryQueue:
         if current is not None:
             current.superseded = True
         self._inflight.discard(function_id)
+        self._inflight_started_at.pop(function_id, None)
         replacement = QueueItem(
             priority=effective_priority,
             seq=next(self._seq_counter),

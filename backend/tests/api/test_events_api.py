@@ -96,7 +96,12 @@ async def test_demanding_a_summary_publishes_a_queue_event(
 
     await client.post(f"/api/v1/functions/{function_id}/summary", json={"priority": 0})
 
+    # `demand_summary` now also publishes a `summary` event on the
+    # `->pending` transition (see `services/summary_service.py`), ahead of
+    # the `queue` event this test cares about — drain past it.
     event = await asyncio.wait_for(queue.get(), timeout=5.0)
+    if event.event == "summary":
+        event = await asyncio.wait_for(queue.get(), timeout=5.0)
     assert event.event == "queue"
     assert "queuedCount" in event.data or "inFlightCount" in event.data
 

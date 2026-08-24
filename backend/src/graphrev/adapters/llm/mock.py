@@ -25,11 +25,20 @@ from graphrev.adapters.llm.base import (
     SummaryResult,
     TransientProviderError,
 )
+from graphrev.adapters.mock_summaries import MOCK_SUMMARIES, fallback_summary
 
-#: TAD §6.3 mock spec.
+#: TAD §6.3 mock spec. Overridable via `Settings.mock_llm_*` (see
+#: `adapters/llm/__init__.py::create_adapter`) so a demo/manual-UI-testing
+#: session can dial latency down (or failures to zero) without editing this
+#: module, while tests and normal `just dev` usage keep the original spec.
 _MIN_LATENCY_SECONDS = 1.0
 _MAX_LATENCY_SECONDS = 8.0
 _BASELINE_FAILURE_RATE = 0.05
+
+#: Deterministic minority of corpus-less functions rendered `low_confidence`
+#: (reachable UI branch) — driven by the same seeded RNG draw as the
+#: baseline failure check, so it stays reproducible per `seed`.
+_LOW_CONFIDENCE_RATE = 0.15
 
 
 class MockLlmAdapter:
@@ -79,19 +88,27 @@ class MockLlmAdapter:
         if self._rng.random() < self._failure_rate:
             raise TransientProviderError(f"mock transient failure for {req.name!r}")
 
+        low_confidence_draw = self._rng.random()
+
         display_name = req.analyst_name or req.name
-        summary_short = f"{display_name}: mock summary".strip()[:120]
-        summary_long = (
-            f"{display_name} at 0x{req.address:x} — mock-generated summary based on "
-            f"{'decompiled C' if req.code_c else 'assembly only'}. "
-            f"{len(req.callee_summaries)} callee summar"
-            f"{'y' if len(req.callee_summaries) == 1 else 'ies'} available."
-        )
+        corpus_entry = MOCK_SUMMARIES.get(req.name)
+        if corpus_entry is not None:
+            summary_short, summary_long = corpus_entry
+            low_confidence = False
+        else:
+            summary_short, summary_long = fallback_summary(
+                display_name,
+                req.address,
+                has_code_c=req.code_c is not None,
+                callee_count=len(req.callee_summaries),
+            )
+            low_confidence = low_confidence_draw < _LOW_CONFIDENCE_RATE
+
         return SummaryResult(
-            summary_short=summary_short,
+            summary_short=summary_short[:120],
             summary_long=summary_long,
             model="mock-llm-v1",
-            low_confidence=False,
+            low_confidence=low_confidence,
             input_truncated=False,
         )
 

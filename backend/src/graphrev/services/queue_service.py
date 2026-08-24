@@ -5,7 +5,6 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from graphrev.core.clock import utc_now_iso
 from graphrev.db.models import Function
 from graphrev.events.bus import EventBus
 from graphrev.schemas.summary import (
@@ -15,6 +14,21 @@ from graphrev.schemas.summary import (
     QueueSnapshotDto,
 )
 from graphrev.summarization.queue import SummaryQueue
+
+
+def queue_event_payload(queue: SummaryQueue) -> dict[str, object]:
+    """The `event: queue` SSE payload (E5b) — shared by every publish site
+    (`summary_service.demand_summary`/`regenerate_summary`/
+    `release_summary_demand`, and `cancel_all_pending` below) so
+    `pausedUntil` is computed the same way everywhere instead of each call
+    site hand-rolling (and, previously, hardcoding `None` for) its own
+    dict."""
+    snapshot = queue.snapshot()
+    return {
+        "inFlightCount": len(snapshot.inflight_function_ids),
+        "queuedCount": len(snapshot.queued),
+        "pausedUntil": queue.paused_until_iso(),
+    }
 
 
 async def get_queue_snapshot(session: AsyncSession, queue: SummaryQueue) -> QueueSnapshotDto:
@@ -44,6 +58,7 @@ async def get_queue_snapshot(session: AsyncSession, queue: SummaryQueue) -> Queu
         InFlightItemDto(
             function_id=function_id,
             display_name=display_names.get(function_id, "?"),
+            started_at=snapshot.inflight_started_at.get(function_id),
         )
         for function_id in snapshot.inflight_function_ids
     ]
@@ -53,7 +68,7 @@ async def get_queue_snapshot(session: AsyncSession, queue: SummaryQueue) -> Queu
         queued=queued,
         in_flight_count=len(in_flight),
         queued_count=len(queued),
-        paused_until=_iso_or_none(snapshot.paused_until),
+        paused_until=queue.paused_until_iso(),
     )
 
 
@@ -69,25 +84,5 @@ async def cancel_all_pending(
             queue.release(item.function_id)
         cancelled += 1
     if event_bus is not None:
-        after = queue.snapshot()
-        event_bus.publish(
-            "queue",
-            {
-                "inFlightCount": len(after.inflight_function_ids),
-                "queuedCount": len(after.queued),
-                "pausedUntil": None,
-            },
-        )
+        event_bus.publish("queue", queue_event_payload(queue))
     return CancelPendingResponseDto(cancelled_count=cancelled)
-
-
-def _iso_or_none(paused_until_monotonic: float | None) -> str | None:
-    """`SummaryQueue.paused_until()` is a monotonic-clock deadline, not a wall
-    timestamp; render it as "now" in ISO form only as a presence flag — the
-    exact wall-clock value is not meaningful across the monotonic clock,
-    which is why the DTO field only needs to say "queue is currently
-    paused", matching the TAD payload's `pausedUntil: null` when not
-    paused."""
-    if paused_until_monotonic is None:
-        return None
-    return utc_now_iso()

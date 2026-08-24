@@ -50,6 +50,7 @@ from graphrev.adapters.ghidra.base import (
     RawFunction,
     RawParam,
 )
+from graphrev.adapters.mock_summaries import MOCK_SUMMARIES
 
 #: A7: at least two distinct synthetic binaries.
 ACME_EXE = RawBinary(name="acme.exe", version="1.0")
@@ -315,146 +316,11 @@ def _typecheck_conforms(adapter: MockGhidraAdapter) -> GhidraAdapter:
 # ---------------------------------------------------------------------------
 # Fake LLM summaries for UI development
 # ---------------------------------------------------------------------------
-
-#: name_ghidra -> (summary_short, summary_long)
-_MOCK_SUMMARIES: dict[str, tuple[str, str]] = {
-    "main": (
-        "Program entry point; initialises subsystems and dispatches to the main event loop.",
-        (
-            "Parses command-line arguments and environment variables, then calls check_config "
-            "to validate the runtime configuration. Initialises the logging subsystem and the "
-            "memory allocator before handing control to the primary dispatch loop. Returns 0 on "
-            "clean exit or a non-zero error code if any subsystem fails to initialise."
-        ),
-    ),
-    "check_config": (
-        "Validates the global configuration struct; returns non-zero if any required field is absent.",
-        (
-            "Iterates over every field in the config struct and checks that mandatory values are "
-            "non-NULL and within their documented ranges. Emits a diagnostic message to stderr for "
-            "each violation found. Called both directly from main and transitively from several "
-            "entry_child handlers, giving it a fan-in of 3. Does not modify any global state."
-        ),
-    ),
-    "dispatch_large": (
-        "Central opcode dispatcher; routes execution to one of 300+ handler functions based on the input byte.",
-        (
-            "Implements a jump-table dispatch over the full 8-bit opcode space. Each case invokes "
-            "a dedicated handler from the utility pool, making this function the primary fan-out "
-            "hub of the binary. Uses indirect calls (computed branch through a function pointer "
-            "table) so static analysis cannot fully resolve all callee targets. Has no meaningful "
-            "return value; side effects are owned by the individual handlers."
-        ),
-    ),
-    "dispatch_small": (
-        "Lightweight secondary dispatcher handling 34 specialised opcodes that bypass the main table.",
-        (
-            "Covers opcodes that require pre-processing before the main dispatch loop, such as "
-            "prefix bytes and escape sequences. Decodes the next byte to determine the secondary "
-            "opcode and delegates to the appropriate handler. Falls back to an error handler if "
-            "the opcode is not in the expected range."
-        ),
-    ),
-    "mem_copy_block": (
-        "High-throughput block copy; called by ~291 callers as the canonical memory-copy primitive.",
-        (
-            "Copies `len` bytes from `src` to `dst` using SIMD-aligned 16-byte chunks where "
-            "possible, falling back to a byte loop for the remainder. Handles overlapping regions "
-            "by delegating to memmove when src < dst + len. Is the most-called function in the "
-            "binary; all heap-manipulation paths eventually reach it."
-        ),
-    ),
-    "mem_set_block": (
-        "Fills a memory region with a repeating byte value; the primary zeroing primitive.",
-        (
-            "Accepts a destination pointer, a fill byte, and a length. Uses 8-byte store "
-            "instructions on aligned addresses and a scalar tail loop for the remainder. "
-            "Frequently used to zero-initialise stack frames and heap allocations. "
-            "Approximately 120 callers across the binary."
-        ),
-    ),
-    "str_length": (
-        "Null-terminated string length; thin wrapper over the platform strlen with bounds check.",
-        (
-            "Walks the string one byte at a time until it finds a NUL terminator or reaches "
-            "the optional `max_len` guard, whichever comes first. Returns the number of bytes "
-            "before the terminator. The bounds-checking wrapper is called in preference to "
-            "raw strlen wherever the input may not be NUL-terminated within a trusted buffer."
-        ),
-    ),
-    "walk_tree_recursive": (
-        "Depth-first tree traversal; recurses into each child node before processing the current one.",
-        (
-            "Processes an AST-like node tree in post-order. For each node it first recurses into "
-            "all child pointers, then invokes the registered visitor callback on the current node. "
-            "The recursion depth is bounded by the tree height; no explicit stack limit is enforced, "
-            "so deeply nested inputs may overflow the call stack."
-        ),
-    ),
-    "eval_expr": (
-        "Evaluates a full expression node by delegating term parsing to eval_term.",
-        (
-            "Implements the expression grammar rule: expr ::= term (('+' | '-') term)*. "
-            "Calls eval_term for each operand and folds the results left-to-right using the "
-            "arithmetic operator. Mutually recursive with eval_term for handling parenthesised "
-            "sub-expressions. Returns the computed integer value of the expression."
-        ),
-    ),
-    "eval_term": (
-        "Evaluates a term node; mutually recursive with eval_expr for nested parenthesised expressions.",
-        (
-            "Implements the term grammar rule: term ::= factor (('*' | '/') factor)*. "
-            "Delegates to eval_expr when it encounters a left parenthesis, creating mutual "
-            "recursion for arbitrarily nested groupings. Division by zero is not guarded — "
-            "callers are expected to validate inputs before invoking this function."
-        ),
-    ),
-    "parse_document": (
-        "Top-level entry point for the libparse document parser; drives the parse_section chain.",
-        (
-            "Initialises the parser context from the provided byte buffer and its length, then "
-            "calls parse_section for each top-level section delimiter encountered. Accumulates "
-            "section results into the caller-supplied document struct. Returns the number of "
-            "sections parsed, or -1 if the document header is malformed."
-        ),
-    ),
-    "parse_section": (
-        "Parses one document section header and delegates field parsing to parse_field.",
-        (
-            "Reads the section type tag and byte length from the current buffer position, "
-            "advances the cursor, then iterates over the section body calling parse_field for "
-            "each field descriptor found. Validates the section checksum after all fields are "
-            "consumed and returns an error code if it does not match."
-        ),
-    ),
-    "parse_field": (
-        "Parses a single field descriptor; delegates value decoding to parse_value.",
-        (
-            "Reads the field ID and type tag, dispatches to parse_value for the payload bytes, "
-            "and stores the result in the section's field table. Unknown field IDs are skipped "
-            "with a warning rather than treated as hard errors, maintaining forward compatibility "
-            "with newer document versions."
-        ),
-    ),
-    "parse_value": (
-        "Decodes a typed value payload from the raw byte stream.",
-        (
-            "Handles the full set of primitive types: int8, int16, int32, int64, float32, "
-            "float64, boolean, and variable-length UTF-8 strings. For string values, allocates "
-            "a heap buffer and copies the bytes; the caller owns the allocation. Returns a "
-            "tagged union holding the decoded value and its type discriminant."
-        ),
-    ),
-    "parse_literal": (
-        "Reads a raw literal byte sequence without type interpretation.",
-        (
-            "Copies exactly `len` bytes from the current stream position into the provided "
-            "output buffer and advances the cursor. Used for opaque blob fields whose "
-            "content is not inspected by the parser itself. Returns the number of bytes "
-            "actually read, which may be less than `len` if the stream ends early."
-        ),
-    ),
-}
+# The corpus itself now lives in `adapters/mock_summaries.py` (shared with
+# `adapters/llm/mock.py::MockLlmAdapter` so both mocks agree on the same
+# fake content) — see that module's docstring for why importing it here does
+# not violate the "only adapters/*/base outside the package" import-linter
+# contract.
 
 
 async def seed_mock_summaries(session_factory: "async_sessionmaker") -> int:  # type: ignore[type-arg]
@@ -471,7 +337,7 @@ async def seed_mock_summaries(session_factory: "async_sessionmaker") -> int:  # 
     updated = 0
     async with session_factory() as session:
         async with session.begin():
-            for name, (short, long_) in _MOCK_SUMMARIES.items():
+            for name, (short, long_) in MOCK_SUMMARIES.items():
                 result = await session.execute(
                     select(Function.id).where(
                         Function.name_ghidra == name,

@@ -12,7 +12,7 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 GhidraAdapterName = Literal["mock", "rest"]
@@ -111,6 +111,31 @@ class Settings(BaseSettings):
     sse_keepalive_seconds: int = Field(default=15, gt=0)
     sse_subscriber_queue_size: int = Field(default=256, gt=0)
     sqlite_busy_timeout_ms: int = Field(default=5000, gt=0)
+
+    #: Gates `MockLlmAdapter`'s latency/failure simulation (TAD §6.3's
+    #: "1-8s latency, ~5% failures" spec). Off by default so `just test` and
+    #: everyday `just dev` usage get fast, reliable mock summaries; flip this
+    #: on (env `GRAPHREV_MOCK_LLM_SIMULATE_LATENCY=true`) for manual UI
+    #: testing of the shimmer/queue-depth/pending-state experience under
+    #: realistic timing. NOT exposed on `GET /config` — backend-only knob,
+    #: no frontend consumer.
+    mock_llm_simulate_latency: bool = Field(
+        default=False, description="Enable MockLlmAdapter's simulated latency (see min/max below)."
+    )
+    mock_llm_min_latency_seconds: float = Field(default=1.0, ge=0)
+    mock_llm_max_latency_seconds: float = Field(default=8.0, ge=0)
+    #: Kept non-zero even with latency simulation off, so the error+retry UI
+    #: state stays reachable in a normal demo. Set to 0 to disable entirely.
+    mock_llm_failure_rate: float = Field(default=0.05, ge=0, le=1)
+
+    @model_validator(mode="after")
+    def _check_mock_llm_latency_bounds(self) -> Settings:
+        if self.mock_llm_min_latency_seconds > self.mock_llm_max_latency_seconds:
+            raise ValueError(
+                "mock_llm_min_latency_seconds must be <= mock_llm_max_latency_seconds "
+                f"(got {self.mock_llm_min_latency_seconds} > {self.mock_llm_max_latency_seconds})"
+            )
+        return self
 
 
 @lru_cache

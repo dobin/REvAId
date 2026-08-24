@@ -55,6 +55,16 @@ to the frontend as a single payload from `GET /api/v1/config`; no component
 may hard-code a threshold (enforced by `scripts/check-magic-numbers.sh`,
 which also runs in CI).
 
+`MockLlmAdapter`'s simulated latency (1-8s per TAD §6.3) is **off by
+default** (`GRAPHREV_MOCK_LLM_SIMULATE_LATENCY=false`) so `just test` and
+everyday `just dev` get fast, near-instant mock summaries. Set it to `true`
+(plus optionally `GRAPHREV_MOCK_LLM_MIN_LATENCY_SECONDS` /
+`_MAX_LATENCY_SECONDS`) when you want to manually exercise the
+pending/shimmer/queue-depth UI under realistic timing. A small
+`GRAPHREV_MOCK_LLM_FAILURE_RATE` (default `0.05`) stays on even with latency
+off, so the summary error+retry state is reachable in a normal demo; set it
+to `0` to disable.
+
 ## Adding a migration
 
 The database schema is created **exclusively** through Alembic — there is no

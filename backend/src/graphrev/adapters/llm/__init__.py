@@ -26,7 +26,13 @@ def create_adapter(name: LlmAdapterName, settings: Settings, *, seed: int = 1337
     if name == "mock":
         from graphrev.adapters.llm.mock import MockLlmAdapter
 
-        return MockLlmAdapter(seed=seed)
+        return MockLlmAdapter(
+            seed=seed,
+            simulate_latency=settings.mock_llm_simulate_latency,
+            min_latency_seconds=settings.mock_llm_min_latency_seconds,
+            max_latency_seconds=settings.mock_llm_max_latency_seconds,
+            failure_rate=settings.mock_llm_failure_rate,
+        )
     if name == "litellm":
         raise LlmAdapterNotImplementedError(
             "The 'litellm' LLM adapter is not implemented until Increment I13. "
