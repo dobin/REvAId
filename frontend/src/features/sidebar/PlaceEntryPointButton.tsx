@@ -1,13 +1,11 @@
 /**
- * Manual stopgap for placing a root node (D8/B10a) on an empty canvas.
+ * One-click stopgap for placing a root node (D8/B10a) on an empty canvas.
  *
- * The real affordance for this — `SearchOmnibox` (name/address search) and
- * the callstack-import dialog — is I11 scope. Until then, an empty view has
- * no way to get its first node onto the canvas at all. This button uses the
- * binary's first entry-point suggestion (E1b, already implemented) and
- * upserts it as a `originKind: "root"` node via the existing batch-patch
- * endpoint (TAD §4.3 #12) — the same call `SearchOmnibox` will eventually
- * make, just without the search UI in front of it.
+ * `FunctionSearchInput` now covers the general "find any function by
+ * name/address and add it" case (name/address search, I11 scope); this
+ * button remains as a zero-typing shortcut that uses the binary's first
+ * entry-point suggestion (E1b) and upserts it as an `originKind: "root"`
+ * node via the same batch-patch endpoint (TAD §4.3 #12).
  */
 import { useEntryPointsQuery } from "@/api/queries/binaries";
 import { usePatchViewNodesMutation } from "@/api/queries/viewNodes";

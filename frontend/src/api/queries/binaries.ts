@@ -7,6 +7,7 @@ import type {
   BinaryId,
   BinarySummaryDto,
   EntryPointsDto,
+  FunctionSearchPageDto,
   GhidraExportDocument,
   ImportResultDto,
 } from "@/api/types";
@@ -31,6 +32,31 @@ export function useEntryPointsQuery(binaryId: BinaryId | null) {
     queryKey: ["entry-points", binaryId],
     queryFn: () => fetchEntryPoints(binaryId as BinaryId),
     enabled: binaryId !== null,
+  });
+}
+
+async function fetchFunctionSearch(
+  binaryId: BinaryId,
+  query: string,
+): Promise<FunctionSearchPageDto> {
+  const params = new URLSearchParams({ q: query });
+  return apiClient.get<FunctionSearchPageDto>(
+    `/binaries/${String(binaryId)}/functions?${params.toString()}`,
+  );
+}
+
+/**
+ * `GET /binaries/{id}/functions?q=...` (B11/E1a) — searches `name_ghidra`,
+ * `name_analyst`, `notes`, and `address` for a substring match. Disabled
+ * until both a binary is selected and the query is non-empty, so an empty
+ * sidebar search box does not fetch the whole (unfiltered) function list.
+ */
+export function useFunctionSearchQuery(binaryId: BinaryId | null, query: string) {
+  const trimmed = query.trim();
+  return useQuery({
+    queryKey: ["function-search", binaryId, trimmed],
+    queryFn: () => fetchFunctionSearch(binaryId as BinaryId, trimmed),
+    enabled: binaryId !== null && trimmed.length > 0,
   });
 }
 

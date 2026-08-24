@@ -3,6 +3,7 @@
  * `OnCanvasList` (I6) above the `GlyphLegend`.
  */
 import type { BinaryId, ViewId } from "@/api/types";
+import { FunctionSearchInput } from "./FunctionSearchInput";
 import { GlyphLegend } from "./GlyphLegend";
 import { ImportBinaryButton } from "./ImportBinaryButton";
 import { OnCanvasList } from "./OnCanvasList";
@@ -62,6 +63,11 @@ export function Sidebar({
       <SidebarSection title="Binary">
         <ImportBinaryButton onImported={onImported} />
       </SidebarSection>
+      {binaryId !== null && (
+        <SidebarSection title="Find function">
+          <FunctionSearchInput binaryId={binaryId} viewId={viewId} />
+        </SidebarSection>
+      )}
       {viewId !== null ? (
         <SidebarSection title="Actions">
           {binaryId !== null && (

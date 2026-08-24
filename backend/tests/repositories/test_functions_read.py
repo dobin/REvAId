@@ -109,6 +109,28 @@ async def test_search_functions_matches_name_analyst_and_notes(session: AsyncSes
 
 
 @pytest.mark.asyncio
+async def test_search_functions_matches_address_decimal_and_hex(
+    session: AsyncSession,
+) -> None:
+    binary, _ = await get_or_create_binary(session, name="acme.exe", version="1.0")
+    await _make_function(session, binary_id=binary.id, address=0x401000, name_ghidra="fn_a")
+    await _make_function(session, binary_id=binary.id, address=0x401010, name_ghidra="fn_b")
+    await session.commit()
+
+    by_decimal, total1 = await search_functions(
+        session, binary_id=binary.id, query=str(0x401000), limit=50, offset=0
+    )
+    assert total1 == 1
+    assert by_decimal[0].name_ghidra == "fn_a"
+
+    by_hex, total2 = await search_functions(
+        session, binary_id=binary.id, query="0x401010", limit=50, offset=0
+    )
+    assert total2 == 1
+    assert by_hex[0].name_ghidra == "fn_b"
+
+
+@pytest.mark.asyncio
 async def test_search_functions_paginates_and_reports_total(session: AsyncSession) -> None:
     binary, _ = await get_or_create_binary(session, name="acme.exe", version="1.0")
     for i in range(5):

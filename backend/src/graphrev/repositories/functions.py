@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import String, cast, func, or_, select, text
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -196,20 +196,27 @@ async def search_functions(
     """Paginated, case-insensitive substring search over a binary's functions
     (B11/E1a).
 
-    Matches `name_ghidra`, `name_analyst`, or `notes` via
+    Matches `name_ghidra`, `name_analyst`, `notes`, or `address` via
     ``LIKE '%q%' COLLATE NOCASE`` (TAD §3.3 design note — an FTS5 upgrade is
-    an additive M1 item, TQ1). Returns `(page, total)`; `total` is the count
-    across the whole match set, not just the returned page, so the caller
-    can render "showing N of TOTAL".
+    an additive M1 item, TQ1). The address match is substring-based against
+    both the decimal and hex (`0x`-stripped) renderings of `address`, so a
+    query like `1000` or `0x1000` finds function `0x00401000`. Returns
+    `(page, total)`; `total` is the count across the whole match set, not
+    just the returned page, so the caller can render "showing N of TOTAL".
     """
     filters = [Function.binary_id == binary_id]
     if query:
         like = f"%{query}%"
+        address_query = query.strip()
+        if address_query.lower().startswith("0x"):
+            address_query = address_query[2:]
         filters.append(
             or_(
                 Function.name_ghidra.collate("NOCASE").like(like),
                 Function.name_analyst.collate("NOCASE").like(like),
                 Function.notes.collate("NOCASE").like(like),
+                cast(Function.address, String).like(like),
+                func.printf("%X", Function.address).like(f"%{address_query.upper()}%"),
             )
         )
 

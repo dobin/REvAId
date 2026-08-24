@@ -237,6 +237,28 @@ export interface EntryPointsDto {
   entryPoints: EntryPointDto[];
 }
 
+/** One row in a `GET /binaries/{id}/functions` search result (B11/E1a) —
+ * narrow, matching the `NeighbourRowDto` philosophy. */
+export interface FunctionSearchRowDto {
+  id: FunctionId;
+  address: number;
+  displayName: string;
+  isRenamed: boolean;
+  kind: FunctionKind;
+  isUtility: boolean;
+  fanIn: number;
+  hasNotes: boolean;
+  isEntryPoint: boolean;
+}
+
+export interface FunctionSearchPageDto {
+  rows: FunctionSearchRowDto[];
+  total: number;
+  limit: number;
+  offset: number;
+  query: string | null;
+}
+
 /** Derived client-side from ViewNodeDto only — never from the edges table (D8b). */
 export interface CanvasEdge {
   id: string;
