@@ -1,0 +1,519 @@
+/* GraphRevExport.java
+ *
+ * Ghidra script that exports every function of the current program to a single
+ * JSON file shaped for GraphRev ingestion.
+ *
+ * The output JSON maps 1:1 onto the backend ingestion DTOs in
+ *   backend/src/graphrev/adapters/ghidra/base.py
+ * namely RawBinary, RawFunction (RawParam), and RawEdge / FunctionKind. Keeping
+ * the field names aligned means a future file/REST GhidraAdapter (Increment I12)
+ * can load this file with no contract change.
+ *
+ * Deliberately zero-dependency: Java has no stdlib JSON and Gson is not
+ * guaranteed to be on Ghidra's classpath across versions, so JSON is emitted by
+ * a tiny hand-rolled writer (see JsonWriter below). This keeps the script
+ * portable across Ghidra releases.
+ *
+ * Robustness follows the pipeline's A4 rule ("report failures, never abort"):
+ * a decompilation error/timeout yields codeC = null and a logged warning, and
+ * ingestion continues.
+ *
+ * @category GraphRev
+ * @runtime Ghidra (Java) — run from the Script Manager (GUI) or headless
+ *          analyzeHeadless via -postScript.
+ */
+
+import java.io.File;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+import ghidra.app.decompiler.DecompInterface;
+import ghidra.app.decompiler.DecompileOptions;
+import ghidra.app.decompiler.DecompileResults;
+import ghidra.app.decompiler.DecompiledFunction;
+import ghidra.app.script.GhidraScript;
+import ghidra.program.model.address.Address;
+import ghidra.program.model.listing.Function;
+import ghidra.program.model.listing.FunctionIterator;
+import ghidra.program.model.listing.Instruction;
+import ghidra.program.model.listing.InstructionIterator;
+import ghidra.program.model.listing.Listing;
+import ghidra.program.model.listing.Parameter;
+import ghidra.program.model.listing.Program;
+import ghidra.program.model.symbol.Reference;
+import ghidra.program.model.symbol.RefType;
+
+public class GraphRevExport extends GhidraScript {
+
+    /** Bump when the emitted schema changes shape. */
+    private static final int SCHEMA_VERSION = 1;
+
+    /** Per-function decompiler timeout, in seconds. */
+    private static final int DECOMPILE_TIMEOUT_SECONDS = 60;
+
+    private DecompInterface decompiler;
+
+    @Override
+    protected void run() throws Exception {
+        Program program = currentProgram;
+        if (program == null) {
+            printerr("GraphRevExport: no program is open.");
+            return;
+        }
+
+        File outFile = resolveOutputFile(program);
+        String version = resolveVersion();
+
+        println("GraphRevExport: exporting " + program.getName() + " -> " + outFile.getAbsolutePath());
+
+        decompiler = new DecompInterface();
+        DecompileOptions options = new DecompileOptions();
+        decompiler.setOptions(options);
+        decompiler.openProgram(program);
+
+        try {
+            List<Function> functions = collectFunctions(program);
+            monitor.initialize(functions.size());
+            monitor.setMessage("Exporting functions");
+
+            StringBuilder functionsJson = new StringBuilder();
+            StringBuilder edgesJson = new StringBuilder();
+            Set<String> emittedEdges = new LinkedHashSet<>(); // dedupe (caller,callee) pairs
+            int functionCount = 0;
+            int edgeCount = 0;
+
+            for (Function fn : functions) {
+                monitor.checkCancelled();
+                monitor.setMessage("Exporting " + fn.getName());
+
+                appendFunctionJson(functionsJson, functionCount, fn);
+                functionCount++;
+
+                edgeCount += appendEdgesForFunction(edgesJson, emittedEdges, edgeCount, fn);
+
+                monitor.incrementProgress(1);
+            }
+
+            writeJson(outFile, program, version, functionsJson, edgesJson, functionCount, edgeCount);
+            println("GraphRevExport: wrote " + functionCount + " functions, " + edgeCount + " edges.");
+        } finally {
+            decompiler.dispose();
+        }
+    }
+
+    // ------------------------------------------------------------------ setup
+
+    /**
+     * Output path: first script arg in headless mode, else a GUI file prompt,
+     * defaulting to {@code <program>_graphrev.json} in the user's home dir.
+     */
+    private File resolveOutputFile(Program program) throws Exception {
+        String[] args = getScriptArgs();
+        if (args.length >= 1 && args[0] != null && !args[0].isEmpty()) {
+            return new File(args[0]);
+        }
+        String defaultName = program.getName() + "_graphrev.json";
+        File defaultFile = new File(System.getProperty("user.home"), defaultName);
+        try {
+            return askFile("GraphRev export destination", "Save").getCanonicalFile();
+        } catch (Exception headless) {
+            // askFile throws in headless mode with no arg — fall back to default.
+            return defaultFile;
+        }
+    }
+
+    /** Version is free text (AS11); optional second script arg overrides "". */
+    private String resolveVersion() {
+        String[] args = getScriptArgs();
+        if (args.length >= 2 && args[1] != null) {
+            return args[1];
+        }
+        return "";
+    }
+
+    /** All functions in the program, in address order. */
+    private List<Function> collectFunctions(Program program) {
+        Listing listing = program.getListing();
+        FunctionIterator it = listing.getFunctions(true);
+        List<Function> out = new ArrayList<>();
+        while (it.hasNext()) {
+            out.add(it.next());
+        }
+        return out;
+    }
+
+    // -------------------------------------------------------------- functions
+
+    /** Emit one RawFunction-shaped object into {@code sb}. */
+    private void appendFunctionJson(StringBuilder sb, int index, Function fn) {
+        if (index > 0) {
+            sb.append(",\n");
+        }
+
+        long address = fn.getEntryPoint().getOffset();
+        String kind = classifyKind(fn);
+        boolean hasBody = !fn.isExternal() && !fn.isThunk();
+
+        String assembly = hasBody ? disassemble(fn) : null;
+        String codeC = hasBody ? decompile(fn) : null;
+
+        JsonWriter w = new JsonWriter(sb);
+        w.beginObject();
+        w.field("address", address);
+        w.field("name", fn.getName());
+        appendParameters(w, fn);
+        w.fieldOrNull("signature", fn.getPrototypeString(false, false));
+        w.fieldOrNull("assembly", assembly);
+        w.fieldOrNull("codeC", codeC);
+        w.field("kind", kind);
+        w.field("hasIndirectCalls", detectIndirectCalls(fn));
+        w.field("isEntryPoint", isEntryPoint(fn));
+        w.endObject();
+    }
+
+    private void appendParameters(JsonWriter w, Function fn) {
+        w.rawKey("parameters");
+        StringBuilder arr = w.target();
+        arr.append('[');
+        Parameter[] params = fn.getParameters();
+        for (int i = 0; i < params.length; i++) {
+            if (i > 0) {
+                arr.append(',');
+            }
+            Parameter p = params[i];
+            JsonWriter pw = new JsonWriter(arr);
+            pw.beginObject();
+            pw.field("ordinal", p.getOrdinal());
+            pw.field("name", p.getName() == null ? ("param_" + i) : p.getName());
+            pw.field("type", p.getDataType() == null ? "undefined" : p.getDataType().getDisplayName());
+            pw.endObject();
+        }
+        arr.append(']');
+        w.markFieldWritten();
+    }
+
+    /**
+     * Map a Ghidra Function onto GraphRev's FunctionKind. Never returns
+     * "placeholder" — those are materialised by ingestion from unresolved
+     * cross-module edges (B17), not reported by an adapter.
+     */
+    private String classifyKind(Function fn) {
+        if (fn.isThunk()) {
+            return "thunk";
+        }
+        if (fn.isExternal()) {
+            return "external";
+        }
+        // An imported function typically lives in the EXTERNAL memory block or
+        // resolves through the import table; treat body-less library entries as
+        // "import" so library calls appear with a distinct kind (A8).
+        if (fn.getBody() == null || fn.getBody().isEmpty()) {
+            return "import";
+        }
+        return "normal";
+    }
+
+    private boolean isEntryPoint(Function fn) {
+        String name = fn.getName();
+        if (name == null) {
+            return false;
+        }
+        // Common entry symbols across PE/ELF; a real bridge may refine this.
+        return name.equals("main")
+                || name.equals("WinMain")
+                || name.equals("wWinMain")
+                || name.equals("DllMain")
+                || name.equals("entry")
+                || name.equals("_start");
+    }
+
+    // --------------------------------------------------------------- assembly
+
+    /** Body instructions joined one per line: "<hex addr>  <mnemonic operands>". */
+    private String disassemble(Function fn) {
+        Listing listing = fn.getProgram().getListing();
+        InstructionIterator it = listing.getInstructions(fn.getBody(), true);
+        StringBuilder sb = new StringBuilder();
+        boolean first = true;
+        while (it.hasNext()) {
+            Instruction ins = it.next();
+            if (!first) {
+                sb.append('\n');
+            }
+            first = false;
+            sb.append(ins.getAddress().toString()).append("  ").append(ins.toString());
+        }
+        return sb.length() == 0 ? null : sb.toString();
+    }
+
+    // ---------------------------------------------------------- decompilation
+
+    /** Decompiled C, or null on error/timeout (logged, never fatal — A4). */
+    private String decompile(Function fn) {
+        try {
+            DecompileResults results =
+                    decompiler.decompileFunction(fn, DECOMPILE_TIMEOUT_SECONDS, monitor);
+            String err = results.getErrorMessage();
+            if (err != null && !err.isEmpty()) {
+                printerr("GraphRevExport: decompile warning for " + fn.getName() + ": " + err);
+            }
+            DecompiledFunction decompiled = results.getDecompiledFunction();
+            return decompiled == null ? null : decompiled.getC();
+        } catch (Exception e) {
+            printerr("GraphRevExport: decompile failed for " + fn.getName() + ": " + e.getMessage());
+            return null;
+        }
+    }
+
+    // ------------------------------------------------------------------ edges
+
+    /**
+     * Emit one RawEdge per unique (caller,callee) pair reachable from {@code fn}.
+     * Self-edges (recursion) are kept. Returns the number of new edges written.
+     */
+    private int appendEdgesForFunction(
+            StringBuilder sb, Set<String> emitted, int alreadyWritten, Function caller) {
+        int written = 0;
+        for (Function callee : caller.getCalledFunctions(monitor)) {
+            long callerAddr = caller.getEntryPoint().getOffset();
+            long calleeAddr = callee.getEntryPoint().getOffset();
+            String dedupeKey = callerAddr + "->" + calleeAddr;
+            if (!emitted.add(dedupeKey)) {
+                continue;
+            }
+            String calleeModule = resolveCalleeModule(callee);
+
+            if (alreadyWritten + written > 0) {
+                sb.append(",\n");
+            }
+            JsonWriter w = new JsonWriter(sb);
+            w.beginObject();
+            w.field("callerAddress", callerAddr);
+            w.field("calleeAddress", calleeAddr);
+            w.fieldOrNull("calleeModule", calleeModule);
+            w.endObject();
+            written++;
+        }
+        return written;
+    }
+
+    /**
+     * The library/namespace name when the callee lives outside this program
+     * body — the signal ingestion uses to create a placeholder row (B17).
+     * Returns null for ordinary in-program callees.
+     */
+    private String resolveCalleeModule(Function callee) {
+        if (callee.isExternal()) {
+            String libName = callee.getExternalLocation() != null
+                    ? callee.getExternalLocation().getLibraryName()
+                    : null;
+            return libName != null ? libName : "EXTERNAL";
+        }
+        if (callee.isThunk()) {
+            Function thunked = callee.getThunkedFunction(true);
+            if (thunked != null && thunked.isExternal()) {
+                String libName = thunked.getExternalLocation() != null
+                        ? thunked.getExternalLocation().getLibraryName()
+                        : null;
+                return libName != null ? libName : "EXTERNAL";
+            }
+        }
+        return null;
+    }
+
+    /**
+     * True when the function contains a call whose target is computed/indirect
+     * (register or memory indirect) — feeds RawFunction.hasIndirectCalls and
+     * the neighbour-table "may be incomplete" hint.
+     */
+    private boolean detectIndirectCalls(Function fn) {
+        Listing listing = fn.getProgram().getListing();
+        InstructionIterator it = listing.getInstructions(fn.getBody(), true);
+        while (it.hasNext()) {
+            Instruction ins = it.next();
+            for (Reference ref : ins.getReferencesFrom()) {
+                RefType rt = ref.getReferenceType();
+                if (rt.isCall() && rt.isComputed()) {
+                    return true;
+                }
+                if (rt.isIndirect() && rt.isCall()) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    // ----------------------------------------------------------------- output
+
+    private void writeJson(
+            File outFile,
+            Program program,
+            String version,
+            StringBuilder functionsJson,
+            StringBuilder edgesJson,
+            int functionCount,
+            int edgeCount)
+            throws IOException {
+
+        StringBuilder doc = new StringBuilder(functionsJson.length() + edgesJson.length() + 512);
+        JsonWriter w = new JsonWriter(doc);
+        w.beginObject();
+        w.field("schemaVersion", SCHEMA_VERSION);
+
+        w.rawKey("binary");
+        JsonWriter b = new JsonWriter(doc);
+        b.beginObject();
+        b.field("name", program.getName());
+        b.field("version", version);
+        b.fieldOrNull("sourcePath", program.getExecutablePath());
+        b.fieldOrNull("sha256", program.getExecutableSHA256());
+        b.field("functionCount", functionCount);
+        b.field("edgeCount", edgeCount);
+        b.endObject();
+        w.markFieldWritten();
+
+        w.rawKey("functions");
+        doc.append("[\n").append(functionsJson).append("\n]");
+        w.markFieldWritten();
+
+        w.rawKey("edges");
+        doc.append("[\n").append(edgesJson).append("\n]");
+        w.markFieldWritten();
+
+        w.endObject();
+
+        File parent = outFile.getParentFile();
+        if (parent != null) {
+            Files.createDirectories(parent.toPath());
+        }
+        try (PrintWriter out =
+                new PrintWriter(Files.newBufferedWriter(outFile.toPath(), StandardCharsets.UTF_8))) {
+            out.write(doc.toString());
+        }
+    }
+
+    // ------------------------------------------------------- tiny JSON writer
+
+    /**
+     * Minimal JSON object writer over a shared StringBuilder. Handles comma
+     * placement between fields and RFC 8259 string escaping. Deliberately not a
+     * general-purpose serializer — just enough for this fixed schema.
+     */
+    private static final class JsonWriter {
+        private final StringBuilder sb;
+        private boolean hasField;
+
+        JsonWriter(StringBuilder sb) {
+            this.sb = sb;
+        }
+
+        StringBuilder target() {
+            return sb;
+        }
+
+        void beginObject() {
+            sb.append('{');
+            hasField = false;
+        }
+
+        void endObject() {
+            sb.append('}');
+        }
+
+        /** Write only the key and separator; the caller appends the raw value. */
+        void rawKey(String key) {
+            comma();
+            escape(key);
+            sb.append(':');
+        }
+
+        /** Signal that a value written via {@link #rawKey}/{@link #target} is complete. */
+        void markFieldWritten() {
+            hasField = true;
+        }
+
+        void field(String key, String value) {
+            comma();
+            escape(key);
+            sb.append(':');
+            escape(value);
+            hasField = true;
+        }
+
+        void field(String key, long value) {
+            comma();
+            escape(key);
+            sb.append(':').append(value);
+            hasField = true;
+        }
+
+        void field(String key, boolean value) {
+            comma();
+            escape(key);
+            sb.append(':').append(value);
+            hasField = true;
+        }
+
+        void fieldOrNull(String key, String value) {
+            comma();
+            escape(key);
+            sb.append(':');
+            if (value == null) {
+                sb.append("null");
+            } else {
+                escape(value);
+            }
+            hasField = true;
+        }
+
+        private void comma() {
+            if (hasField) {
+                sb.append(',');
+            }
+        }
+
+        private void escape(String s) {
+            sb.append('"');
+            for (int i = 0; i < s.length(); i++) {
+                char c = s.charAt(i);
+                switch (c) {
+                    case '"':
+                        sb.append("\\\"");
+                        break;
+                    case '\\':
+                        sb.append("\\\\");
+                        break;
+                    case '\n':
+                        sb.append("\\n");
+                        break;
+                    case '\r':
+                        sb.append("\\r");
+                        break;
+                    case '\t':
+                        sb.append("\\t");
+                        break;
+                    case '\b':
+                        sb.append("\\b");
+                        break;
+                    case '\f':
+                        sb.append("\\f");
+                        break;
+                    default:
+                        if (c < 0x20) {
+                            sb.append(String.format("\\u%04x", (int) c));
+                        } else {
+                            sb.append(c);
+                        }
+                }
+            }
+            sb.append('"');
+        }
+    }
+}

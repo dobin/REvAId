@@ -10,8 +10,13 @@ own package" contract in ``pyproject.toml``.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 from graphrev.adapters.ghidra.base import GhidraAdapter
 from graphrev.core.config import GhidraAdapterName
+
+if TYPE_CHECKING:
+    from graphrev.schemas.ingest import GhidraExportDocument
 
 
 class GhidraAdapterNotImplementedError(NotImplementedError):
@@ -36,4 +41,23 @@ def create_adapter(name: GhidraAdapterName, *, seed: int = 1337) -> GhidraAdapte
     raise GhidraAdapterNotImplementedError(f"Unknown Ghidra adapter: {name!r}")
 
 
-__all__ = ["GhidraAdapter", "GhidraAdapterNotImplementedError", "create_adapter"]
+def create_file_adapter(document: GhidraExportDocument) -> GhidraAdapter:
+    """Build a `GhidraAdapter` over an already-parsed Ghidra JSON export (I12).
+
+    Separate from :func:`create_adapter` because a file adapter is addressed by
+    document, not by a config name/seed. Kept here so
+    :class:`~graphrev.adapters.ghidra.file.FileGhidraAdapter` (a concrete
+    implementation) is still only imported inside this package, per the
+    ``import-linter`` contract.
+    """
+    from graphrev.adapters.ghidra.file import FileGhidraAdapter
+
+    return FileGhidraAdapter(document)
+
+
+__all__ = [
+    "GhidraAdapter",
+    "GhidraAdapterNotImplementedError",
+    "create_adapter",
+    "create_file_adapter",
+]

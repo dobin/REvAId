@@ -4,6 +4,7 @@
  */
 import type { BinaryId, ViewId } from "@/api/types";
 import { GlyphLegend } from "./GlyphLegend";
+import { ImportBinaryButton } from "./ImportBinaryButton";
 import { OnCanvasList } from "./OnCanvasList";
 import { PlaceEntryPointButton } from "./PlaceEntryPointButton";
 import { RebalanceButton } from "./RebalanceButton";
@@ -42,9 +43,11 @@ function SidebarSection({
 export function Sidebar({
   binaryId,
   viewId,
+  onImported,
 }: {
   binaryId: BinaryId | null;
   viewId: ViewId | null;
+  onImported: (binaryId: BinaryId) => void;
 }) {
   return (
     <aside
@@ -56,13 +59,16 @@ export function Sidebar({
         flexDirection: "column",
       }}
     >
-      {(binaryId !== null && viewId !== null) || viewId !== null ? (
+      <SidebarSection title="Binary">
+        <ImportBinaryButton onImported={onImported} />
+      </SidebarSection>
+      {viewId !== null ? (
         <SidebarSection title="Actions">
-          {binaryId !== null && viewId !== null && (
+          {binaryId !== null && (
             <PlaceEntryPointButton binaryId={binaryId} viewId={viewId} />
           )}
-          {viewId !== null && <RebalanceButton viewId={viewId} />}
-          {viewId !== null && <ResetCanvasButton viewId={viewId} />}
+          <RebalanceButton viewId={viewId} />
+          <ResetCanvasButton viewId={viewId} />
         </SidebarSection>
       ) : null}
       <SidebarSection title="On canvas">

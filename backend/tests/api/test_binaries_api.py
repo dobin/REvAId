@@ -163,3 +163,76 @@ async def test_delete_binary_404_for_missing_binary(client: AsyncClient) -> None
     response = await client.delete("/api/v1/binaries/99999", params={"confirm": "anything"})
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "BINARY_NOT_FOUND"
+
+
+def _import_document() -> dict:
+    """A minimal Ghidra export document (schema v1) for the import endpoint."""
+    return {
+        "schemaVersion": 1,
+        "binary": {"name": "imported.exe", "version": "2.0", "sourcePath": "/tmp/imported.exe"},
+        "functions": [
+            {
+                "address": 0x401000,
+                "name": "main",
+                "parameters": [{"ordinal": 0, "name": "argc", "type": "int"}],
+                "signature": "int main(int argc)",
+                "assembly": "00401000  PUSH RBP",
+                "codeC": "int main(int argc){return 0;}",
+                "kind": "normal",
+                "isEntryPoint": True,
+            },
+            {
+                "address": 0x401100,
+                "name": "helper",
+                "parameters": [],
+                "signature": "void helper(void)",
+                "assembly": "00401100  RET",
+                "codeC": "void helper(void){}",
+                "kind": "normal",
+            },
+        ],
+        "edges": [{"callerAddress": 0x401000, "calleeAddress": 0x401100}],
+    }
+
+
+@pytest.mark.asyncio
+async def test_import_binary_creates_new_binary(client: AsyncClient) -> None:
+    response = await client.post("/api/v1/binaries/import", json=_import_document())
+    assert response.status_code == 201
+    body = response.json()
+    assert body["name"] == "imported.exe"
+    assert body["version"] == "2.0"
+    assert body["functionsInserted"] == 2
+    assert body["edgesInserted"] == 1
+
+    listing = (await client.get("/api/v1/binaries")).json()
+    names = {b["name"] for b in listing}
+    assert "imported.exe" in names
+
+
+@pytest.mark.asyncio
+async def test_import_binary_is_idempotent(client: AsyncClient) -> None:
+    first = (await client.post("/api/v1/binaries/import", json=_import_document())).json()
+    second = (await client.post("/api/v1/binaries/import", json=_import_document())).json()
+
+    assert second["binaryId"] == first["binaryId"]
+    assert second["functionsInserted"] == 0
+    assert second["functionsUpdated"] > 0
+
+    listing = (await client.get("/api/v1/binaries")).json()
+    assert len([b for b in listing if b["name"] == "imported.exe"]) == 1
+
+
+@pytest.mark.asyncio
+async def test_import_binary_rejects_unsupported_schema(client: AsyncClient) -> None:
+    doc = _import_document()
+    doc["schemaVersion"] = 999
+    response = await client.post("/api/v1/binaries/import", json=doc)
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_import_binary_rejects_malformed_body(client: AsyncClient) -> None:
+    response = await client.post("/api/v1/binaries/import", json={"not": "an export"})
+    assert response.status_code == 422

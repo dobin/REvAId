@@ -90,6 +90,20 @@ async def get_binary_by_id(session: AsyncSession, binary_id: int) -> Binary | No
     return await session.get(Binary, binary_id)
 
 
+async def get_binary_by_name_version(
+    session: AsyncSession, *, name: str, version: str
+) -> Binary | None:
+    """A single `Binary` row by its unique `(name, version)`, or `None`.
+
+    A read-only lookup (unlike :func:`get_or_create_binary`, which mutates
+    `source_path`/`updated_at`) — used by the import flow to resolve the id of
+    the binary the ingestion pipeline just upserted."""
+    result = await session.execute(
+        select(Binary).where(Binary.name == name, Binary.version == version)
+    )
+    return result.scalar_one_or_none()
+
+
 async def delete_binary(session: AsyncSession, binary: Binary) -> None:
     """Delete a binary; cascades to functions/edges/views/view_nodes via the
     DB-level `ON DELETE CASCADE` foreign keys (`passive_deletes=True` on the

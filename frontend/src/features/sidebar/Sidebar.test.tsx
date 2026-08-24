@@ -8,7 +8,7 @@ describe("Sidebar", () => {
     const queryClient = new QueryClient();
     render(
       <QueryClientProvider client={queryClient}>
-        <Sidebar binaryId={null} viewId={null} />
+        <Sidebar binaryId={null} viewId={null} onImported={() => undefined} />
       </QueryClientProvider>,
     );
     expect(screen.getByText("Legend")).toBeInTheDocument();

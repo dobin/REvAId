@@ -1,13 +1,27 @@
-"""Binary use cases (E1): list, typed-confirm delete, entry-point suggestions."""
+"""Binary use cases (E1): list, typed-confirm delete, entry-point suggestions,
+and Ghidra JSON-export import (I12)."""
 
 from __future__ import annotations
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from graphrev.adapters.ghidra import create_file_adapter
+from graphrev.core.config import Settings
 from graphrev.core.errors import AppError, ErrorCode
-from graphrev.repositories.binaries import delete_binary, get_binary_by_id, list_binaries
+from graphrev.ingestion.pipeline import run_ingestion
+from graphrev.repositories.binaries import (
+    delete_binary,
+    get_binary_by_id,
+    get_binary_by_name_version,
+    list_binaries,
+)
 from graphrev.repositories.functions import list_entry_points
 from graphrev.schemas.binary import BinarySummaryDto, binary_summary_from_row
+from graphrev.schemas.ingest import (
+    SUPPORTED_EXPORT_SCHEMA_VERSION,
+    GhidraExportDocument,
+    ImportResultDto,
+)
 from graphrev.schemas.search import EntryPointDto, EntryPointsDto, entry_point_dto_from_function
 
 #: E1b: "≤ 5 empty-canvas suggestions" — enforced server-side regardless of
@@ -60,3 +74,67 @@ async def get_entry_points(session: AsyncSession, binary_id: int) -> EntryPoints
     functions = await list_entry_points(session, binary_id=binary_id, limit=_MAX_ENTRY_POINTS)
     entry_points: list[EntryPointDto] = [entry_point_dto_from_function(fn) for fn in functions]
     return EntryPointsDto(entry_points=entry_points)
+
+
+async def import_ghidra_export(
+    session_factory: async_sessionmaker[AsyncSession],
+    settings: Settings,
+    document: GhidraExportDocument,
+) -> ImportResultDto:
+    """Ingest a Ghidra JSON export as a binary (I12).
+
+    Re-importing the same `(name, version)` is idempotent: the ingestion
+    pipeline upserts inherent fields and preserves analyst-owned columns
+    (`summary_*`, `name_analyst`, `notes`, `utility_override`) exactly as
+    re-ingestion does (A3). Raises `VALIDATION_ERROR` for an unsupported
+    schema version or if the pipeline reports the binary as failed.
+
+    Takes the session *factory* rather than a request session because
+    `run_ingestion` owns its own `unit_of_work` transactions (one per binary).
+    """
+    if document.schema_version != SUPPORTED_EXPORT_SCHEMA_VERSION:
+        raise AppError(
+            ErrorCode.VALIDATION_ERROR,
+            f"Unsupported export schemaVersion {document.schema_version}; "
+            f"this build supports {SUPPORTED_EXPORT_SCHEMA_VERSION}.",
+            details={
+                "schemaVersion": document.schema_version,
+                "supported": SUPPORTED_EXPORT_SCHEMA_VERSION,
+            },
+        )
+
+    adapter = create_file_adapter(document)
+    reports = await run_ingestion(
+        session_factory, adapter, settings, binary_filter=document.binary.name
+    )
+
+    # `run_ingestion` yields one report; `binary_filter` restricts it to the
+    # single binary this document carries.
+    report = reports[0]
+    if report.binary_failed:
+        raise AppError(
+            ErrorCode.VALIDATION_ERROR,
+            f"Ingestion of '{document.binary.name}' failed.",
+            details={"failures": report.failures},
+        )
+
+    async with session_factory() as session:
+        binary = await get_binary_by_name_version(
+            session, name=document.binary.name, version=document.binary.version
+        )
+    if binary is None:  # pragma: no cover - defensive; ingestion just created it
+        raise AppError(
+            ErrorCode.INTERNAL_ERROR,
+            f"Imported binary '{document.binary.name}' not found after ingestion.",
+        )
+
+    return ImportResultDto(
+        binary_id=binary.id,
+        name=binary.name,
+        version=binary.version,
+        functions_inserted=report.functions_inserted,
+        functions_updated=report.functions_updated,
+        edges_inserted=report.edges_inserted,
+        placeholders_created=report.placeholders_created,
+        failures=report.failures,
+    )

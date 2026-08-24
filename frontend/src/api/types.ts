@@ -38,6 +38,38 @@ export interface BinarySummaryDto {
   createdAt: string;
 }
 
+/**
+ * A Ghidra JSON export document — the `POST /binaries/import` request body
+ * (I12). Produced by `tools/ghidra/GraphRevExport.java` (schema v1). Typed
+ * loosely here (functions/edges as `unknown[]`) since the file is parsed and
+ * validated server-side; the client only needs to POST the parsed JSON.
+ */
+export interface GhidraExportDocument {
+  schemaVersion: number;
+  binary: {
+    name: string;
+    version?: string;
+    sourcePath?: string | null;
+    sha256?: string | null;
+    functionCount?: number | null;
+    edgeCount?: number | null;
+  };
+  functions: unknown[];
+  edges: unknown[];
+}
+
+/** `POST /binaries/import` response (I12). */
+export interface ImportResultDto {
+  binaryId: BinaryId;
+  name: string;
+  version: string;
+  functionsInserted: number;
+  functionsUpdated: number;
+  edgesInserted: number;
+  placeholdersCreated: number;
+  failures: string[];
+}
+
 export interface FunctionParam {
   ordinal: number;
   name: string;

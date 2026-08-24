@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Query, status
 
-from graphrev.api.deps import SessionDep, SettingsDep
+from graphrev.api.deps import SessionDep, SessionFactoryDep, SettingsDep
 from graphrev.core.errors import AppError, ErrorCode
 from graphrev.schemas.binary import BinarySummaryDto
 from graphrev.schemas.function import FunctionDto
+from graphrev.schemas.ingest import GhidraExportDocument, ImportResultDto
 from graphrev.schemas.search import EntryPointsDto, FunctionSearchPageDto
 from graphrev.services import binary_service, function_service, search_service
 
@@ -29,6 +30,24 @@ def _parse_address(raw: str) -> int:
 @router.get("/binaries", response_model=list[BinarySummaryDto])
 async def list_binaries(session: SessionDep) -> list[BinarySummaryDto]:
     return await binary_service.list_binaries_dto(session)
+
+
+@router.post(
+    "/binaries/import",
+    response_model=ImportResultDto,
+    status_code=status.HTTP_201_CREATED,
+)
+async def import_binary(
+    document: GhidraExportDocument,
+    session_factory: SessionFactoryDep,
+    settings: SettingsDep,
+) -> ImportResultDto:
+    """Import a Ghidra JSON export as a binary (I12).
+
+    Idempotent on `(name, version)` — re-importing upserts inherent fields and
+    preserves analyst-owned data (A3).
+    """
+    return await binary_service.import_ghidra_export(session_factory, settings, document)
 
 
 @router.delete("/binaries/{binary_id}", status_code=status.HTTP_204_NO_CONTENT)

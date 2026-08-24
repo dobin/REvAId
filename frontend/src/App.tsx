@@ -46,7 +46,11 @@ function AppShell() {
       />
       <CanvasActionsRegistryProvider value={actionsRegistry}>
         <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-          <Sidebar binaryId={selectedBinaryId} viewId={selectedViewId} />
+          <Sidebar
+            binaryId={selectedBinaryId}
+            viewId={selectedViewId}
+            onImported={handleSelectBinary}
+          />
           <main style={{ flex: 1, minWidth: 0 }}>
             <CanvasView selectedBinaryId={selectedBinaryId} viewId={selectedViewId} actionsRegistry={actionsRegistry} />
           </main>
