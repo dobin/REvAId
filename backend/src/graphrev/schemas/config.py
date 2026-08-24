@@ -27,6 +27,9 @@ class AppConfigDto(ApiModel):
     summary_concurrency: int
     layout_height_change_threshold_px: int
     layout_animation_ms: int
+    # I9 (F1a): fast-scroll debounce guard for row-summary demand acquisition —
+    # `hooks/useSummaryDemand.ts` must read this rather than hard-coding 250ms.
+    summary_demand_debounce_ms: int
     node_color_palette: list[str]
     adapters: AdapterIdentityDto
 
@@ -48,6 +51,7 @@ def app_config_from_settings(settings: Settings) -> AppConfigDto:
         summary_concurrency=settings.summary_concurrency,
         layout_height_change_threshold_px=settings.layout_height_change_threshold_px,
         layout_animation_ms=settings.layout_animation_ms,
+        summary_demand_debounce_ms=settings.summary_demand_debounce_ms,
         node_color_palette=list(NODE_COLOR_PALETTE),
         adapters=AdapterIdentityDto(
             ghidra=settings.ghidra_adapter,

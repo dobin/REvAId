@@ -13,6 +13,7 @@ so it can be linked from onboarding docs without importing TypeScript.
 | ≡ | Placeholder — outside the ingested module (D35a) |
 | 📝 / ✎ | Has notes / renamed by analyst |
 | ! | Error |
+| ↺ | Retry a failed summary (I9) — distinct from ↻ (recursive) |
 | ✨ | Marks LLM output (three-tier truthfulness, PRD §4.4) |
 | ⋯ ✕ ⌄ ▾ ▸ ⇅ ⚙ 🎨 🔍 ✓ ⚠ | Card menu, close, collapse, expand, sort, settings, color, search, resolved, warning |
 

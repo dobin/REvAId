@@ -18,6 +18,9 @@ export const GLYPHS = {
   hasNotes: "📝",
   renamed: "✎",
   error: "!",
+  // I9: retry affordance on a failed summary (§5.3). Deliberately U+21BA,
+  // distinct from `recursive` (U+21BB) — do not confuse the two.
+  retry: "↺",
   llmMarker: "✨", // marks LLM output (§4.4 three-tier truthfulness)
   menu: "⋯",
   close: "✕",
@@ -65,6 +68,7 @@ export const GLYPH_LABELS: Record<GlyphKey, string> = {
   hasNotes: "Has analyst notes",
   renamed: "Renamed by analyst",
   error: "Summary error",
+  retry: "Retry summary",
   llmMarker: "LLM-generated output",
   menu: "More actions",
   close: "Close",

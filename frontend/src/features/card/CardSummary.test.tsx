@@ -1,7 +1,13 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { CardSummary } from "./CardSummary";
 import type { FunctionDto } from "@/api/types";
+
+function renderWithClient(node: React.ReactElement) {
+  const queryClient = new QueryClient();
+  return render(<QueryClientProvider client={queryClient}>{node}</QueryClientProvider>);
+}
 
 const baseFn: FunctionDto = {
   id: 1,
@@ -39,13 +45,17 @@ const baseFn: FunctionDto = {
 };
 
 describe("CardSummary", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("renders nothing when no summary exists yet", () => {
-    const { container } = render(<CardSummary fn={baseFn} />);
+    const { container } = renderWithClient(<CardSummary fn={baseFn} />);
     expect(container).toBeEmptyDOMElement();
   });
 
   it("renders the short summary when ready", () => {
-    render(
+    renderWithClient(
       <CardSummary
         fn={{ ...baseFn, summary: { ...baseFn.summary, status: "ready", short: "Entry point." } }}
       />,
@@ -53,10 +63,39 @@ describe("CardSummary", () => {
     expect(screen.getByText(/entry point/i)).toBeInTheDocument();
   });
 
-  it("renders a generating message when pending", () => {
-    render(
+  it("renders a shimmering generating message when pending", () => {
+    renderWithClient(
       <CardSummary fn={{ ...baseFn, summary: { ...baseFn.summary, status: "pending" } }} />,
     );
-    expect(screen.getByText(/generating/i)).toBeInTheDocument();
+    const shimmer = screen.getByText(/generating/i);
+    expect(shimmer).toBeInTheDocument();
+    expect(shimmer).toHaveClass("gr-shimmer");
+  });
+
+  it("renders a retry button on error and regenerates on click", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({ functionId: 1, summaryStatus: "pending", queuePosition: 0, summaryShort: null }),
+            { status: 202 },
+          ),
+        ),
+      ),
+    );
+    renderWithClient(
+      <CardSummary
+        fn={{
+          ...baseFn,
+          summary: { ...baseFn.summary, status: "error", errorCode: "SUMMARY_PROVIDER_ERROR" },
+        }}
+      />,
+    );
+    const retryButton = screen.getByRole("button", { name: /retry summary/i });
+    fireEvent.click(retryButton);
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalled();
+    });
   });
 });

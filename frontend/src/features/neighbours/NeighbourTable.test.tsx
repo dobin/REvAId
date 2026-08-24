@@ -1,8 +1,27 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ConfigProvider } from "@/config/ConfigProvider";
 import { NeighbourTable } from "./NeighbourTable";
-import type { NeighbourPageDto, NeighbourRowDto } from "@/api/types";
+import type { AppConfigDto, NeighbourPageDto, NeighbourRowDto } from "@/api/types";
+
+// I9: VirtualRowList/UtilityGroup now call useSummaryDemand, which needs a
+// resolved ConfigProvider (for summaryDemandDebounceMs) even in tests that
+// only render one card's tables in isolation.
+const config: AppConfigDto = {
+  tableRowCap: 16,
+  callerSuppressThreshold: 32,
+  utilityFanInThreshold: 50,
+  fanOutAllHardCap: 50,
+  nodeCountSoftWarning: 150,
+  cardWidthPx: 380,
+  summaryConcurrency: 4,
+  layoutHeightChangeThresholdPx: 8,
+  layoutAnimationMs: 400,
+  summaryDemandDebounceMs: 250,
+  nodeColorPalette: ["slate"],
+  adapters: { ghidra: "mock", llm: "mock", llmModel: "mock-llm-v1" },
+};
 
 function makeRow(id: number, overrides: Partial<NeighbourRowDto> = {}): NeighbourRowDto {
   return {
@@ -32,7 +51,9 @@ function renderWithProviders(
   const queryClient = new QueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
-      <NeighbourTable functionId={functionId} viewId={viewId} direction={direction} />
+      <ConfigProvider fallback={null}>
+        <NeighbourTable functionId={functionId} viewId={viewId} direction={direction} />
+      </ConfigProvider>
     </QueryClientProvider>,
   );
 }
@@ -40,7 +61,13 @@ function renderWithProviders(
 function mockFetchOnce(page: NeighbourPageDto) {
   vi.stubGlobal(
     "fetch",
-    vi.fn(() => Promise.resolve(new Response(JSON.stringify(page), { status: 200 }))),
+    vi.fn((input: string | URL | Request) => {
+      const url = input instanceof Request ? input.url : String(input);
+      if (url.endsWith("/api/v1/config")) {
+        return Promise.resolve(new Response(JSON.stringify(config), { status: 200 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify(page), { status: 200 }));
+    }),
   );
 }
 

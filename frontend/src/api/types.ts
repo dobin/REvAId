@@ -289,6 +289,9 @@ export interface AppConfigDto {
   // component hard-codes either literal (F1a).
   layoutHeightChangeThresholdPx: number;
   layoutAnimationMs: number;
+  // I9: fast-scroll debounce guard for row-summary demand acquisition —
+  // `hooks/useSummaryDemand.ts` reads this rather than hard-coding a value.
+  summaryDemandDebounceMs: number;
   nodeColorPalette: NodeColor[];
   adapters: AdapterIdentityDto;
 }

@@ -13,6 +13,7 @@ import type { FunctionId, ViewId, ViewNodeDto } from "@/api/types";
 import { CardHeader } from "@/features/card/CardHeader";
 import { CardSummary } from "@/features/card/CardSummary";
 import { NeighbourTable } from "@/features/neighbours/NeighbourTable";
+import { useSummaryDemand } from "@/hooks/useSummaryDemand";
 import { useAppStore } from "@/store";
 import { useViewNodeActions } from "../useViewNodeActions";
 import { CollapsedChip } from "./CollapsedChip";
@@ -46,6 +47,17 @@ export function FunctionCardNode({ data }: { data: FunctionCardNodeData }) {
   const { data: fn, isPending, isError } = useFunctionQuery(data.functionId);
   const selectFunction = useAppStore((s) => s.selectFunction);
   const actions = useViewNodeActions(data.viewId);
+
+  // I9 §5.1: opening/placing a card demands its OWN summary at priority 0,
+  // ahead of anything in its tables (priority 1/2) — "analyse the function
+  // itself first". Suppressed while collapsed (D14) since a collapsed card
+  // shows no summary at all (mirrors the C2b "deferred, not skipped" rule).
+  useSummaryDemand({
+    surface: `card:${String(data.functionId)}`,
+    functionIds: [data.functionId],
+    priority: 0,
+    enabled: !data.viewNode.collapsed,
+  });
 
   if (isPending) {
     return (

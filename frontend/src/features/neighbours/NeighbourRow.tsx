@@ -3,12 +3,18 @@
  * the row's function onto the canvas via `useCanvasActions` (D8); when the
  * function is already placed (◎), clicking again hides it (toggles it off).
  * `isSelf` (recursion) keeps the button inert.
+ *
+ * I9 §5.3: a second thin line renders `SummaryCell` under the name, once the
+ * row has a non-`none` summary status — this is what actually surfaces the
+ * demand system's results in the table (the demand hook only ever fetches;
+ * this is what displays what it fetched).
  */
 import { Glyph } from "@/components/Glyph";
 import { toHex } from "@/lib/hex";
 import type { NeighbourRowDto } from "@/api/types";
 import { useCanvasActions, type FanOutOrigin } from "@/features/canvas/CanvasActions";
 import { FunctionInfoTooltip } from "./FunctionInfoTooltip";
+import { SummaryCell } from "./SummaryCell";
 
 export function NeighbourRow({
   row,
@@ -62,19 +68,31 @@ export function NeighbourRow({
       >
         {toHex(row.address)}
       </span>
-      <span style={{ display: "flex", alignItems: "center", gap: "0.375rem", minWidth: 0 }}>
-        {row.isSelf && <Glyph name="recursive" />}
-        {row.isUtility && <Glyph name="utility" />}
-        {row.hasNotes && <Glyph name="hasNotes" />}
-        {row.isRenamed && <Glyph name="renamed" />}
-        <FunctionInfoTooltip functionId={row.id}>
-          <span
-            className="gr-ground-truth"
-            style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-          >
-            {row.displayName}
+      <span style={{ display: "flex", flexDirection: "column", minWidth: 0, gap: "0.0625rem" }}>
+        <span style={{ display: "flex", alignItems: "center", gap: "0.375rem", minWidth: 0 }}>
+          {row.isSelf && <Glyph name="recursive" />}
+          {row.isUtility && <Glyph name="utility" />}
+          {row.hasNotes && <Glyph name="hasNotes" />}
+          {row.isRenamed && <Glyph name="renamed" />}
+          <FunctionInfoTooltip functionId={row.id}>
+            <span
+              className="gr-ground-truth"
+              style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+            >
+              {row.displayName}
+            </span>
+          </FunctionInfoTooltip>
+        </span>
+        {row.summaryStatus !== "none" && (
+          <span style={{ fontSize: "0.6875rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            <SummaryCell
+              status={row.summaryStatus}
+              summaryShort={row.summaryShort}
+              lowConfidence={row.summaryLowConfidence}
+              functionId={row.id}
+            />
           </span>
-        </FunctionInfoTooltip>
+        )}
       </span>
       <button
         type="button"

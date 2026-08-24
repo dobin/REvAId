@@ -1,15 +1,23 @@
 /**
  * Orchestrates one direction (`callees` | `callers`) of a card's neighbour
- * tables (TAD §2.3/§4.3). Side-effect free (C2c) — a GET only, no summary
- * demand wiring in I5.
+ * tables (TAD §2.3/§4.3).
  *
  * `callersSuppressed` short-circuits to just `SuppressedNotice` (D7/E2a) —
- * filter/sort/utility-group never render for a suppressed caller table,
- * matching the backend's own "never fetch 291 rows" guarantee.
+ * filter/sort/utility-group (and therefore `VirtualRowList`'s demand
+ * acquisition) never render for a suppressed caller table, matching the
+ * backend's own "never fetch 291 rows" guarantee. A suppressed hub's own
+ * card summary (priority 0, wired in `FunctionCardNode`) is still demanded —
+ * only its caller *table* is inert.
+ *
+ * I9: row demand priority is 1 for the selected card's own tables, 2
+ * otherwise (§5.1's priority ladder) — this is what makes "open a card,
+ * analyse it first, then its neighbours" fall out of the existing queue
+ * priorities rather than any client-side sequencing.
  */
 import { useState } from "react";
 import { useNeighboursQuery } from "@/api/queries/neighbours";
 import type { FunctionId, ViewId } from "@/api/types";
+import { useAppStore } from "@/store";
 import { FilterInput } from "./FilterInput";
 import { SortControl, type SortKey, type SortOrder } from "./SortControl";
 import { SuppressedNotice } from "./SuppressedNotice";
@@ -29,6 +37,8 @@ export function NeighbourTable({
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortKey>("name");
   const [order, setOrder] = useState<SortOrder>("asc");
+  const isSelected = useAppStore((s) => s.selectedFunctionId === functionId);
+  const rowPriority = isSelected ? 1 : 2;
 
   const { data, isPending, isError } = useNeighboursQuery({
     functionId,
@@ -78,12 +88,17 @@ export function NeighbourTable({
           />
         </div>
       </div>
-      <VirtualRowList rows={data.rows} origin={origin} />
+      <VirtualRowList
+        rows={data.rows}
+        origin={origin}
+        demand={{ surface: `table:${String(functionId)}:${direction}:primary`, priority: rowPriority }}
+      />
       <UtilityGroup
         functionId={functionId}
         viewId={viewId}
         direction={direction}
         totalUtility={data.totalUtility}
+        priority={rowPriority}
       />
       {data.mayBeIncomplete && (
         <p style={{ fontSize: "0.6875rem", color: "#9ca3af", margin: "0.25rem 0 0" }}>

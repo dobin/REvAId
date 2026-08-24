@@ -21,6 +21,7 @@ async def test_config_returns_camel_case_defaults(client: AsyncClient) -> None:
     assert body["nodeCountSoftWarning"] == 150
     assert body["cardWidthPx"] == 380
     assert body["summaryConcurrency"] == 4
+    assert body["summaryDemandDebounceMs"] == 250
     assert "red" in body["nodeColorPalette"]
     assert body["adapters"] == {"ghidra": "mock", "llm": "mock", "llmModel": "mock-llm-v1"}
 

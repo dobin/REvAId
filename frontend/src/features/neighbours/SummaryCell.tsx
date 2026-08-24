@@ -1,21 +1,28 @@
 /**
  * Renders a row/card summary per `SummaryStatus` (§4.3 all table/card
- * states). No shimmer/animation in I5 — that polish arrives with I9's
- * demand system, which is what actually triggers generation.
+ * states). I9 §5.3 finishes the states left as plain text in I5: `pending`
+ * shimmers (`.gr-shimmer`, `styles/tokens.css`) instead of static text, and
+ * `error` gains a retry button (only rendered when `functionId` is passed —
+ * omit it for read-only/isolated rendering).
  */
 import { Glyph } from "@/components/Glyph";
-import type { SummaryStatus } from "@/api/types";
+import type { FunctionId, SummaryStatus } from "@/api/types";
+import { useRegenerateSummaryMutation } from "@/api/queries/summaries";
 
 export function SummaryCell({
   status,
   summaryShort,
   lowConfidence,
   errorCode,
+  functionId,
 }: {
   status: SummaryStatus;
   summaryShort: string | null;
   lowConfidence?: boolean;
   errorCode?: string | null;
+  /** Enables the retry-on-error affordance. Omitted in isolated/unit
+   * rendering that has no mutation/QueryClient context to call into. */
+  functionId?: FunctionId;
 }) {
   switch (status) {
     case "none":
@@ -23,7 +30,7 @@ export function SummaryCell({
     case "pending":
       return (
         <span style={{ color: "#6b7280" }}>
-          <Glyph name="generating" /> Generating…
+          <Glyph name="generating" /> <span className="gr-shimmer">Generating…</span>
         </span>
       );
     case "ready":
@@ -43,9 +50,35 @@ export function SummaryCell({
       return (
         <span style={{ color: "#b91c1c" }}>
           <Glyph name="error" /> {errorCode ?? "Summary failed"}
+          {functionId !== undefined && <RetryButton functionId={functionId} />}
         </span>
       );
     default:
       return null;
   }
+}
+
+function RetryButton({ functionId }: { functionId: FunctionId }) {
+  const regenerate = useRegenerateSummaryMutation();
+  return (
+    <button
+      type="button"
+      aria-label="Retry summary"
+      title="Retry summary"
+      onClick={(e) => {
+        e.stopPropagation();
+        regenerate.mutate(functionId);
+      }}
+      disabled={regenerate.isPending}
+      style={{
+        border: "none",
+        background: "none",
+        cursor: regenerate.isPending ? "default" : "pointer",
+        padding: "0 0.25rem",
+        color: "inherit",
+      }}
+    >
+      <Glyph name="retry" />
+    </button>
+  );
 }
