@@ -6,10 +6,11 @@ import type { BinaryId, ViewId } from "@/api/types";
 import { FunctionSearchInput } from "./FunctionSearchInput";
 import { GlyphLegend } from "./GlyphLegend";
 import { ImportBinaryButton } from "./ImportBinaryButton";
-import { OnCanvasList } from "./OnCanvasList";
+import { OnCanvasSearch } from "./OnCanvasSearch";
 import { PlaceEntryPointButton } from "./PlaceEntryPointButton";
 import { RebalanceButton } from "./RebalanceButton";
 import { ResetCanvasButton } from "./ResetCanvasButton";
+import { ResetSummariesButton } from "./ResetSummariesButton";
 
 const sectionStyle: React.CSSProperties = {
   paddingTop: "0.875rem",
@@ -62,9 +63,10 @@ export function Sidebar({
     >
       <SidebarSection title="Binary">
         <ImportBinaryButton onImported={onImported} />
+        {binaryId !== null && <ResetSummariesButton binaryId={binaryId} />}
       </SidebarSection>
       {binaryId !== null && (
-        <SidebarSection title="Find function">
+        <SidebarSection title="Add Function">
           <FunctionSearchInput binaryId={binaryId} viewId={viewId} />
         </SidebarSection>
       )}
@@ -77,8 +79,8 @@ export function Sidebar({
           <ResetCanvasButton viewId={viewId} />
         </SidebarSection>
       ) : null}
-      <SidebarSection title="On canvas">
-        <OnCanvasList viewId={viewId} />
+      <SidebarSection title="Find Function">
+        <OnCanvasSearch binaryId={binaryId} viewId={viewId} />
       </SidebarSection>
       <SidebarSection title="Legend">
         <GlyphLegend />
