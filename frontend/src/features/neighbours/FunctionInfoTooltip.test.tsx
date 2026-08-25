@@ -27,6 +27,7 @@ function makeFunction(overrides: Partial<FunctionDto["summary"]> = {}): Function
       short: "Parses the file header.",
       long: "Reads the first bytes and validates the magic number before dispatching.",
       model: "mock",
+      adapter: null,
       errorCode: null,
       lowConfidence: false,
       generatedAt: "2026-01-01T00:00:00Z",

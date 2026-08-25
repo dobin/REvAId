@@ -72,6 +72,7 @@ async def test_reingest_preserves_llm_and_analyst_fields(session: AsyncSession) 
     assert fn is not None
     fn.summary_short = "Parses the on-disk configuration."
     fn.summary_status = "ready"
+    fn.summary_adapter = "litellm"  # I13/AM4: adapter provenance is LLM-owned
     fn.name_analyst = "parse_config"
     fn.notes = "Confirmed this handles the v2 format only."
     fn.utility_override = "never"
@@ -100,6 +101,7 @@ async def test_reingest_preserves_llm_and_analyst_fields(session: AsyncSession) 
     # LLM- and analyst-owned fields untouched (A3).
     assert refreshed.summary_short == "Parses the on-disk configuration."
     assert refreshed.summary_status == "ready"
+    assert refreshed.summary_adapter == "litellm"
     assert refreshed.name_analyst == "parse_config"
     assert refreshed.notes == "Confirmed this handles the v2 format only."
     assert refreshed.utility_override == "never"

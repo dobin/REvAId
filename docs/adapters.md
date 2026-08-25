@@ -87,3 +87,33 @@ Prompt content is explicitly out of scope for GraphRev's own architecture
 what a real adapter does with it (system prompt, model choice, truncation
 strategy, prompt-injection fencing for untrusted binary content) is
 adapter-owned.
+
+### Implementations
+
+- **`MockLlmAdapter`** (`adapters/llm/mock.py`, I7) — deterministic, seeded,
+  latency/failure-simulating; the default.
+- **`LiteLlmAdapter`** (`adapters/llm/litellm_adapter.py`, I13) — real
+  summaries via `litellm.acompletion`. One adapter covers every provider
+  litellm routes to (Anthropic / OpenAI / Ollama / vLLM / OpenRouter) via a
+  provider-prefixed `GRAPHREV_LLM_MODEL` string; see README "Real LLM
+  summaries (litellm)" for configuration. Its contract obligations:
+
+  - Enforces a JSON response `{summary_short, summary_long, low_confidence}`
+    validated with Pydantic — never regexes a prose blob. Unparseable output
+    raises `PermanentProviderError` so garbage is never cached (C6).
+  - Hard-clamps `summary_short` to one table row (C4) in the adapter — the
+    DB column is what the UI trusts.
+  - Truncates oversized `code_c` itself and reports `input_truncated`;
+    raises `ContextTooLargeError` only if even the truncated form fails.
+  - Fences untrusted content (decompiled C, strings, symbol names, notes) in
+    delimited `<untrusted>` data blocks with an explicit data-not-
+    instructions instruction (§5.1/§6.4).
+  - Maps litellm's normalised exceptions onto the taxonomy:
+    `RateLimitError`→`RateLimitError` (with `retry_after` when the provider
+    supplies it), `AuthenticationError`→`AuthError`,
+    `ContextWindowExceededError`→`ContextTooLargeError`,
+    `APIConnectionError`/timeout→`TransientProviderError`.
+  - `max_concurrency = settings.summary_concurrency` (stateless HTTP calls,
+    AM1); `health()` is a one-token completion probe that never raises.
+
+- **opencode agent adapter** (I13, commit boundary 8) — not yet implemented.

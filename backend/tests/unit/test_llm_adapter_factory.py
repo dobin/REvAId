@@ -49,9 +49,13 @@ def test_default_settings_disable_latency_simulation() -> None:
     assert adapter._simulate_latency is False
 
 
-def test_create_adapter_litellm_not_implemented() -> None:
-    with pytest.raises(LlmAdapterNotImplementedError):
-        create_adapter("litellm", _settings())
+def test_create_adapter_litellm_returns_litellm_adapter() -> None:
+    from graphrev.adapters.llm.litellm_adapter import LiteLlmAdapter
+
+    adapter = create_adapter("litellm", _settings())
+    assert isinstance(adapter, LiteLlmAdapter)
+    assert adapter.name == "litellm"
+    assert adapter.max_concurrency == _settings().summary_concurrency
 
 
 def test_create_adapter_opencode_not_implemented() -> None:

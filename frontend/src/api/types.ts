@@ -99,6 +99,9 @@ export interface FunctionDto {
     short: string | null;
     long: string | null;
     model: string | null;
+    // I13/AM4: which adapter produced the summary ("mock"/"litellm"/...).
+    // Hand-mirrored from FunctionSummaryStateDto; no UI affordance yet.
+    adapter: string | null;
     errorCode: string | null;
     lowConfidence: boolean;
     generatedAt: string | null;

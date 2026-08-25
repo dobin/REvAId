@@ -133,6 +133,9 @@ class Function(Base):
     summary_long: Mapped[str | None] = mapped_column(default=None)
     summary_status: Mapped[str] = mapped_column(default="none")
     summary_model: Mapped[str | None] = mapped_column(default=None)
+    #: I13/AM4: which adapter produced this summary ("mock"/"litellm"/...).
+    #: Nullable, no CHECK (see migration 0005) — not surfaced in the UI yet.
+    summary_adapter: Mapped[str | None] = mapped_column(default=None)
     summary_error_code: Mapped[str | None] = mapped_column(default=None)
     summary_low_confidence: Mapped[bool] = mapped_column(default=False)
     summary_generated_at: Mapped[str | None] = mapped_column(default=None)

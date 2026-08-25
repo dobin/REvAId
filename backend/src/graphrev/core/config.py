@@ -52,6 +52,23 @@ class Settings(BaseSettings):
     ghidra_adapter: GhidraAdapterName = Field(default="mock")
     llm_adapter: LlmAdapterName = Field(default="mock")
     llm_model: str = Field(default="mock-llm-v1")
+    #: I13 (§6.5): LiteLlmAdapter plumbing. `llm_model` is a litellm
+    #: router string (e.g. "anthropic/claude-sonnet-4-5", "openai/gpt-4o",
+    #: "ollama/llama3") — one adapter covers every provider litellm routes
+    #: to (Anthropic/OpenAI/Ollama/vLLM/OpenRouter), which is the point:
+    #: V1–V3 retune the model by config alone.
+    llm_api_base: str | None = Field(
+        default=None,
+        description="Base URL for self-hosted/proxied LLM endpoints (litellm api_base).",
+    )
+    llm_api_key: str | None = Field(
+        default=None,
+        description="Provider API key (litellm api_key). Prefer the .env file.",
+    )
+    #: Bound on a single adapter.summarize() call so a hung provider cannot
+    #: wedge a worker slot (§6.5). Also replaces the worker's old hard-coded
+    #: 120s module constant.
+    summary_request_timeout_seconds: float = Field(default=120.0, gt=0)
 
     #: C5 "default assumption: 4" — max in-flight LLM generations.
     summary_concurrency: int = Field(default=4, gt=0)

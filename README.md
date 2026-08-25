@@ -49,8 +49,8 @@ wired together end to end.
 All tunable thresholds (`TABLE_ROW_CAP`, `CALLER_SUPPRESS_THRESHOLD`,
 `UTILITY_FANIN_THRESHOLD`, `FAN_OUT_ALL_HARD_CAP`, `NODE_COUNT_SOFT_WARNING`,
 plus adapter selection and everything else) live in
-`backend/src/Revealm/core/config.py` and are set via environment variables
-(prefix `Revealm_`) or a `.env` file — see `.env.example`. They are exposed
+`backend/src/graphrev/core/config.py` and are set via environment variables
+(prefix `GRAPHREV_`) or a `.env` file — see `.env.example`. They are exposed
 to the frontend as a single payload from `GET /api/v1/config`; no component
 may hard-code a threshold (enforced by `scripts/check-magic-numbers.sh`,
 which also runs in CI).
@@ -64,6 +64,45 @@ pending/shimmer/queue-depth UI under realistic timing. A small
 `GRAPHREV_MOCK_LLM_FAILURE_RATE` (default `0.05`) stays on even with latency
 off, so the summary error+retry state is reachable in a normal demo; set it
 to `0` to disable.
+
+### Real LLM summaries (litellm)
+
+Set `GRAPHREV_LLM_ADAPTER=litellm` to summarise with a real model instead of
+the mock. The adapter is backed by [litellm](https://docs.litellm.ai/), so
+one configuration covers every provider it routes to — Anthropic, OpenAI,
+Ollama, vLLM, OpenRouter — which is the point: retuning the model is a
+config change, not a code change.
+
+| Variable | Meaning |
+| --- | --- |
+| `GRAPHREV_LLM_ADAPTER=litellm` | Select the litellm adapter |
+| `GRAPHREV_LLM_MODEL` | litellm router string, e.g. `anthropic/claude-sonnet-4-5`, `openai/gpt-4o`, `ollama/llama3` |
+| `GRAPHREV_LLM_API_KEY` | Provider API key (put it in `.env`, not the shell) |
+| `GRAPHREV_LLM_API_BASE` | Base URL for self-hosted/proxied endpoints (Ollama, vLLM, an LLM gateway); leave unset for hosted providers |
+| `GRAPHREV_SUMMARY_REQUEST_TIMEOUT_SECONDS` | Per-request bound (default `120`) so a hung provider cannot wedge a worker |
+
+Examples:
+
+```sh
+# Anthropic (key from https://console.anthropic.com/)
+GRAPHREV_LLM_ADAPTER=litellm
+GRAPHREV_LLM_MODEL=anthropic/claude-sonnet-4-5
+GRAPHREV_LLM_API_KEY=sk-ant-...
+
+# Local Ollama — no key needed
+GRAPHREV_LLM_ADAPTER=litellm
+GRAPHREV_LLM_MODEL=ollama/llama3
+GRAPHREV_LLM_API_BASE=http://127.0.0.1:11434
+```
+
+The adapter enforces a JSON response shape (`summary_short` / `summary_long`
+/ `low_confidence`), clamps `summary_short` to one table row, fences
+untrusted binary content (decompiled code, strings, symbol names) behind
+delimited data blocks, and maps provider errors (rate limit, auth, context
+overflow, connection) onto the internal error taxonomy that drives retry and
+queue-pause behaviour. Which adapter produced each summary is recorded in
+`functions.summary_adapter` and exposed on the API, but not surfaced in the
+UI yet.
 
 ## Adding a migration
 

@@ -31,6 +31,7 @@ const baseFn: FunctionDto = {
     short: null,
     long: null,
     model: null,
+    adapter: null,
     errorCode: null,
     lowConfidence: false,
     generatedAt: null,

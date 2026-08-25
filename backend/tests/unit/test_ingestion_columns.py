@@ -13,6 +13,7 @@ FORBIDDEN_COLUMNS = frozenset(
         "summary_long",
         "summary_status",
         "summary_model",
+        "summary_adapter",
         "summary_error_code",
         "summary_low_confidence",
         "summary_generated_at",

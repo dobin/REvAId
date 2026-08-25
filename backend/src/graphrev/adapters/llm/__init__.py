@@ -34,10 +34,9 @@ def create_adapter(name: LlmAdapterName, settings: Settings, *, seed: int = 1337
             failure_rate=settings.mock_llm_failure_rate,
         )
     if name == "litellm":
-        raise LlmAdapterNotImplementedError(
-            "The 'litellm' LLM adapter is not implemented until Increment I13. "
-            "Use --llm-adapter mock for now."
-        )
+        from graphrev.adapters.llm.litellm_adapter import LiteLlmAdapter
+
+        return LiteLlmAdapter(settings=settings)
     if name == "opencode":
         raise LlmAdapterNotImplementedError(
             "The 'opencode' LLM adapter is not implemented until Increment I13. "

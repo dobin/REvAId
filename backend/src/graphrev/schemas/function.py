@@ -20,6 +20,9 @@ class FunctionSummaryStateDto(ApiModel):
     short: str | None
     long: str | None
     model: str | None
+    #: I13/AM4: which adapter produced the summary ("mock"/"litellm"/...).
+    #: Exposed for later analysis; no UI affordance yet (decision 6).
+    adapter: str | None
     error_code: str | None
     low_confidence: bool
     generated_at: str | None
@@ -81,6 +84,7 @@ def function_dto_from_row(fn: Function) -> FunctionDto:
             short=fn.summary_short,
             long=fn.summary_long,
             model=fn.summary_model,
+            adapter=fn.summary_adapter,
             error_code=fn.summary_error_code,
             low_confidence=fn.summary_low_confidence,
             generated_at=fn.summary_generated_at,

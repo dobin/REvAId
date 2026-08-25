@@ -93,11 +93,6 @@ async def _persist_success(
 ) -> int:
     """Write a successful result; returns the function's `binary_id` (for
     event publication) via a single UPDATE...RETURNING."""
-    # NOTE (AM4): the TAD/plan also persist `summary_adapter` here, but that
-    # column does not exist until migration 0005 (I13, commit boundary 6).
-    # `adapter_name` is accepted now (and logged) so the call sites at every
-    # layer above already carry it; wiring it into this UPDATE is a one-line
-    # follow-up once the column exists.
     row = await session.execute(
         text(
             """
@@ -106,6 +101,7 @@ async def _persist_success(
                 summary_long = :summary_long,
                 summary_status = 'ready',
                 summary_model = :model,
+                summary_adapter = :adapter,
                 summary_error_code = NULL,
                 summary_low_confidence = :low_confidence,
                 summary_generated_at = :generated_at,
@@ -119,6 +115,7 @@ async def _persist_success(
             "summary_short": result.summary_short,
             "summary_long": result.summary_long,
             "model": result.model,
+            "adapter": adapter_name,
             "low_confidence": result.low_confidence,
             "generated_at": generated_at,
             "input_hash": input_hash,
