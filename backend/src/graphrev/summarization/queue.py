@@ -239,8 +239,10 @@ class SummaryQueue:
             return
         current = self._index.get(function_id)
         demand = current.demand if current is not None else 1
-        effective_priority = priority if priority is not None else (
-            current.priority if current is not None else MAX_PRIORITY
+        effective_priority = (
+            priority
+            if priority is not None
+            else (current.priority if current is not None else MAX_PRIORITY)
         )
         if current is not None:
             current.superseded = True

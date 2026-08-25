@@ -85,10 +85,10 @@ async def test_import_creates_binary_with_functions_and_placeholder(
 
     async with session_factory() as session:
         rows = (
-            await session.execute(
-                select(Function).where(Function.binary_id == result.binary_id)
-            )
-        ).scalars().all()
+            (await session.execute(select(Function).where(Function.binary_id == result.binary_id)))
+            .scalars()
+            .all()
+        )
     kinds = sorted(r.kind for r in rows)
     # 3 real (normal/normal/import) + 1 placeholder.
     assert "placeholder" in kinds

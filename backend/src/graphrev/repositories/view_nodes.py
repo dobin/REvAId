@@ -86,8 +86,6 @@ async def remove_view_nodes(
     if not function_ids:
         return
     await session.execute(
-        delete(ViewNode).where(
-            ViewNode.view_id == view_id, ViewNode.function_id.in_(function_ids)
-        )
+        delete(ViewNode).where(ViewNode.view_id == view_id, ViewNode.function_id.in_(function_ids))
     )
     await session.flush()

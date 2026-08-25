@@ -34,7 +34,7 @@ def create_engine(settings: Settings) -> AsyncEngine:
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.execute("PRAGMA journal_mode=WAL")
-        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute(f"PRAGMA synchronous={settings.sqlite_synchronous}")
         cursor.execute(f"PRAGMA busy_timeout={settings.sqlite_busy_timeout_ms}")
         cursor.close()
 

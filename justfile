@@ -44,7 +44,14 @@ db-reset:
 
 test: test-py test-ts
 
+# Full backend suite INCLUDING `slow` (real-CLI-subprocess) tests. This is the
+# CI/quality-gate entrypoint. A bare `uv run pytest` (the fast editor loop)
+# deselects `slow` via `addopts = -m 'not slow'` in pyproject.toml.
 test-py:
+    cd backend && uv run pytest -m "slow or not slow"
+
+# Fast local loop: everything except the `slow` CLI-subprocess tests.
+test-py-fast:
     cd backend && uv run pytest
 
 test-ts:

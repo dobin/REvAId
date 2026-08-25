@@ -5,6 +5,7 @@ the item without ever marking it errored."""
 
 from __future__ import annotations
 
+import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from graphrev.adapters.llm.base import (
@@ -18,7 +19,18 @@ from graphrev.adapters.llm.base import (
 from graphrev.core.clock import utc_now_iso
 from graphrev.db.models import Binary, Function
 from graphrev.summarization.queue import SummaryQueue
+from graphrev.summarization import worker as worker_module
 from graphrev.summarization.worker import run_one_item
+
+
+@pytest.fixture(autouse=True)
+def _no_backoff_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Collapse the worker's real exponential backoff sleeps to zero.
+
+    The transient-retry tests would otherwise block for ~1.5-3s of real
+    wall time each on `asyncio.sleep(_backoff_seconds(attempt))`.
+    """
+    monkeypatch.setattr(worker_module, "_backoff_seconds", lambda attempt: 0)
 
 
 class _StubAdapter:

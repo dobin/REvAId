@@ -156,6 +156,11 @@ class Settings(BaseSettings):
     sse_keepalive_seconds: int = Field(default=15, gt=0)
     sse_subscriber_queue_size: int = Field(default=256, gt=0)
     sqlite_busy_timeout_ms: int = Field(default=5000, gt=0)
+    #: SQLite `PRAGMA synchronous` level. Production default `NORMAL` is the
+    #: WAL-safe recommendation. Test suites point at disposable temp DBs and
+    #: set `GRAPHREV_SQLITE_SYNCHRONOUS=OFF` to skip fsyncs (durability is
+    #: irrelevant for a throwaway file).
+    sqlite_synchronous: str = Field(default="NORMAL")
 
     #: Gates `MockLlmAdapter`'s latency/failure simulation (TAD §6.3's
     #: "1-8s latency, ~5% failures" spec). Off by default so `just test` and

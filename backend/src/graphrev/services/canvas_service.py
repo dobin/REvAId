@@ -76,9 +76,7 @@ async def patch_view_nodes(
     node in the view (TAD's "so the client can reconcile" contract)."""
     view = await get_view_by_id(session, view_id)
     if view is None:
-        raise AppError(
-            ErrorCode.VIEW_NOT_FOUND, f"No view {view_id}.", details={"viewId": view_id}
-        )
+        raise AppError(ErrorCode.VIEW_NOT_FOUND, f"No view {view_id}.", details={"viewId": view_id})
 
     for entry in request.upsert:
         _validate_provenance(entry)

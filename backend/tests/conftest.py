@@ -69,18 +69,41 @@ def settings(db_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Setting
     get_settings.cache_clear()
 
 
-@pytest.fixture
-def migrated_db(settings: Settings) -> Path:
-    """Run `alembic upgrade head` against `settings.db_path` and return it."""
+@pytest.fixture(scope="session")
+def migrated_template_db(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Run `alembic upgrade head` ONCE per session into a template DB.
+
+    Migrating a fresh SQLite file per test (a subprocess interpreter boot +
+    the full migration chain each time) dominated the suite's wall time.
+    Tests instead copy this template file — the migration path under test
+    is still the exact one `just migrate` runs, just amortised.
+    """
+    template = tmp_path_factory.mktemp("template") / "graphrev-template.db"
     result = subprocess.run(
         [sys.executable, "-m", "alembic", "upgrade", "head"],
         cwd=BACKEND_DIR,
-        env={"GRAPHREV_DB_PATH": settings.db_path, **_inherit_env()},
+        # Explicit path LAST: `settings` may have monkeypatch.setenv'd
+        # GRAPHREV_DB_PATH by the time this session fixture first runs, and
+        # it must not override the template path.
+        env={**_inherit_env(), "GRAPHREV_DB_PATH": str(template)},
         capture_output=True,
         text=True,
         check=False,
     )
     assert result.returncode == 0, f"alembic upgrade head failed:\n{result.stdout}\n{result.stderr}"
+    assert template.exists(), "alembic reported success but created no template DB"
+    return template
+
+
+@pytest.fixture
+def migrated_db(settings: Settings, migrated_template_db: Path) -> Path:
+    """Give this test its own copy of the session-migrated template DB."""
+    import shutil
+
+    for suffix in ("", "-wal", "-shm"):
+        src = Path(str(migrated_template_db) + suffix)
+        if src.exists():
+            shutil.copyfile(src, Path(str(settings.db_path) + suffix))
     return Path(settings.db_path)
 
 

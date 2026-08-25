@@ -57,18 +57,14 @@ async def create_view_dto(session: AsyncSession, binary_id: int, create: ViewCre
 async def get_view_dto(session: AsyncSession, view_id: int) -> ViewDto:
     view = await get_view_by_id(session, view_id)
     if view is None:
-        raise AppError(
-            ErrorCode.VIEW_NOT_FOUND, f"No view {view_id}.", details={"viewId": view_id}
-        )
+        raise AppError(ErrorCode.VIEW_NOT_FOUND, f"No view {view_id}.", details={"viewId": view_id})
     return view_dto_from_view(view)
 
 
 async def patch_view_dto(session: AsyncSession, view_id: int, patch: ViewPatchDto) -> ViewDto:
     view = await get_view_by_id(session, view_id)
     if view is None:
-        raise AppError(
-            ErrorCode.VIEW_NOT_FOUND, f"No view {view_id}.", details={"viewId": view_id}
-        )
+        raise AppError(ErrorCode.VIEW_NOT_FOUND, f"No view {view_id}.", details={"viewId": view_id})
 
     fields_set = patch.model_fields_set
     if "root_function_id" in fields_set:
@@ -101,9 +97,7 @@ async def patch_view_dto(session: AsyncSession, view_id: int, patch: ViewPatchDt
 async def delete_view_dto(session: AsyncSession, view_id: int) -> None:
     view = await get_view_by_id(session, view_id)
     if view is None:
-        raise AppError(
-            ErrorCode.VIEW_NOT_FOUND, f"No view {view_id}.", details={"viewId": view_id}
-        )
+        raise AppError(ErrorCode.VIEW_NOT_FOUND, f"No view {view_id}.", details={"viewId": view_id})
     remaining = await count_views_by_binary(session, binary_id=view.binary_id)
     if remaining <= 1:
         raise AppError(
@@ -118,9 +112,7 @@ async def delete_view_dto(session: AsyncSession, view_id: int) -> None:
 async def duplicate_view_dto(session: AsyncSession, view_id: int) -> ViewDto:
     view = await get_view_by_id(session, view_id)
     if view is None:
-        raise AppError(
-            ErrorCode.VIEW_NOT_FOUND, f"No view {view_id}.", details={"viewId": view_id}
-        )
+        raise AppError(ErrorCode.VIEW_NOT_FOUND, f"No view {view_id}.", details={"viewId": view_id})
     new_view = await duplicate_view(session, view)
     await session.commit()
     return view_dto_from_view(new_view)

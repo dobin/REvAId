@@ -242,9 +242,7 @@ async def test_patch_view_nodes_upsert_and_remove_full_post_state(
 
 
 @pytest.mark.asyncio
-async def test_patch_view_nodes_fanin_round_trips(
-    client: AsyncClient, ingested: None
-) -> None:
+async def test_patch_view_nodes_fanin_round_trips(client: AsyncClient, ingested: None) -> None:
     """A `fanin` node (leftward caller fan-out, D8b) persists like `fanout`."""
     binary_id = await _get_binary_id(client, "acme.exe")
     view_id = await _get_default_view_id(client, binary_id)
@@ -314,9 +312,7 @@ async def test_patch_view_nodes_rejects_root_with_origin_function_id(
     response = await client.patch(
         f"/api/v1/views/{view_id}/nodes",
         json={
-            "upsert": [
-                {"functionId": fn_id, "originKind": "root", "originFunctionId": other_fn_id}
-            ]
+            "upsert": [{"functionId": fn_id, "originKind": "root", "originFunctionId": other_fn_id}]
         },
     )
     assert response.status_code == 422

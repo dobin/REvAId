@@ -107,9 +107,7 @@ async def test_demand_summary_full_queue_raises_queue_full_and_row_not_stranded_
         await summary_service.demand_summary(session, queue, function_id=fn.id, priority=1)
     assert exc_info.value.code == ErrorCode.QUEUE_FULL
 
-    refreshed = (
-        await session.execute(select(Function).where(Function.id == fn.id))
-    ).scalar_one()
+    refreshed = (await session.execute(select(Function).where(Function.id == fn.id))).scalar_one()
     assert refreshed.summary_status == "none"
 
 
@@ -126,7 +124,5 @@ async def test_regenerate_summary_full_queue_raises_queue_full_and_row_not_stran
         await summary_service.regenerate_summary(session, queue, function_id=fn.id)
     assert exc_info.value.code == ErrorCode.QUEUE_FULL
 
-    refreshed = (
-        await session.execute(select(Function).where(Function.id == fn.id))
-    ).scalar_one()
+    refreshed = (await session.execute(select(Function).where(Function.id == fn.id))).scalar_one()
     assert refreshed.summary_status == "ready"

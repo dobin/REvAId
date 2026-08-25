@@ -25,9 +25,7 @@ async def list_binary_views(binary_id: int, session: SessionDep) -> list[ViewSum
 @router.post(
     "/binaries/{binary_id}/views", response_model=ViewDto, status_code=status.HTTP_201_CREATED
 )
-async def create_binary_view(
-    binary_id: int, create: ViewCreateDto, session: SessionDep
-) -> ViewDto:
+async def create_binary_view(binary_id: int, create: ViewCreateDto, session: SessionDep) -> ViewDto:
     return await view_service.create_view_dto(session, binary_id, create)
 
 

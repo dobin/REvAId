@@ -33,9 +33,7 @@ async def list_views_by_binary(session: AsyncSession, *, binary_id: int) -> list
 
 
 async def count_views_by_binary(session: AsyncSession, *, binary_id: int) -> int:
-    result = await session.execute(
-        select(func.count(View.id)).where(View.binary_id == binary_id)
-    )
+    result = await session.execute(select(func.count(View.id)).where(View.binary_id == binary_id))
     return result.scalar_one()
 
 

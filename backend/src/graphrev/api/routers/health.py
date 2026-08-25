@@ -39,7 +39,5 @@ async def get_health(
         migration_revision=revision,
         ghidra_adapter=settings.ghidra_adapter,
         llm_adapter=settings.llm_adapter,
-        llm_health=LlmHealthDto(
-            reachable=llm_health.reachable, detail=llm_health.detail
-        ),
+        llm_health=LlmHealthDto(reachable=llm_health.reachable, detail=llm_health.detail),
     )

@@ -117,7 +117,9 @@ async def test_upsert_partial_patch_leaves_omitted_fields_untouched(
     )
     await session.commit()
     # Only patch pos_x — pos_y must be preserved.
-    await upsert_view_nodes(session, view_id=view.id, upserts=[{"function_id": fn.id, "pos_x": 5.0}])
+    await upsert_view_nodes(
+        session, view_id=view.id, upserts=[{"function_id": fn.id, "pos_x": 5.0}]
+    )
     await session.commit()
 
     nodes = await list_nodes_by_view(session, view_id=view.id)

@@ -105,16 +105,11 @@ async def _ingest_one_binary(
                 report.functions_inserted += 1
             else:
                 report.functions_updated += 1
-            log_event(
-                logger,
-                "ingestion.function_upserted",
-                function_id=_fn_id,
-                binary_id=binary.id,
-                duration_ms=0,
-                adapter="mock",
-                model=None,
-                outcome="created" if was_created else "updated",
-            )
+            # Per-function success is intentionally NOT logged: at INFO level
+            # it fires ~1 line per function (hundreds per binary) and the
+            # structlog call itself is a measurable slice of ingest wall time.
+            # Aggregate counts live in the returned BinaryIngestionReport;
+            # per-item *failures* are still logged below.
         except Exception as exc:
             message = f"function 0x{raw_fn.address:x} ({raw_fn.name}): {exc}"
             report.failures.append(message)

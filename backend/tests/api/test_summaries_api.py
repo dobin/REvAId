@@ -23,9 +23,7 @@ async def test_demand_summary_returns_202_pending_immediately(
     `pending`, regardless of the (1-8s simulated) adapter latency."""
     function_id = await _get_main_function_id(client)
 
-    response = await client.post(
-        f"/api/v1/functions/{function_id}/summary", json={"priority": 0}
-    )
+    response = await client.post(f"/api/v1/functions/{function_id}/summary", json={"priority": 0})
     assert response.status_code == 202
     body = response.json()
     assert body["functionId"] == function_id
@@ -59,9 +57,7 @@ async def test_demand_summary_validation_error_for_out_of_range_priority(
     reached `SummaryQueue.enqueue`'s own `ValueError` as an unhandled 500,
     after the DB write had already happened."""
     function_id = await _get_main_function_id(client)
-    response = await client.post(
-        f"/api/v1/functions/{function_id}/summary", json={"priority": 99}
-    )
+    response = await client.post(f"/api/v1/functions/{function_id}/summary", json={"priority": 99})
     assert response.status_code == 422
 
     # The row must not have been left dangling at `pending` by the rejected
@@ -89,9 +85,7 @@ async def test_release_summary_demand_is_a_noop_for_unqueued_function(
 
 
 @pytest.mark.asyncio
-async def test_regenerate_summary_returns_202_pending(
-    client: AsyncClient, ingested: None
-) -> None:
+async def test_regenerate_summary_returns_202_pending(client: AsyncClient, ingested: None) -> None:
     """C7: regenerate forces priority 0 and bypasses the cache check."""
     function_id = await _get_main_function_id(client)
 
@@ -125,4 +119,10 @@ async def test_duplicate_demand_does_not_create_a_second_queue_item(
         for row in (*snapshot["queued"], *snapshot["inFlight"])
         if row["functionId"] == function_id
     )
-    assert occurrences == 1
+    # I7's guarantee is "no *second* queue item", i.e. the duplicate POST must
+    # never ADD one — so the invariant is `occurrences <= 1`, not `== 1`.
+    # Asserting `== 1` raced the background worker pool (which, with the mock
+    # adapter's latency simulation off in tests, can drain the single item
+    # between the POSTs and this GET, leaving 0). Zero live rows does not
+    # violate dedup; two would. See test_worker_pool_* for worker behaviour.
+    assert occurrences <= 1

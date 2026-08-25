@@ -73,11 +73,58 @@ def _fn(address: int, name: str, kind: str = "normal") -> RawFunction:
     )
 
 
+class _MultiBinaryFakeAdapter:
+    """A `GhidraAdapter` returning several tiny binaries, for pipeline
+    behaviours that need the *multi-binary* shape (default-view-per-binary,
+    cross-binary idempotency) but not the ~560-function scale of the real
+    `MockGhidraAdapter`. Keeping these behavioural tests on a handful of rows
+    keeps them fast; the full mock's realistic scale is still exercised by the
+    `slow` CLI tests and the api-suite ingested template."""
+
+    def __init__(self, binaries: dict[str, tuple[list[RawFunction], list[RawEdge]]]) -> None:
+        self._binaries = binaries
+
+    def list_binaries(self) -> Sequence[RawBinary]:
+        return [RawBinary(name=name, version="1.0") for name in self._binaries]
+
+    def iter_functions(self, binary: RawBinaryRef) -> Iterator[RawFunction]:
+        yield from self._binaries[binary.name][0]
+
+    def iter_edges(self, binary: RawBinaryRef) -> Iterator[RawEdge]:
+        yield from self._binaries[binary.name][1]
+
+    def get_function(self, binary: RawBinaryRef, address: int) -> RawFunction | None:
+        for fn in self._binaries[binary.name][0]:
+            if fn.address == address:
+                return fn
+        return None
+
+
+def _two_binary_adapter() -> _MultiBinaryFakeAdapter:
+    """Two small binaries with an intra-binary edge each — enough to prove
+    multi-binary + edge idempotency without the mock's scale."""
+    return _MultiBinaryFakeAdapter(
+        {
+            "acme.exe": (
+                [_fn(0x1000, "main"), _fn(0x1010, "helper")],
+                [RawEdge(caller_address=0x1000, callee_address=0x1010)],
+            ),
+            "libparse.dll": (
+                [_fn(0x2000, "parse"), _fn(0x2010, "lex")],
+                [RawEdge(caller_address=0x2000, callee_address=0x2010)],
+            ),
+        }
+    )
+
+
 @pytest.mark.asyncio
-async def test_mock_adapter_ingestion_is_idempotent_across_two_runs(
+async def test_ingestion_is_idempotent_across_two_runs(
     session_factory: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
-    adapter = MockGhidraAdapter(seed=1337)
+    """A3: a second run of the same input inserts nothing new and changes no
+    row/edge counts. Behaviour is topology-independent, so a tiny two-binary
+    fake proves it identically to the full mock — but ~100x faster."""
+    adapter = _two_binary_adapter()
 
     reports1 = await run_ingestion(session_factory, adapter, settings)
     assert all(not r.binary_failed for r in reports1)
@@ -105,10 +152,12 @@ async def test_mock_adapter_ingestion_is_idempotent_across_two_runs(
 
 
 @pytest.mark.asyncio
-async def test_mock_adapter_ingestion_creates_default_view_per_binary(
+async def test_ingestion_creates_default_view_per_binary(
     session_factory: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
-    adapter = MockGhidraAdapter(seed=1337)
+    """B9: every ingested binary gets exactly one default view. Uses a tiny
+    two-binary fake — the assertion is per-binary, not per-function-count."""
+    adapter = _two_binary_adapter()
     await run_ingestion(session_factory, adapter, settings)
 
     async with session_factory() as session:

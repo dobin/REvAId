@@ -314,9 +314,7 @@ async def test_schema_invalid_json_is_permanent_error(
 async def test_rate_limit_maps_with_retry_after(
     adapter: LiteLlmAdapter, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    exc = litellm.RateLimitError(
-        message="rate limited", llm_provider="stub", model="stub"
-    )
+    exc = litellm.RateLimitError(message="rate limited", llm_provider="stub", model="stub")
     exc.retry_after = 12.0
     _install_completion(monkeypatch, _raising(exc))
     with pytest.raises(RateLimitError) as info:
@@ -325,9 +323,7 @@ async def test_rate_limit_maps_with_retry_after(
 
 
 @pytest.mark.asyncio
-async def test_auth_error_maps(
-    adapter: LiteLlmAdapter, monkeypatch: pytest.MonkeyPatch
-) -> None:
+async def test_auth_error_maps(adapter: LiteLlmAdapter, monkeypatch: pytest.MonkeyPatch) -> None:
     exc = litellm.AuthenticationError(message="bad key", llm_provider="stub", model="stub")
     _install_completion(monkeypatch, _raising(exc))
     with pytest.raises(AuthError):
@@ -338,9 +334,7 @@ async def test_auth_error_maps(
 async def test_context_window_exceeded_maps(
     adapter: LiteLlmAdapter, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    exc = litellm.ContextWindowExceededError(
-        message="too big", llm_provider="stub", model="stub"
-    )
+    exc = litellm.ContextWindowExceededError(message="too big", llm_provider="stub", model="stub")
     _install_completion(monkeypatch, _raising(exc))
     with pytest.raises(ContextTooLargeError):
         await adapter.summarize(_req())

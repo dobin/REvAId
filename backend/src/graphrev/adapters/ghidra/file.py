@@ -66,9 +66,7 @@ class FileGhidraAdapter:
             version=document.binary.version,
             source_path=document.binary.source_path,
         )
-        self._functions: list[RawFunction] = [
-            _to_raw_function(fn) for fn in document.functions
-        ]
+        self._functions: list[RawFunction] = [_to_raw_function(fn) for fn in document.functions]
         self._edges: list[RawEdge] = [_to_raw_edge(edge) for edge in document.edges]
 
     def list_binaries(self) -> Sequence[RawBinary]:

@@ -79,7 +79,13 @@ disallow_untyped_decorators = false
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "-ra"
+# `slow` tests (the real-CLI-subprocess I2 exit tests) are deselected by
+# default for a fast local loop; run them explicitly with `-m slow` or the
+# whole suite with `-m "slow or not slow"`. CI runs the full suite (see just).
+addopts = "-ra -m 'not slow'"
+markers = [
+  "slow: end-to-end tests that shell out to the real CLI (deselected by default).",
+]
 
 # ---------------------------------------------------------------------------
 # import-linter — enforces TAD §2.2 layering

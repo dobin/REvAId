@@ -18,7 +18,9 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 
 
 def _run_cli(*args: str, db_path: str) -> subprocess.CompletedProcess[str]:
-    env = {**os.environ, "GRAPHREV_DB_PATH": db_path}
+    # Disposable test DB: skip fsyncs (the ingest's ~1k statements over the
+    # async driver dominate CLI-test wall time).
+    env = {**os.environ, "GRAPHREV_DB_PATH": db_path, "GRAPHREV_SQLITE_SYNCHRONOUS": "OFF"}
     return subprocess.run(
         [sys.executable, "-m", "graphrev.cli.__main__", *args],
         cwd=BACKEND_DIR,
@@ -29,6 +31,7 @@ def _run_cli(*args: str, db_path: str) -> subprocess.CompletedProcess[str]:
     )
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 async def test_ingest_command_twice_is_idempotent(migrated_db: Path, engine: AsyncEngine) -> None:
     db_path = str(migrated_db)
@@ -50,6 +53,7 @@ async def test_ingest_command_twice_is_idempotent(migrated_db: Path, engine: Asy
     assert "0 per-item failures" in result1.stdout
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 async def test_ingest_command_preserves_analyst_fields_on_third_run(
     migrated_db: Path, engine: AsyncEngine
@@ -86,6 +90,7 @@ async def test_ingest_command_preserves_analyst_fields_on_third_run(
     assert row.summary_short == "a cached summary"
 
 
+@pytest.mark.slow
 @pytest.mark.asyncio
 async def test_ingest_command_preserves_is_entry_point_override_on_third_run(
     migrated_db: Path, engine: AsyncEngine

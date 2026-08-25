@@ -107,9 +107,7 @@ async def test_demanding_a_summary_publishes_a_queue_event(
 
 
 @pytest.mark.asyncio
-async def test_cancel_pending_publishes_a_queue_event(
-    client: AsyncClient, ingested: None
-) -> None:
+async def test_cancel_pending_publishes_a_queue_event(client: AsyncClient, ingested: None) -> None:
     function_id = await _get_main_function_id(client)
     await client.post(f"/api/v1/functions/{function_id}/summary", json={"priority": 3})
 

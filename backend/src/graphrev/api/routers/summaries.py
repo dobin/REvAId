@@ -43,9 +43,7 @@ async def demand_summary(
     "/functions/{function_id}/summary",
     status_code=status.HTTP_204_NO_CONTENT,
 )
-async def release_summary(
-    function_id: int, queue: SummaryQueueDep, event_bus: EventBusDep
-) -> None:
+async def release_summary(function_id: int, queue: SummaryQueueDep, event_bus: EventBusDep) -> None:
     """Release demand / cancel if unstarted (endpoint 18, C8). Advisory only
     — an in-flight generation is never interrupted."""
     summary_service.release_summary_demand(queue, function_id=function_id, event_bus=event_bus)
