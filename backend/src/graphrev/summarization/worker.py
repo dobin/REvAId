@@ -279,6 +279,8 @@ async def run_one_item(
                     function_id=function_id,
                     error_code="SUMMARY_PROVIDER_ERROR",
                     result_listener=result_listener,
+                    adapter_name=adapter.name,
+                    reason=f"timeout after {_SUMMARIZE_TIMEOUT_SECONDS}s x{attempt}",
                 )
                 return False
             await asyncio.sleep(_backoff_seconds(attempt))
@@ -297,7 +299,7 @@ async def run_one_item(
             # as errored — the whole queue is paused, not this one function.
             queue.requeue_inflight(function_id, item.priority)
             return True
-        except TransientProviderError:
+        except TransientProviderError as exc:
             attempt += 1
             if attempt >= _MAX_TRANSIENT_RETRIES:
                 await _fail(
@@ -305,6 +307,8 @@ async def run_one_item(
                     function_id=function_id,
                     error_code="SUMMARY_PROVIDER_ERROR",
                     result_listener=result_listener,
+                    adapter_name=adapter.name,
+                    reason=f"{type(exc).__name__}: {exc}",
                 )
                 return False
             await asyncio.sleep(_backoff_seconds(attempt))
@@ -315,6 +319,8 @@ async def run_one_item(
                 function_id=function_id,
                 error_code=_error_code_for(exc),
                 result_listener=result_listener,
+                adapter_name=adapter.name,
+                reason=f"{type(exc).__name__}: {exc}",
             )
             return False
         else:
@@ -376,6 +382,8 @@ async def _fail(
     function_id: int,
     error_code: str,
     result_listener: ResultListener | None,
+    adapter_name: str | None = None,
+    reason: str | None = None,
 ) -> None:
     async with unit_of_work(session_factory) as session:
         binary_id = await _persist_failure(session, function_id=function_id, error_code=error_code)
@@ -384,8 +392,13 @@ async def _fail(
         "summary_worker.failed",
         function_id=function_id,
         binary_id=binary_id,
+        adapter=adapter_name,
         outcome="error",
         error_code=error_code,
+        # The provider's own message. Without it a `SUMMARY_PROVIDER_ERROR`
+        # is undiagnosable from logs alone (which cost a debugging session
+        # when DeepseSeek-via-OpenRouter returned fenced JSON).
+        reason=reason,
     )
     if result_listener is not None and binary_id is not None:
         await result_listener(

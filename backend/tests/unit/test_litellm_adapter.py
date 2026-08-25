@@ -96,6 +96,22 @@ def _install_completion(monkeypatch: pytest.MonkeyPatch, impl: Any) -> list[list
     return calls
 
 
+def _install_completion_kwargs(monkeypatch: pytest.MonkeyPatch, impl: Any) -> list[dict[str, Any]]:
+    """Like :func:`_install_completion` but records the FULL kwargs, for
+    assertions about request options (e.g. JSON mode)."""
+    calls: list[dict[str, Any]] = []
+
+    async def _fake_acompletion(**kwargs: Any) -> Any:
+        calls.append(kwargs)
+        result = impl(**kwargs)
+        if isawaitable(result):
+            result = await result
+        return result
+
+    monkeypatch.setattr(litellm, "acompletion", _fake_acompletion)
+    return calls
+
+
 # -- happy path --------------------------------------------------------------
 
 
@@ -133,6 +149,105 @@ async def test_summarize_tolerates_markdown_code_fence(
     _install_completion(monkeypatch, lambda **kw: _ok_response(fenced))
     result = await adapter.summarize(_req())
     assert result.summary_short == "Checks licence blob"
+
+
+# -- real-world response-shape regressions -----------------------------------
+# Every shape below was produced by DeepSeek via OpenRouter in live testing
+# and made the original strict parser raise PermanentProviderError, surfacing
+# as a spurious SUMMARY_PROVIDER_ERROR on ~1 function in 25.
+
+
+@pytest.mark.parametrize(
+    ("label", "raw"),
+    [
+        ("unclosed fence", f"```json\n{_VALID_JSON}"),
+        (
+            "fence plus trailing prose",
+            f"```json\n{_VALID_JSON}\n```\n\nLet me know if you need more.",
+        ),
+        ("prose prefix", f"Here is the summary:\n{_VALID_JSON}"),
+        ("leading whitespace and fence", f"\n\n  ```JSON\n{_VALID_JSON}\n```  \n"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_summarize_recovers_json_from_wrapped_output(
+    adapter: LiteLlmAdapter, monkeypatch: pytest.MonkeyPatch, label: str, raw: str
+) -> None:
+    _install_completion(monkeypatch, lambda **kw: _ok_response(raw))
+    result = await adapter.summarize(_req())
+    assert result.summary_short == "Checks licence blob", label
+
+
+@pytest.mark.asyncio
+async def test_summarize_requests_json_mode(
+    adapter: LiteLlmAdapter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Belt-and-braces with the tolerant parser: ask the provider to enforce
+    JSON, and let litellm drop the option for models that lack support."""
+    calls = _install_completion_kwargs(monkeypatch, lambda **kw: _ok_response(_VALID_JSON))
+    await adapter.summarize(_req())
+    assert calls[0]["response_format"] == {"type": "json_object"}
+    assert calls[0]["drop_params"] is True
+
+
+@pytest.mark.asyncio
+async def test_summarize_uses_low_temperature(
+    adapter: LiteLlmAdapter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Structured extraction, not creative writing: a high temperature is what
+    made the model decorate its JSON in live testing."""
+    calls = _install_completion_kwargs(monkeypatch, lambda **kw: _ok_response(_VALID_JSON))
+    await adapter.summarize(_req())
+    assert calls[0]["temperature"] == 0.0
+
+
+@pytest.mark.asyncio
+async def test_malformed_json_is_retried_then_succeeds(
+    adapter: LiteLlmAdapter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The bug this fixes: malformed output is flaky, not deterministic, so one
+    unlucky response must not permanently mark a function errored."""
+    responses = [_ok_response("I'd rather not answer that."), _ok_response(_VALID_JSON)]
+
+    def _impl(**kw: Any) -> Any:
+        return responses.pop(0)
+
+    calls = _install_completion_kwargs(monkeypatch, _impl)
+    result = await adapter.summarize(_req())
+    assert result.summary_short == "Checks licence blob"
+    assert len(calls) == 2, "should have retried exactly once before succeeding"
+
+
+@pytest.mark.asyncio
+async def test_malformed_json_fails_after_exhausting_attempts(
+    adapter: LiteLlmAdapter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Retries are bounded — persistent garbage still fails, and still caches
+    nothing (C6)."""
+    calls = _install_completion_kwargs(monkeypatch, lambda **kw: _ok_response("nope"))
+    with pytest.raises(PermanentProviderError):
+        await adapter.summarize(_req())
+    assert len(calls) == _settings().llm_json_attempts
+
+
+@pytest.mark.asyncio
+async def test_json_attempts_is_configurable(monkeypatch: pytest.MonkeyPatch) -> None:
+    single = LiteLlmAdapter(settings=_settings(llm_json_attempts=1))
+    calls = _install_completion_kwargs(monkeypatch, lambda **kw: _ok_response("nope"))
+    with pytest.raises(PermanentProviderError):
+        await single.summarize(_req())
+    assert len(calls) == 1, "no retries when configured to a single attempt"
+
+
+@pytest.mark.asyncio
+async def test_empty_response_is_permanent_error(
+    adapter: LiteLlmAdapter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An empty completion has no JSON object to recover — it must fail
+    loudly rather than persist an empty summary (C6)."""
+    _install_completion(monkeypatch, lambda **kw: _ok_response(""))
+    with pytest.raises(PermanentProviderError):
+        await adapter.summarize(_req())
 
 
 @pytest.mark.asyncio

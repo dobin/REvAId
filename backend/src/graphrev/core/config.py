@@ -54,9 +54,9 @@ class Settings(BaseSettings):
     llm_model: str = Field(default="mock-llm-v1")
     #: I13 (§6.5): LiteLlmAdapter plumbing. `llm_model` is a litellm
     #: router string (e.g. "anthropic/claude-sonnet-4-5", "openai/gpt-4o",
-    #: "ollama/llama3") — one adapter covers every provider litellm routes
+    #: "ollama/llama3") - one adapter covers every provider litellm routes
     #: to (Anthropic/OpenAI/Ollama/vLLM/OpenRouter), which is the point:
-    #: V1–V3 retune the model by config alone.
+    #: V1-V3 retune the model by config alone.
     llm_api_base: str | None = Field(
         default=None,
         description="Base URL for self-hosted/proxied LLM endpoints (litellm api_base).",
@@ -65,6 +65,17 @@ class Settings(BaseSettings):
         default=None,
         description="Provider API key (litellm api_key). Prefer the .env file.",
     )
+    #: Summarisation is structured extraction, not creative writing: a high
+    #: temperature is what makes a model decorate its JSON with markdown
+    #: fences or trailing pleasantries (observed live with DeepSeek via
+    #: OpenRouter). Default 0 for reproducible, schema-compliant output.
+    llm_temperature: float = Field(default=0.0, ge=0, le=2)
+    #: Attempts to obtain *parseable* JSON from the model before giving up.
+    #: Malformed output is empirically flaky rather than deterministic (the
+    #: same function succeeded 25x and failed once), so one retry removes
+    #: nearly all spurious SUMMARY_PROVIDER_ERRORs. Only after this many
+    #: attempts does the adapter report `PermanentProviderError`.
+    llm_json_attempts: int = Field(default=3, gt=0)
     #: Bound on a single adapter.summarize() call so a hung provider cannot
     #: wedge a worker slot (§6.5). Also replaces the worker's old hard-coded
     #: 120s module constant.

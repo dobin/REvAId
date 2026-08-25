@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 
 import litellm
 from litellm.exceptions import (
@@ -63,6 +64,14 @@ from graphrev.adapters.llm.base import (
     TransientProviderError,
 )
 from graphrev.core.config import Settings
+
+#: litellm logs an INFO line per call ("LiteLLM completion() model=... provider=
+#: ...") plus a "Give Feedback / Get Help" banner on every error, straight to
+#: stdout/its own logger. Both are noise that drowns our structured `summary_
+#: worker.*` events, and neither is actionable. Silenced at import time — our
+#: own logging (§6.4) already records model, adapter, duration and outcome.
+litellm.suppress_debug_info = True
+logging.getLogger("LiteLLM").setLevel(logging.WARNING)
 
 #: C4 — `summary_short` MUST fit one table row. Matches the mock adapter's
 #: clamp so both adapters produce interchangeable column content.
@@ -135,19 +144,33 @@ def _build_messages(req: SummaryRequest, *, code_c: str | None) -> list[dict[str
 def _extract_json(text: str) -> _SummaryPayload:
     """Parse the model output as the enforced JSON payload.
 
-    Tolerates a single surrounding markdown code fence (a common provider
-    habit) but nothing else — anything unparseable is a
-    ``PermanentProviderError`` so garbage is never cached (C6).
+    Providers are asked for JSON mode (``response_format``), but not every
+    model honours it strictly: observed real-world variants from DeepSeek via
+    OpenRouter include a bare object, a ```json fence, a fence with no closing
+    delimiter, and an object followed by a trailing pleasantry. So rather than
+    pattern-matching envelopes, locate the outermost ``{...}`` span and parse
+    that.
+
+    This is NOT "regexing a prose blob" (which §6.2 forbids): the extracted
+    span is still parsed as JSON and validated against
+    :class:`_SummaryPayload`, which remains the only gate on the content.
+    Anything that fails either step raises ``PermanentProviderError`` so
+    garbage is never cached (C6).
     """
     stripped = text.strip()
-    if stripped.startswith("```"):
-        first_newline = stripped.find("\n")
-        if first_newline != -1 and stripped.endswith("```"):
-            stripped = stripped[first_newline + 1 : -3].strip()
+    start = stripped.find("{")
+    end = stripped.rfind("}")
+    if start == -1 or end == -1 or end < start:
+        raise PermanentProviderError(
+            f"model returned no JSON object (first 200 chars: {stripped[:200]!r})"
+        )
+    candidate = stripped[start : end + 1]
     try:
-        obj = json.loads(stripped)
+        obj = json.loads(candidate)
     except json.JSONDecodeError as exc:
-        raise PermanentProviderError(f"model returned non-JSON output: {exc}") from exc
+        raise PermanentProviderError(
+            f"model returned non-JSON output: {exc} (first 200 chars: {stripped[:200]!r})"
+        ) from exc
     try:
         return _SummaryPayload.model_validate(obj)
     except ValidationError as exc:
@@ -191,21 +214,27 @@ class LiteLlmAdapter:
         # Stateless HTTP calls — the global setting is the only bound (AM1).
         return self._settings.summary_concurrency
 
-    async def summarize(self, req: SummaryRequest) -> SummaryResult:
-        input_truncated = False
-        code_c = req.code_c
-        if code_c is not None and len(code_c) > _CODE_C_MAX_CHARS:
-            code_c = code_c[:_CODE_C_MAX_CHARS]
-            input_truncated = True
-
-        messages = _build_messages(req, code_c=code_c)
+    async def _complete(self, messages: list[dict[str, str]], *, input_truncated: bool) -> object:
+        """One provider round-trip, with every failure already mapped onto the
+        taxonomy. Separated from :meth:`summarize` so the JSON-parse retry loop
+        does not have to duplicate the error mapping."""
         try:
             async with asyncio.timeout(self._settings.summary_request_timeout_seconds):
-                response = await litellm.acompletion(
+                return await litellm.acompletion(
                     model=self._settings.llm_model,
                     messages=messages,
                     api_base=self._settings.llm_api_base,
                     api_key=self._settings.llm_api_key,
+                    # Summarisation is extraction, not creative writing —
+                    # a low temperature is what keeps output schema-compliant.
+                    temperature=self._settings.llm_temperature,
+                    # Ask the provider to enforce JSON at the API level rather
+                    # than trusting the prompt. `drop_params` makes litellm
+                    # silently drop this for models/providers that do not
+                    # support it, so the adapter still works everywhere —
+                    # `_extract_json` remains the backstop either way.
+                    response_format={"type": "json_object"},
+                    drop_params=True,
                 )
         except SummarizationError:
             raise
@@ -217,23 +246,44 @@ class LiteLlmAdapter:
             mapped = _map_exception(exc)
             # §6.2: ContextTooLargeError only if even the truncated form
             # fails — i.e. an overflow on an already-truncated input.
-            if isinstance(mapped, ContextTooLargeError) and not input_truncated:
-                raise mapped from exc
-            if isinstance(mapped, ContextTooLargeError):
+            if isinstance(mapped, ContextTooLargeError) and input_truncated:
                 raise ContextTooLargeError(
                     f"context still too large after truncating code_c to {_CODE_C_MAX_CHARS} chars"
                 ) from exc
             raise mapped from exc
 
-        content = response.choices[0].message.content or ""
-        payload = _extract_json(content)
-        return SummaryResult(
-            summary_short=payload.summary_short[:_SUMMARY_SHORT_MAX_CHARS],
-            summary_long=payload.summary_long,
-            model=getattr(response, "model", None) or self._settings.llm_model,
-            low_confidence=payload.low_confidence,
-            input_truncated=input_truncated,
-        )
+    async def summarize(self, req: SummaryRequest) -> SummaryResult:
+        input_truncated = False
+        code_c = req.code_c
+        if code_c is not None and len(code_c) > _CODE_C_MAX_CHARS:
+            code_c = code_c[:_CODE_C_MAX_CHARS]
+            input_truncated = True
+
+        messages = _build_messages(req, code_c=code_c)
+
+        # Malformed output is FLAKY, not deterministic: in live testing the
+        # same function parsed fine 25 times and failed once. Treat a parse
+        # failure as retryable here (a fresh sample usually complies) and only
+        # surface `PermanentProviderError` once the attempts are exhausted —
+        # otherwise one unlucky response permanently marks a function errored.
+        attempts = self._settings.llm_json_attempts
+        for attempt in range(1, attempts + 1):
+            response = await self._complete(messages, input_truncated=input_truncated)
+            content = response.choices[0].message.content or ""  # type: ignore[attr-defined]
+            try:
+                payload = _extract_json(content)
+            except PermanentProviderError:
+                if attempt == attempts:
+                    raise
+                continue
+            return SummaryResult(
+                summary_short=payload.summary_short[:_SUMMARY_SHORT_MAX_CHARS],
+                summary_long=payload.summary_long,
+                model=getattr(response, "model", None) or self._settings.llm_model,
+                low_confidence=payload.low_confidence,
+                input_truncated=input_truncated,
+            )
+        raise AssertionError("unreachable: loop either returns or raises")  # pragma: no cover
 
     async def health(self) -> LlmHealth:
         """Cheap reachability probe for `GET /health` (AM5).
@@ -252,6 +302,8 @@ class LiteLlmAdapter:
                     max_tokens=1,
                     api_base=self._settings.llm_api_base,
                     api_key=self._settings.llm_api_key,
+                    temperature=self._settings.llm_temperature,
+                    drop_params=True,
                 )
         except Exception as exc:
             return LlmHealth(reachable=False, detail=str(exc))
