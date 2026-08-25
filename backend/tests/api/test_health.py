@@ -16,3 +16,7 @@ async def test_health_reports_db_ok_and_revision(client: AsyncClient) -> None:
     assert body["migrationRevision"] == "0005"
     assert body["ghidraAdapter"] == "mock"
     assert body["llmAdapter"] == "mock"
+    # AM5: adapter reachability, not just the name — the mock adapter is
+    # always reachable, so the default test app reports healthy.
+    assert body["llmHealth"]["reachable"] is True
+    assert body["llmHealth"]["detail"] is None

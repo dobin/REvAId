@@ -155,6 +155,11 @@ def _error_code_for(exc: SummarizationError) -> str:
     """Map an exception type onto `ErrorCode` string values (E4)."""
     if isinstance(exc, RateLimitError):
         return "SUMMARY_RATE_LIMITED"
+    # I13: adapters may pin a specific code (e.g. the opencode adapter's
+    # GhidraProgramMismatchError -> GHIDRA_PROGRAM_MISMATCH).
+    pinned = getattr(exc, "error_code", None)
+    if isinstance(pinned, str):
+        return pinned
     return "SUMMARY_PROVIDER_ERROR"
 
 

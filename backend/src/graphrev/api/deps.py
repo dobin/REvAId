@@ -12,6 +12,7 @@ from typing import Annotated
 from fastapi import Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from graphrev.adapters.llm.base import LlmAdapter
 from graphrev.core.config import Settings, get_settings
 from graphrev.events.bus import InProcessEventBus
 from graphrev.summarization.queue import SummaryQueue
@@ -51,8 +52,17 @@ def get_event_bus(request: Request) -> InProcessEventBus:
     return bus
 
 
+def get_llm_adapter(request: Request) -> LlmAdapter:
+    """The process-wide `LlmAdapter` (I7/I13), constructed once in the
+    lifespan. Routers depend on the Protocol from ``adapters/llm/base`` —
+    never a concrete adapter (import-linter)."""
+    adapter: LlmAdapter = request.app.state.llm_adapter
+    return adapter
+
+
 SettingsDep = Annotated[Settings, Depends(get_settings_dep)]
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 SessionFactoryDep = Annotated[async_sessionmaker[AsyncSession], Depends(get_session_factory)]
 SummaryQueueDep = Annotated[SummaryQueue, Depends(get_summary_queue)]
 EventBusDep = Annotated[InProcessEventBus, Depends(get_event_bus)]
+LlmAdapterDep = Annotated[LlmAdapter, Depends(get_llm_adapter)]

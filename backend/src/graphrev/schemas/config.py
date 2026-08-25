@@ -61,9 +61,18 @@ def app_config_from_settings(settings: Settings) -> AppConfigDto:
     )
 
 
+class LlmHealthDto(ApiModel):
+    """AM5: adapter reachability, so the UI can tell "no summaries because
+    misconfigured" from "no summaries yet"."""
+
+    reachable: bool
+    detail: str | None = None
+
+
 class HealthDto(ApiModel):
     status: str
     db_ok: bool
     migration_revision: str | None
     ghidra_adapter: str
     llm_adapter: str
+    llm_health: LlmHealthDto

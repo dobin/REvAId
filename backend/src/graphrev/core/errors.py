@@ -31,6 +31,10 @@ class ErrorCode(StrEnum):
     SUMMARY_RATE_LIMITED = "SUMMARY_RATE_LIMITED"
     QUEUE_FULL = "QUEUE_FULL"
     LAST_VIEW_DELETE_FORBIDDEN = "LAST_VIEW_DELETE_FORBIDDEN"
+    #: I13 (§6.3, decision 5): the opencode agent's loaded Ghidra program does
+    #: not match the requested binary. Unrecoverable via re-ingestion (A3:
+    #: `summary_*` is ingestion-immutable), so it must fail loudly.
+    GHIDRA_PROGRAM_MISMATCH = "GHIDRA_PROGRAM_MISMATCH"
     INTERNAL_ERROR = "INTERNAL_ERROR"
 
 
@@ -47,6 +51,7 @@ _DEFAULT_STATUS: dict[ErrorCode, int] = {
     ErrorCode.SUMMARY_RATE_LIMITED: status.HTTP_429_TOO_MANY_REQUESTS,
     ErrorCode.QUEUE_FULL: status.HTTP_503_SERVICE_UNAVAILABLE,
     ErrorCode.LAST_VIEW_DELETE_FORBIDDEN: status.HTTP_400_BAD_REQUEST,
+    ErrorCode.GHIDRA_PROGRAM_MISMATCH: status.HTTP_502_BAD_GATEWAY,
     ErrorCode.INTERNAL_ERROR: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }
 

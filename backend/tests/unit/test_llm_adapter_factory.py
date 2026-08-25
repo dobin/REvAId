@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from graphrev.adapters.llm import LlmAdapterNotImplementedError, create_adapter
+from graphrev.adapters.llm import create_adapter
 from graphrev.adapters.llm.mock import MockLlmAdapter
 from graphrev.core.config import Settings
 
@@ -58,6 +58,12 @@ def test_create_adapter_litellm_returns_litellm_adapter() -> None:
     assert adapter.max_concurrency == _settings().summary_concurrency
 
 
-def test_create_adapter_opencode_not_implemented() -> None:
-    with pytest.raises(LlmAdapterNotImplementedError):
-        create_adapter("opencode", _settings())
+def test_create_adapter_opencode_returns_opencode_adapter() -> None:
+    from graphrev.adapters.llm.opencode_adapter import OpenCodeAdapter
+
+    adapter = create_adapter("opencode", _settings())
+    assert isinstance(adapter, OpenCodeAdapter)
+    assert adapter.name == "opencode"
+    # AM1: one Ghidra program, one bridge — the pool must never run parallel
+    # agents against a single Ghidra instance.
+    assert adapter.max_concurrency == 1

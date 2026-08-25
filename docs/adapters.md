@@ -116,4 +116,34 @@ adapter-owned.
   - `max_concurrency = settings.summary_concurrency` (stateless HTTP calls,
     AM1); `health()` is a one-token completion probe that never raises.
 
-- **opencode agent adapter** (I13, commit boundary 8) — not yet implemented.
+- **`OpenCodeAdapter`** (`adapters/llm/opencode_adapter.py`, I13) — an agent
+  with ghidra-MCP access, driving a running `opencode serve` sidecar over
+  plain `httpx` (no Node runtime dependency in the backend). One fresh
+  session per function (no context bleed); `POST /session/:id/message`
+  blocks until the agent answers, which is fine because the worker runs
+  off-request. Sidecar configuration lives in `tools/opencode-ghidra/` (see
+  its README). Its contract obligations:
+
+  - `max_concurrency = 1` (AM1): the ghidra-MCP bridge drives one loaded
+    program; parallel agents on one Ghidra instance are a correctness
+    hazard, not just slow.
+  - **Filename guard** (plan decision 5, deliberately loose): the agent's
+    required JSON payload includes `program_filename` — the basename of the
+    program currently loaded in Ghidra — verified post-hoc against
+    `req.binary_name`. Mismatch raises `GhidraProgramMismatchError`, which
+    the worker persists as `summary_error_code = GHIDRA_PROGRAM_MISMATCH`
+    with nothing cached: a wrong summary is unrecoverable because
+    `summary_*` is ingestion-immutable (A3).
+  - Enforces a JSON response `{summary_short, summary_long,
+    low_confidence, program_filename}` validated with Pydantic; unparseable
+    output raises `PermanentProviderError` (C6). Hard-clamps
+    `summary_short` (C4) and truncates oversized `code_c` like the litellm
+    adapter.
+  - Bounded agent loop: `agent_max_tool_calls` (stated in the prompt and the
+    agent definition) and `agent_timeout_seconds` via `asyncio.timeout` —
+    an unbounded agent on a 1-wide queue is a permanent stall.
+  - Maps transport failures onto the taxonomy: connect/timeout→
+    `TransientProviderError`, 401/403→`AuthError`, 429→`RateLimitError`,
+    5xx→`TransientProviderError`, other 4xx→`PermanentProviderError`.
+  - `health()` probes `GET /global/health` + `GET /mcp` (AM5) and never
+    raises; surfaced as `llmHealth` on `GET /health`.

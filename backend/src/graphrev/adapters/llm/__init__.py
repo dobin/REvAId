@@ -38,10 +38,9 @@ def create_adapter(name: LlmAdapterName, settings: Settings, *, seed: int = 1337
 
         return LiteLlmAdapter(settings=settings)
     if name == "opencode":
-        raise LlmAdapterNotImplementedError(
-            "The 'opencode' LLM adapter is not implemented until Increment I13. "
-            "Use --llm-adapter mock for now."
-        )
+        from graphrev.adapters.llm.opencode_adapter import OpenCodeAdapter
+
+        return OpenCodeAdapter(settings=settings)
     raise LlmAdapterNotImplementedError(f"Unknown LLM adapter: {name!r}")
 
 

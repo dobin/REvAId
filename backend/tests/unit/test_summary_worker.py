@@ -108,6 +108,33 @@ async def test_permanent_failure_persists_error_and_caches_nothing(
     assert fn.summary_short is None  # C6: nothing cached on failure
 
 
+async def test_pinned_error_code_is_persisted(
+    session: AsyncSession, session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """I13 §6.6: the opencode adapter's filename guard must surface as
+    GHIDRA_PROGRAM_MISMATCH (nothing cached) — the worker honours an
+    adapter-pinned `error_code` attribute."""
+    fn = await _make_function(session)
+    queue = SummaryQueue(max_depth=10)
+    item = queue.enqueue(fn.id, priority=0)
+    await queue.pop()
+
+    from graphrev.adapters.llm.base import GhidraProgramMismatchError
+
+    adapter = _StubAdapter(
+        [GhidraProgramMismatchError("agent summarised other.exe, wanted demo.exe")]
+    )
+    requeued = await run_one_item(
+        item, queue=queue, adapter=adapter, session_factory=session_factory
+    )
+    assert requeued is False
+
+    await session.refresh(fn)
+    assert fn.summary_status == "error"
+    assert fn.summary_error_code == "GHIDRA_PROGRAM_MISMATCH"
+    assert fn.summary_short is None  # nothing written to summary_*
+
+
 async def test_transient_failure_retries_then_fails(
     session: AsyncSession, session_factory: async_sessionmaker[AsyncSession]
 ) -> None:

@@ -120,6 +120,19 @@ class PermanentProviderError(SummarizationError):
     persisted as if it were a real summary."""
 
 
+class GhidraProgramMismatchError(PermanentProviderError):
+    """The opencode agent's loaded Ghidra program does not match the requested
+    binary (I13 §6.3, plan decision 5 — filename-only comparison, no hashing).
+
+    Subclasses :class:`PermanentProviderError` (nothing is cached) but carries
+    a distinct ``error_code`` so the worker persists
+    ``summary_error_code = GHIDRA_PROGRAM_MISMATCH`` and the UI can say *why*
+    the summary failed. Unrecoverable via re-ingestion (A3).
+    """
+
+    error_code = "GHIDRA_PROGRAM_MISMATCH"
+
+
 class LlmAdapter(Protocol):
     """LLM/agent access, abstracted behind an interface.
 

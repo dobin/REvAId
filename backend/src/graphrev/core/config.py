@@ -70,6 +70,23 @@ class Settings(BaseSettings):
     #: 120s module constant.
     summary_request_timeout_seconds: float = Field(default=120.0, gt=0)
 
+    #: I13 (§6.5): OpenCodeAdapter plumbing — `opencode serve` is the sidecar
+    #: (plan decision 4: no custom bridge web service, no Node runtime dep in
+    #: the backend; just httpx against a port). `opencode_agent` selects the
+    #: agent defined in `tools/opencode-ghidra/.opencode/agent/graphrev-re.md`.
+    opencode_url: str = Field(default="http://127.0.0.1:4096")
+    opencode_agent: str = Field(default="graphrev-re")
+    opencode_password: str | None = Field(
+        default=None,
+        description="OPENCODE_SERVER_PASSWORD of the sidecar (basic auth, user 'opencode').",
+    )
+    #: §6.3: an unbounded agent on a 1-wide queue is a permanent stall —
+    #: bound the agent loop (enforced prompt-side; see tools/opencode-ghidra).
+    agent_max_tool_calls: int = Field(default=40, gt=0)
+    #: Agent runs are minutes-long, so they get their own bound, wider than
+    #: `summary_request_timeout_seconds` (which governs plain LLM calls).
+    agent_timeout_seconds: float = Field(default=300.0, gt=0)
+
     #: C5 "default assumption: 4" — max in-flight LLM generations.
     summary_concurrency: int = Field(default=4, gt=0)
     #: C5 "bounded FIFO queue" — the PRD gives no number; TAD picks 500.

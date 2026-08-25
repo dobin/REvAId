@@ -136,6 +136,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         result_listener=_publish_summary_event,
     )
     app.state.summary_queue = summary_queue
+    app.state.llm_adapter = llm_adapter
     app.state.summary_worker_pool = worker_pool
     worker_pool.start()
 

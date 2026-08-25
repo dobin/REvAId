@@ -299,12 +299,20 @@ export interface AppConfigDto {
   adapters: AdapterIdentityDto;
 }
 
+export interface LlmHealthDto {
+  reachable: boolean;
+  detail: string | null;
+}
+
 export interface HealthDto {
   status: string;
   dbOk: boolean;
   migrationRevision: string | null;
   ghidraAdapter: string;
   llmAdapter: string;
+  // AM5: adapter reachability, so the UI can tell "no summaries because
+  // misconfigured" from "no summaries yet".
+  llmHealth: LlmHealthDto;
 }
 
 /** Machine-readable error codes (E4). */
@@ -320,6 +328,7 @@ export type ErrorCode =
   | "SUMMARY_RATE_LIMITED"
   | "QUEUE_FULL"
   | "LAST_VIEW_DELETE_FORBIDDEN"
+  | "GHIDRA_PROGRAM_MISMATCH"
   | "INTERNAL_ERROR";
 
 export interface ErrorEnvelope {
