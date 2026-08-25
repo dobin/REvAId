@@ -7,6 +7,7 @@ the exact same migration path as `just migrate`.
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 from collections.abc import AsyncIterator, Iterator
@@ -22,6 +23,37 @@ from graphrev.db.engine import create_engine, create_session_factory, dispose_en
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
+# ---------------------------------------------------------------------------
+# Hermetic config: tests must not see a developer's `backend/.env`.
+#
+# Two distinct leakage paths, both observed live:
+#
+# 1. `Settings` declares `env_file=".env"` (resolved against the process
+#    cwd, i.e. `backend/` under `uv run pytest`), so a developer's real
+#    config would override the defaults the tests assert on.
+# 2. **Importing `litellm` loads `.env` from the cwd and exports every entry
+#    into `os.environ`** — real environment variables, which beat everything
+#    in pydantic-settings' source order. The litellm adapter tests import it,
+#    so the poison arrives mid-session, after any import-time cleanup.
+#
+# Therefore: disable the dotenv source at conftest import time (before any
+# test instantiates `Settings`), and purge `GRAPHREV_*` from `os.environ`
+# both at import time and in the `settings` fixture (which runs after the
+# litellm tests may have already polluted it). `monkeypatch.setenv` in
+# individual override tests still works — it re-adds vars after the purge.
+# ---------------------------------------------------------------------------
+Settings.model_config["env_file"] = None
+get_settings.cache_clear()
+for _key in [k for k in os.environ if k.startswith("GRAPHREV_")]:
+    del os.environ[_key]
+
+
+def _purge_graphrev_env() -> None:
+    """Remove `GRAPHREV_*` vars that `import litellm` may have exported from a
+    developer's `.env` after this conftest was imported (see block above)."""
+    for key in [k for k in os.environ if k.startswith("GRAPHREV_")]:
+        del os.environ[key]
+
 
 @pytest.fixture
 def db_path(tmp_path: Path) -> Path:
@@ -30,6 +62,7 @@ def db_path(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def settings(db_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Settings]:
+    _purge_graphrev_env()
     monkeypatch.setenv("GRAPHREV_DB_PATH", str(db_path))
     get_settings.cache_clear()
     yield get_settings()
