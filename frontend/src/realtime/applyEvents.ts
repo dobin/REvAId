@@ -22,6 +22,12 @@ export function applySummaryEvent(qc: QueryClient, e: SummaryEvent): void {
     fn
       ? {
           ...fn,
+          // C13 auto-display: patch the proposed name and recompute the
+          // display name with the same precedence the server applies
+          // (`name_analyst ?? name_llm ?? name_ghidra`) — E5a "one event,
+          // all surfaces", no refetch, no reload.
+          nameLlm: e.nameLlm ?? fn.nameLlm,
+          displayName: fn.nameAnalyst ?? e.nameLlm ?? fn.nameGhidra,
           summary: {
             ...fn.summary,
             status: e.summaryStatus,
@@ -39,6 +45,9 @@ export function applySummaryEvent(qc: QueryClient, e: SummaryEvent): void {
   // Patch the row wherever it appears, in every cached neighbour page —
   // this is the "one event updates all surfaces" requirement (E5a): the
   // same function can be a row in several open cards' tables at once.
+  // `NeighbourRowDto` carries no `nameAnalyst`, but `isRenamed` gates the
+  // LLM name server-side (analyst beats LLM), so a renamed row keeps its
+  // analyst display name untouched.
   qc.setQueriesData<NeighbourPageDto>({ queryKey: ["neighbours"] }, (page) =>
     page && page.rows.some((r) => r.id === e.functionId)
       ? {
@@ -47,6 +56,8 @@ export function applySummaryEvent(qc: QueryClient, e: SummaryEvent): void {
             r.id === e.functionId
               ? {
                   ...r,
+                  nameLlm: e.nameLlm ?? r.nameLlm,
+                  displayName: !r.isRenamed && e.nameLlm ? e.nameLlm : r.displayName,
                   summaryShort: e.summaryShort ?? r.summaryShort,
                   summaryStatus: e.summaryStatus,
                   summaryLowConfidence: e.lowConfidence,

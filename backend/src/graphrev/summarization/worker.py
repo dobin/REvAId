@@ -79,6 +79,7 @@ class ResultListener(Protocol):
         low_confidence: bool,
         generated_at: str | None,
         error_code: str | None,
+        name_llm: str | None = None,
     ) -> Awaitable[None]: ...
 
 
@@ -375,6 +376,7 @@ async def _succeed(
             low_confidence=result.low_confidence,
             generated_at=generated_at,
             error_code=None,
+            name_llm=result.name_llm,
         )
 
 

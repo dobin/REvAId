@@ -109,6 +109,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         low_confidence: bool,
         generated_at: str | None,
         error_code: str | None,
+        name_llm: str | None = None,
     ) -> None:
         event_bus.publish(
             "summary",
@@ -120,6 +121,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 "lowConfidence": low_confidence,
                 "generatedAt": generated_at,
                 "errorCode": error_code,
+                # C13 auto-display: the LLM-proposed name, so the UI can patch
+                # `displayName`/`nameLlm` on every surface without a refetch
+                # (E5a "one event, all surfaces" — a reload must never be
+                # needed to see a newly proposed name).
+                "nameLlm": name_llm,
             },
         )
 

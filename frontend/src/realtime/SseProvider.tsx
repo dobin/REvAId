@@ -33,6 +33,7 @@ function parseSummaryEvent(raw: unknown): SummaryEvent | null {
     lowConfidence: data.lowConfidence === true,
     generatedAt: typeof data.generatedAt === "string" ? data.generatedAt : null,
     errorCode: typeof data.errorCode === "string" ? data.errorCode : null,
+    nameLlm: typeof data.nameLlm === "string" ? data.nameLlm : null,
   };
 }
 

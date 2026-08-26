@@ -398,6 +398,10 @@ export interface SummaryEvent {
   lowConfidence: boolean;
   generatedAt: string | null;
   errorCode: string | null;
+  // C13 auto-display: the LLM-proposed name (null when the adapter/model
+  // proposed none, or on error events). Drives the displayName patch on
+  // every surface (E5a) so a reload is never needed to see it.
+  nameLlm: string | null;
 }
 
 export interface QueueEvent {
