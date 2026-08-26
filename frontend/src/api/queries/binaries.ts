@@ -61,6 +61,22 @@ export function useFunctionSearchQuery(binaryId: BinaryId | null, query: string)
 }
 
 /**
+ * `DELETE /binaries/{id}?confirm={name}` — the API requires the binary
+ * name as a `confirm` query param to guard against accidental deletes.
+ * Refreshes the binaries list on success.
+ */
+export function useDeleteBinaryMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name }: { id: BinaryId; name: string }) =>
+      apiClient.delete<void>(`/binaries/${String(id)}`, { confirm: name }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["binaries"] });
+    },
+  });
+}
+
+/**
  * `POST /binaries/import` (I12) — ingest a Ghidra JSON export as a binary.
  * Refreshes the binary picker on success; the caller selects the new binary.
  */

@@ -1,4 +1,5 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Toolbar } from "./Toolbar";
@@ -15,22 +16,24 @@ describe("Toolbar", () => {
     vi.unstubAllGlobals();
   });
 
-  it("renders the brand and the binary picker", async () => {
+  it("renders the brand as a home link and the binary name", () => {
     const queryClient = new QueryClient();
     render(
       <QueryClientProvider client={queryClient}>
-        <Toolbar
-          selectedBinaryId={null}
-          onSelectBinary={vi.fn()}
-          selectedViewId={null}
-          onSelectView={vi.fn()}
-        />
+        <MemoryRouter>
+          <Toolbar
+            binaryName="test.exe"
+            binaryId={null}
+            selectedViewId={null}
+            onSelectView={vi.fn()}
+          />
+        </MemoryRouter>
       </QueryClientProvider>,
     );
 
-    expect(screen.getByText("GraphRev")).toBeInTheDocument();
-    await waitFor(() => {
-      expect(screen.getByText(/no binaries ingested yet/i)).toBeInTheDocument();
-    });
+    const homeLink = screen.getByText("GraphRev");
+    expect(homeLink).toBeInTheDocument();
+    expect(homeLink.closest("a")).toHaveAttribute("href", "/");
+    expect(screen.getByText("test.exe")).toBeInTheDocument();
   });
 });

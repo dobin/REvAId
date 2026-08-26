@@ -67,5 +67,8 @@ export const apiClient = {
   get: <T>(path: string) => request<T>(path, { method: "GET" }),
   post: <T>(path: string, body?: unknown) => request<T>(path, jsonInit("POST", body)),
   patch: <T>(path: string, body?: unknown) => request<T>(path, jsonInit("PATCH", body)),
-  delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
+  delete: <T>(path: string, params?: Record<string, string>) => {
+    const suffix = params ? `?${new URLSearchParams(params).toString()}` : "";
+    return request<T>(`${path}${suffix}`, { method: "DELETE" });
+  },
 };
