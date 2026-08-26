@@ -196,7 +196,7 @@ async def search_functions(
     """Paginated, case-insensitive substring search over a binary's functions
     (B11/E1a).
 
-    Matches `name_ghidra`, `name_analyst`, `notes`, or `address` via
+    Matches `name_ghidra`, `name_llm`, `name_analyst`, `notes`, or `address` via
     ``LIKE '%q%' COLLATE NOCASE`` (TAD §3.3 design note — an FTS5 upgrade is
     an additive M1 item, TQ1). The address match is substring-based against
     both the decimal and hex (`0x`-stripped) renderings of `address`, so a
@@ -213,6 +213,7 @@ async def search_functions(
         filters.append(
             or_(
                 Function.name_ghidra.collate("NOCASE").like(like),
+                Function.name_llm.collate("NOCASE").like(like),
                 Function.name_analyst.collate("NOCASE").like(like),
                 Function.notes.collate("NOCASE").like(like),
                 cast(Function.address, String).like(like),

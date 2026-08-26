@@ -22,6 +22,7 @@ async def _make_function(
     binary_id: int,
     address: int,
     name_ghidra: str = "fn",
+    name_llm: str | None = None,
     name_analyst: str | None = None,
     notes: str = "",
     fan_out: int = 0,
@@ -32,6 +33,7 @@ async def _make_function(
         binary_id=binary_id,
         address=address,
         name_ghidra=name_ghidra,
+        name_llm=name_llm,
         name_analyst=name_analyst,
         notes=notes,
         fan_out=fan_out,
@@ -106,6 +108,26 @@ async def test_search_functions_matches_name_analyst_and_notes(session: AsyncSes
     )
     assert total2 == 1
     assert by_notes[0].name_ghidra == "FUN_00401010"
+
+
+@pytest.mark.asyncio
+async def test_search_functions_matches_name_llm(session: AsyncSession) -> None:
+    binary, _ = await get_or_create_binary(session, name="acme.exe", version="1.0")
+    await _make_function(
+        session,
+        binary_id=binary.id,
+        address=0x1000,
+        name_ghidra="FUN_00401000",
+        name_llm="decrypt_buffer",
+    )
+    await _make_function(session, binary_id=binary.id, address=0x1010, name_ghidra="unrelated")
+    await session.commit()
+
+    rows, total = await search_functions(
+        session, binary_id=binary.id, query="decrypt", limit=50, offset=0
+    )
+    assert total == 1
+    assert rows[0].name_ghidra == "FUN_00401000"
 
 
 @pytest.mark.asyncio
