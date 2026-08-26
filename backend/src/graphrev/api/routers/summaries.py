@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Response, status
 
-from graphrev.api.deps import EventBusDep, SessionDep, SummaryQueueDep
+from graphrev.api.deps import EventBusDep, SummaryQueueDep, WriteSessionDep
 from graphrev.schemas.summary import SummaryDemandRequestDto, SummaryDemandResponseDto
 from graphrev.services import summary_service
 
@@ -18,7 +18,7 @@ router = APIRouter(tags=["summaries"])
 async def demand_summary(
     function_id: int,
     request: SummaryDemandRequestDto,
-    session: SessionDep,
+    session: WriteSessionDep,
     queue: SummaryQueueDep,
     event_bus: EventBusDep,
     response: Response,
@@ -54,7 +54,7 @@ async def release_summary(function_id: int, queue: SummaryQueueDep, event_bus: E
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def clear_binary_summaries(
-    binary_id: int, session: SessionDep, queue: SummaryQueueDep, event_bus: EventBusDep
+    binary_id: int, session: WriteSessionDep, queue: SummaryQueueDep, event_bus: EventBusDep
 ) -> None:
     """TESTING affordance: wipe every LLM summary (`summary_short`/
     `summary_long` and friends) for all functions of the binary."""
@@ -69,7 +69,7 @@ async def clear_binary_summaries(
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def regenerate_summary(
-    function_id: int, session: SessionDep, queue: SummaryQueueDep, event_bus: EventBusDep
+    function_id: int, session: WriteSessionDep, queue: SummaryQueueDep, event_bus: EventBusDep
 ) -> SummaryDemandResponseDto:
     """Force regeneration, bypassing the cache (endpoint 19, C7)."""
     return await summary_service.regenerate_summary(

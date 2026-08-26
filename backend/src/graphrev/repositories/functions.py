@@ -9,6 +9,7 @@ the model it guards (``db/models.py``).
 from __future__ import annotations
 
 import json
+from typing import TypedDict
 
 from sqlalchemy import String, cast, func, or_, select, text
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -26,7 +27,23 @@ __all__ = [
     "resolve_function_by_address",
     "search_functions",
     "upsert_function",
+    "upsert_functions_batch",
 ]
+
+
+class FunctionBatchValues(TypedDict, total=False):
+    """Ingestion-owned inputs accepted by :func:`upsert_functions_batch`."""
+
+    address: int
+    name_ghidra: str
+    parameters: list[dict[str, object]]
+    signature: str | None
+    assembly: str | None
+    code_c: str | None
+    kind: FunctionKind
+    placeholder_module: str | None
+    has_indirect_calls: bool
+    is_entry_point: bool
 
 #: Columns present in the INSERT's VALUES that are NOT part of
 #: ``INGESTION_OWNED_COLUMNS`` and must therefore be supplied only on first
@@ -103,6 +120,71 @@ async def upsert_function(
     await session.flush()
 
     return function_id, created
+
+
+async def upsert_functions_batch(
+    session: AsyncSession,
+    *,
+    binary_id: int,
+    functions: list[FunctionBatchValues],
+) -> tuple[dict[int, int], int, int]:
+    """Upsert a bounded group of ingestion rows in one SQLite statement.
+
+    Returns ``(address_to_id, inserted, updated)``. Callers must provide
+    unique addresses inside a batch. The prior address lookup provides exact
+    counts without the former SELECT-per-function cost; the conflict update
+    intentionally retains the same A3 protected-column rule as
+    :func:`upsert_function`.
+    """
+    if not functions:
+        return {}, 0, 0
+
+    addresses = [int(row["address"]) for row in functions]
+    existing_addresses = set(
+        (
+            await session.execute(
+                select(Function.address).where(
+                    Function.binary_id == binary_id, Function.address.in_(addresses)
+                )
+            )
+        ).scalars()
+    )
+    now = utc_now_iso()
+    values: list[dict[str, object]] = [
+        {
+            "binary_id": binary_id,
+            "address": int(row["address"]),
+            "name_ghidra": str(row["name_ghidra"]),
+            "parameters": json.dumps(row.get("parameters", [])),
+            "signature": row.get("signature"),
+            "assembly": row.get("assembly"),
+            "code_c": row.get("code_c"),
+            "kind": row.get("kind", "normal"),
+            "placeholder_module": row.get("placeholder_module"),
+            "has_indirect_calls": bool(row.get("has_indirect_calls", False)),
+            "is_entry_point": bool(row.get("is_entry_point", False)),
+            "created_at": now,
+            "updated_at": now,
+        }
+        for row in functions
+    ]
+    update_columns = INGESTION_OWNED_COLUMNS - _INSERT_ONLY_COLUMNS
+    stmt = sqlite_insert(Function).values(values)
+    stmt = stmt.on_conflict_do_update(
+        index_elements=[Function.binary_id, Function.address],
+        set_={col: stmt.excluded[col] for col in update_columns if col in values[0]},
+    )
+    await session.execute(stmt)
+    rows = (
+        await session.execute(
+            select(Function.address, Function.id).where(
+                Function.binary_id == binary_id, Function.address.in_(addresses)
+            )
+        )
+    ).all()
+    address_to_id = {row.address: row.id for row in rows}
+    inserted = sum(address not in existing_addresses for address in addresses)
+    return address_to_id, inserted, len(addresses) - inserted
 
 
 async def recompute_fan_in_fan_out_and_utility(

@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query, status
+from pathlib import Path
 
-from graphrev.api.deps import SessionDep, SessionFactoryDep, SettingsDep
+from fastapi import APIRouter, Query, Request, status
+
+from graphrev.api.deps import ImportJobManagerDep, SessionDep, SettingsDep, WriteSessionDep
 from graphrev.core.errors import AppError, ErrorCode
 from graphrev.schemas.binary import BinarySummaryDto
 from graphrev.schemas.function import FunctionDto
-from graphrev.schemas.ingest import GhidraExportDocument, ImportResultDto
+from graphrev.schemas.ingest import ImportJobAcceptedDto, ImportJobStatusDto
 from graphrev.schemas.search import EntryPointsDto, FunctionSearchPageDto
 from graphrev.services import binary_service, function_service, search_service
 
@@ -34,24 +36,68 @@ async def list_binaries(session: SessionDep) -> list[BinarySummaryDto]:
 
 @router.post(
     "/binaries/import",
-    response_model=ImportResultDto,
-    status_code=status.HTTP_201_CREATED,
+    response_model=ImportJobAcceptedDto,
+    status_code=status.HTTP_202_ACCEPTED,
 )
 async def import_binary(
-    document: GhidraExportDocument,
-    session_factory: SessionFactoryDep,
+    request: Request,
     settings: SettingsDep,
-) -> ImportResultDto:
-    """Import a Ghidra JSON export as a binary (I12).
+    manager: ImportJobManagerDep,
+) -> ImportJobAcceptedDto:
+    """Stream a raw Ghidra JSON export to staging and enqueue its import.
 
-    Idempotent on `(name, version)` — re-importing upserts inherent fields and
-    preserves analyst-owned data (A3).
+    The configured byte cap is enforced during the read: Content-Length is
+    merely an early rejection optimization because chunked requests lack it.
     """
-    return await binary_service.import_ghidra_export(session_factory, settings, document)
+    content_type = request.headers.get("content-type", "").split(";", 1)[0]
+    if content_type != "application/json":
+        raise AppError(
+            ErrorCode.VALIDATION_ERROR,
+            "Import uploads must use Content-Type application/json.",
+        )
+    content_length = request.headers.get("content-length")
+    if content_length is not None:
+        try:
+            if int(content_length) > settings.import_max_upload_bytes:
+                raise AppError(
+                    ErrorCode.IMPORT_TOO_LARGE,
+                    "Import exceeds the configured upload limit.",
+                    details={"maxBytes": settings.import_max_upload_bytes},
+                )
+        except ValueError as exc:
+            raise AppError(ErrorCode.VALIDATION_ERROR, "Invalid Content-Length header.") from exc
+
+    path: Path = manager.staging_path()
+    bytes_received = 0
+    try:
+        with path.open("xb") as staged_file:
+            async for chunk in request.stream():
+                bytes_received += len(chunk)
+                if bytes_received > settings.import_max_upload_bytes:
+                    raise AppError(
+                        ErrorCode.IMPORT_TOO_LARGE,
+                        "Import exceeds the configured upload limit.",
+                        details={"maxBytes": settings.import_max_upload_bytes},
+                    )
+                staged_file.write(chunk)
+        return await manager.submit(path, bytes_received=bytes_received)
+    except Exception:
+        path.unlink(missing_ok=True)
+        raise
+
+
+@router.get("/binaries/imports/{job_id}", response_model=ImportJobStatusDto)
+async def get_import_status(job_id: str, manager: ImportJobManagerDep) -> ImportJobStatusDto:
+    return manager.status(job_id)
+
+
+@router.delete("/binaries/imports/{job_id}", response_model=ImportJobStatusDto)
+async def cancel_import(job_id: str, manager: ImportJobManagerDep) -> ImportJobStatusDto:
+    return manager.cancel(job_id)
 
 
 @router.delete("/binaries/{binary_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_binary(binary_id: int, confirm: str, session: SessionDep) -> None:
+async def delete_binary(binary_id: int, confirm: str, session: WriteSessionDep) -> None:
     await binary_service.delete_binary_with_confirmation(
         session, binary_id=binary_id, confirm=confirm
     )

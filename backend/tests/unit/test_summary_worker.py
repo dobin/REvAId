@@ -18,8 +18,8 @@ from graphrev.adapters.llm.base import (
 )
 from graphrev.core.clock import utc_now_iso
 from graphrev.db.models import Binary, Function
-from graphrev.summarization.queue import SummaryQueue
 from graphrev.summarization import worker as worker_module
+from graphrev.summarization.queue import SummaryQueue
 from graphrev.summarization.worker import run_one_item
 
 
@@ -98,6 +98,33 @@ async def test_successful_summarize_persists_ready_status(
     assert fn.summary_long == "long"
     assert fn.summary_model == "stub-v1"
     assert fn.summary_input_hash is not None
+
+
+async def test_successful_summarize_logs_non_null_duration_and_attempt_count(
+    session: AsyncSession,
+    session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fn = await _make_function(session)
+    queue = SummaryQueue(max_depth=10)
+    item = queue.enqueue(fn.id, priority=0)
+    await queue.pop()
+    events: list[dict[str, object]] = []
+
+    def _record_event(*args: object, **kwargs: object) -> None:
+        events.append(kwargs)
+
+    monkeypatch.setattr(worker_module, "log_event", _record_event)
+    adapter = _StubAdapter(
+        [SummaryResult(summary_short="short", summary_long="long", model="stub-v1")]
+    )
+
+    await run_one_item(item, queue=queue, adapter=adapter, session_factory=session_factory)
+
+    completed = next(event for event in events if event["outcome"] == "success")
+    assert isinstance(completed["duration_ms"], float)
+    assert completed["duration_ms"] >= 0
+    assert completed["attempt_count"] == 1
 
 
 async def test_successful_summarize_persists_name_llm(

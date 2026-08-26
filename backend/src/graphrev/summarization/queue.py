@@ -207,7 +207,23 @@ class SummaryQueue:
         return it. Silently discards superseded (stale, upgraded-away)
         copies and items that were fully released while still queued."""
         while True:
+            # A provider rate limit applies to every worker, not only the
+            # worker that received it. Do this before taking an item so the
+            # queue snapshot remains truthful while it is paused. A pause
+            # that starts just after another worker takes an item is checked
+            # again below, before that item can reach the provider.
+            paused_until = self.paused_until()
+            if paused_until is not None:
+                await asyncio.sleep(max(0.0, paused_until - time.monotonic()))
+                continue
             item = await self._pq.get()
+            paused_until = self.paused_until()
+            if paused_until is not None:
+                # Hold this item in the worker rather than re-inserting it:
+                # re-insertion would perturb FIFO ordering and create stale
+                # heap copies. It has not been marked in-flight yet, so no
+                # provider call can happen during the pause.
+                await asyncio.sleep(max(0.0, paused_until - time.monotonic()))
             if item.superseded:
                 continue
             current = self._index.get(item.function_id)

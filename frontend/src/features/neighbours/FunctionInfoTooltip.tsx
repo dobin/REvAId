@@ -14,16 +14,27 @@
  * fixed` achieve this without any z-index arms-race against the canvas.
  *
  * Side-effect free (C2c): a GET only, no summary-demand wiring here.
+ *
+ * The popup is **interactable**: the pointer can move off the anchor onto the
+ * popup itself to scroll a long summary or select its text, without it
+ * vanishing. A short close DELAY on leave (cancelled if the pointer re-enters
+ * either the anchor or the popup) bridges the pointer's trip across the small
+ * gap between them; the popup carries its own mouse-enter/leave handlers.
+ * `Escape` also closes it.
  */
-import { useState, useRef, type ReactNode } from "react";
+import { useState, useRef, useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { functionQueryOptions } from "@/api/queries/functions";
+import { SummaryBody } from "@/components/SummaryBody";
 import type { FunctionDto, FunctionId } from "@/api/types";
 
 // Small delay so a quick pass over the name doesn't fire a fetch or flash the
 // popup — only a deliberate hover surfaces it.
 const HOVER_OPEN_DELAY_MS = 200;
+// Grace period after the pointer leaves the anchor so it can travel onto the
+// popup (to scroll / select) before we close. Cancelled on re-enter.
+const HOVER_CLOSE_DELAY_MS = 120;
 const POPUP_WIDTH_PX = 416; // 26rem @ 16px base
 
 export function FunctionInfoTooltip({
@@ -36,45 +47,99 @@ export function FunctionInfoTooltip({
   const anchorRef = useRef<HTMLSpanElement>(null);
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
-  const [timer, setTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const clearTimer = () => {
-    if (timer) {
-      clearTimeout(timer);
-      setTimer(null);
+  const clearOpenTimer = () => {
+    if (openTimerRef.current) {
+      clearTimeout(openTimerRef.current);
+      openTimerRef.current = null;
+    }
+  };
+  const clearCloseTimer = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
     }
   };
 
-  const handleEnter = () => {
-    clearTimer();
-    setTimer(
-      setTimeout(() => {
-        if (anchorRef.current) {
-          const rect = anchorRef.current.getBoundingClientRect();
-          // Prefer opening below; clamp left so it doesn't run off the right
-          // edge of the viewport.
-          const left = Math.min(rect.left, window.innerWidth - POPUP_WIDTH_PX - 8);
-          setPos({ top: rect.bottom + 4, left });
-        }
-        setOpen(true);
-      }, HOVER_OPEN_DELAY_MS),
-    );
+  // Clean up any pending timers if the row unmounts (e.g. virtualised out)
+  // while a hover is in flight.
+  useEffect(() => {
+    return () => {
+      clearOpenTimer();
+      clearCloseTimer();
+    };
+  }, []);
+
+  const openNow = () => {
+    if (anchorRef.current) {
+      const rect = anchorRef.current.getBoundingClientRect();
+      // Prefer opening below; clamp left so it doesn't run off the right edge
+      // of the viewport. No vertical gap — the popup abuts the anchor so the
+      // pointer can travel onto it without crossing a dead zone that would
+      // otherwise fire a mouseLeave and close it.
+      const left = Math.min(rect.left, window.innerWidth - POPUP_WIDTH_PX - 8);
+      setPos({ top: rect.bottom, left });
+    }
+    setOpen(true);
   };
 
-  const handleLeave = () => {
-    clearTimer();
+  // Pointer entered the anchor (or the popup): cancel a pending close, and if
+  // not already open, schedule the open after the deliberate-hover delay.
+  const handleEnter = () => {
+    clearCloseTimer();
+    if (open) return;
+    clearOpenTimer();
+    openTimerRef.current = setTimeout(openNow, HOVER_OPEN_DELAY_MS);
+  };
+
+  // Pointer left the anchor (or the popup): cancel a pending open, and
+  // schedule a delayed close so the pointer has time to reach the other
+  // element. A re-enter of either cancels this before it fires.
+  const scheduleClose = () => {
+    clearOpenTimer();
+    clearCloseTimer();
+    closeTimerRef.current = setTimeout(() => {
+      setOpen(false);
+      setPos(null);
+    }, HOVER_CLOSE_DELAY_MS);
+  };
+
+  // Focus/blur (keyboard) close immediately — there's no pointer to bridge.
+  const handleBlur = () => {
+    clearOpenTimer();
+    clearCloseTimer();
     setOpen(false);
     setPos(null);
   };
+
+  // Escape closes an open popup. Self-contained so it needn't depend on the
+  // per-render `handleBlur` closure (which would re-bind the listener every
+  // render); it only ever runs while `open` is true.
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      clearOpenTimer();
+      clearCloseTimer();
+      setOpen(false);
+      setPos(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
 
   return (
     <span
       ref={anchorRef}
       style={{ display: "inline-flex", minWidth: 0 }}
       onMouseEnter={handleEnter}
-      onMouseLeave={handleLeave}
+      onMouseLeave={scheduleClose}
       onFocus={handleEnter}
-      onBlur={handleLeave}
+      onBlur={handleBlur}
     >
       {children}
       {open &&
@@ -82,6 +147,8 @@ export function FunctionInfoTooltip({
         createPortal(
           <div
             role="tooltip"
+            onMouseEnter={handleEnter}
+            onMouseLeave={scheduleClose}
             style={{
               position: "fixed",
               top: pos.top,
@@ -90,6 +157,9 @@ export function FunctionInfoTooltip({
               width: POPUP_WIDTH_PX,
               maxHeight: "18rem",
               overflowY: "auto",
+              // Slight negative top margin overlaps the anchor's bottom edge so
+              // there's no 1px gap for the pointer to fall through en route.
+              marginTop: "-2px",
               padding: "0.75rem",
               background: "#ffffff",
               border: "1px solid #d1d5db",
@@ -101,9 +171,6 @@ export function FunctionInfoTooltip({
               whiteSpace: "normal",
               textAlign: "left",
               cursor: "default",
-              // Prevent the tooltip itself from triggering a mouseLeave on the
-              // anchor when the pointer moves onto it.
-              pointerEvents: "none",
             }}
           >
             {/* Only mount the fetching child once the popup opens, so a plain
@@ -127,20 +194,5 @@ function TooltipContent({ functionId }: { functionId: FunctionId }) {
 
 function TooltipBody({ fn }: { fn: FunctionDto }) {
   const { status, short, long } = fn.summary;
-
-  if (status === "none" || (!short && !long)) {
-    return <p style={{ margin: 0, color: "#9ca3af" }}>No summary yet.</p>;
-  }
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-      {short && (
-        <p style={{ margin: 0, fontWeight: 600 }}>
-          {short}
-          {status === "stale" && " (stale)"}
-        </p>
-      )}
-      {long && <p style={{ margin: 0, whiteSpace: "pre-wrap" }}>{long}</p>}
-    </div>
-  );
+  return <SummaryBody status={status} short={short} long={long} />;
 }

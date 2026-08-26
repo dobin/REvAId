@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 from httpx import AsyncClient
 
@@ -98,6 +100,28 @@ async def test_patch_view_name_root_and_camera(client: AsyncClient, ingested: No
     assert body["name"] == "crash path"
     assert body["rootFunctionId"] == root_fn_id
     assert body["camera"] == {"x": -240.5, "y": 88.0, "zoom": 0.85}
+
+
+@pytest.mark.asyncio
+async def test_patch_view_waits_for_an_active_import_writer(
+    client: AsyncClient, ingested: None
+) -> None:
+    """A view PATCH must queue behind ingestion, not fail with SQLITE_BUSY."""
+    from graphrev.db.uow import write_lock
+
+    binary_id = await _get_binary_id(client, "acme.exe")
+    view_id = await _get_default_view_id(client, binary_id)
+
+    async with write_lock():
+        patch_task = asyncio.create_task(
+            client.patch(f"/api/v1/views/{view_id}", json={"name": "queued update"})
+        )
+        await asyncio.sleep(0)
+        assert not patch_task.done()
+
+    response = await patch_task
+    assert response.status_code == 200
+    assert response.json()["name"] == "queued update"
 
 
 @pytest.mark.asyncio

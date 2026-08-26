@@ -36,3 +36,38 @@ async def upsert_edge(
     inserted_id = result.scalar_one_or_none()
     await session.flush()
     return inserted_id is not None
+
+
+async def upsert_edges_batch(
+    session: AsyncSession,
+    *,
+    binary_id: int,
+    edges: list[tuple[int, int]],
+    kind: EdgeKind = "call",
+) -> tuple[int, int]:
+    """Insert unique edge pairs in one bounded statement.
+
+    Returns ``(inserted, skipped_duplicate)``. Database uniqueness remains
+    authoritative for duplicates already persisted by an earlier import.
+    """
+    pairs = list(dict.fromkeys(edges))
+    if not pairs:
+        return 0, 0
+    stmt = (
+        sqlite_insert(Edge)
+        .values(
+            [
+                {
+                    "binary_id": binary_id,
+                    "caller_id": caller_id,
+                    "callee_id": callee_id,
+                    "kind": kind,
+                }
+                for caller_id, callee_id in pairs
+            ]
+        )
+        .on_conflict_do_nothing(index_elements=[Edge.caller_id, Edge.callee_id])
+        .returning(Edge.id)
+    )
+    inserted = len((await session.execute(stmt)).scalars().all())
+    return inserted, len(edges) - inserted

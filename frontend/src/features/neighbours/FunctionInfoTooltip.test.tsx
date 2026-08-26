@@ -98,6 +98,44 @@ describe("FunctionInfoTooltip", () => {
     });
   });
 
+  it("stays open when the pointer moves from the anchor onto the popup", async () => {
+    renderTooltip(makeFunction());
+    const wrapper = screen.getByText("parse_header").parentElement as HTMLElement;
+    hover();
+    const tooltip = await screen.findByRole("tooltip");
+    // Wait out the async fetch so the body (and its long text) is settled
+    // before we probe the hover bridge — avoids an act() warning too.
+    await screen.findByText(/Reads the first bytes and validates the magic number/);
+
+    // Pointer leaves the anchor (schedules a delayed close) but immediately
+    // enters the popup (must cancel that close) — the popup must survive.
+    fireEvent.mouseLeave(wrapper);
+    fireEvent.mouseEnter(tooltip);
+
+    // Give the close delay time to (not) fire, then confirm it's still there
+    // and its long, scrollable text is reachable.
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Reads the first bytes and validates the magic number/),
+    ).toBeInTheDocument();
+  });
+
+  it("closes when the pointer finally leaves the popup", async () => {
+    renderTooltip(makeFunction());
+    const wrapper = screen.getByText("parse_header").parentElement as HTMLElement;
+    hover();
+    const tooltip = await screen.findByRole("tooltip");
+
+    fireEvent.mouseLeave(wrapper);
+    fireEvent.mouseEnter(tooltip);
+    fireEvent.mouseLeave(tooltip);
+
+    await waitFor(() => {
+      expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    });
+  });
+
   it("falls back to a placeholder when there is no summary", async () => {
     renderTooltip(makeFunction({ status: "none", short: null, long: null }));
     hover();

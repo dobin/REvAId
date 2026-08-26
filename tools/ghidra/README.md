@@ -25,7 +25,13 @@ GraphRev backend consumes. The output maps 1:1 onto the ingestion DTOs in
 4. Find **GraphRevExport** under the `GraphRev` category and run it (green
    arrow).
 5. Pick a destination file when prompted. If you cancel, it defaults to
-   `~/<program>_graphrev.json`.
+  `~/<program>_graphrev.json`.
+6. Choose the export mode:
+  - **No** produces a complete export, including decompiled C where Ghidra
+    can generate it.
+  - **Yes** produces a faster export without decompilation. It still includes
+    assembly, signatures, parameters, call edges, and resolved external
+    imports; every `codeC` field is `null`.
 
 ### Headless (`analyzeHeadless`)
 
@@ -49,6 +55,9 @@ $GHIDRA_HOME/support/analyzeHeadless \
     -scriptPath /home/dobin/repos/Revealm/tools/ghidra \
     -postScript GraphRevExport.java /out/acme.json
 ```
+
+  Headless exports always use complete mode with decompiled C, because the
+  interactive mode prompt is not available.
 
 Script arguments (both optional, positional):
 
@@ -140,6 +149,9 @@ jq '[.edges[] | {c:.callerAddress, e:.calleeAddress}] | unique | length' acme.js
 - Decompilation is **serial** for readability and robustness. Very large
   binaries (tens of thousands of functions) will be slow; a parallel
   `ChunkingParallelDecompiler` variant is a future optimisation.
+- The exporter prints aggregate `collect`, `export`, `write`, and `total`
+  timings to Ghidra's console. In complete mode, the serial decompilation work
+  is normally the largest part of the `export` time.
 - `version` has no reliable source in Ghidra, so it defaults to `""`. Treat a
   rebuilt binary as a new binary (a new `binaries` row) rather than relying on
   this field.

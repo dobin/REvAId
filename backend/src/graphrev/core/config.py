@@ -81,10 +81,10 @@ class Settings(BaseSettings):
     #: nearly all spurious SUMMARY_PROVIDER_ERRORs. Only after this many
     #: attempts does the adapter report `PermanentProviderError`.
     llm_json_attempts: int = Field(default=3, gt=0)
-    #: Bound on a single adapter.summarize() call so a hung provider cannot
-    #: wedge a worker slot (§6.5). Also replaces the worker's old hard-coded
-    #: 120s module constant.
-    summary_request_timeout_seconds: float = Field(default=120.0, gt=0)
+    #: Bound on one LiteLLM provider request so a hung provider cannot wedge
+    #: a worker slot (§6.5). The worker retains its broader adapter-level
+    #: guard for adapters that perform multiple provider attempts.
+    summary_request_timeout_seconds: float = Field(default=45.0, gt=0)
 
     #: I13 (§6.5): OpenCodeAdapter plumbing — `opencode serve` is the sidecar
     #: (plan decision 4: no custom bridge web service, no Node runtime dep in
@@ -166,6 +166,26 @@ class Settings(BaseSettings):
     #: set `GRAPHREV_SQLITE_SYNCHRONOUS=OFF` to skip fsyncs (durability is
     #: irrelevant for a throwaway file).
     sqlite_synchronous: str = Field(default="NORMAL")
+
+    #: I12 large-export ingestion. Uploads are streamed into this directory
+    #: before a process-local worker parses them. The API enforces this cap
+    #: while reading, rather than trusting a client supplied Content-Length.
+    import_max_upload_bytes: int = Field(default=1024**3, gt=0)
+    import_staging_dir: str = Field(default="./.graphrev-imports")
+    #: SQLite has one writer; a single import worker prevents competing large
+    #: imports from turning its busy timeout into user-visible failures.
+    import_worker_concurrency: int = Field(default=1, gt=0, le=1)
+    #: Small enough to stay below SQLite's conservative 999 bind-parameter
+    #: limit for the function UPSERT's ~14 columns, while replacing thousands
+    #: of individual statement/savepoint round trips.
+    import_function_batch_size: int = Field(default=50, gt=0, le=50)
+    import_edge_batch_size: int = Field(default=200, gt=0, le=200)
+    #: Keep completed status records briefly for UI polling. Staged files are
+    #: removed as soon as their jobs reach a terminal state.
+    import_job_retention_seconds: int = Field(default=3600, gt=0)
+    #: Bound API responses and in-memory job state when a malformed export
+    #: produces many individual ingestion failures.
+    import_failure_sample_limit: int = Field(default=100, gt=0)
 
     #: Gates `MockLlmAdapter`'s latency/failure simulation (TAD §6.3's
     #: "1-8s latency, ~5% failures" spec). Off by default so `just test` and

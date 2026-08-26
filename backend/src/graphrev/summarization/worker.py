@@ -27,6 +27,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import random
+import time
 from collections.abc import Awaitable
 from typing import Protocol, cast
 
@@ -252,6 +253,24 @@ class SummaryWorkerPool:
                 raise
             except Exception:  # pragma: no cover - defensive; a worker must never die
                 logger.exception("summary_worker.unexpected_error", function_id=item.function_id)
+                # Do not silently drop an item that was already marked
+                # pending in the database. A context/persistence bug must
+                # become a visible terminal error rather than a permanently
+                # pending row with no queue entry behind it.
+                try:
+                    await _fail(
+                        self._session_factory,
+                        function_id=item.function_id,
+                        error_code="SUMMARY_PROVIDER_ERROR",
+                        result_listener=self._result_listener,
+                        adapter_name=self._adapter.name,
+                        reason="unexpected worker error; see preceding traceback",
+                    )
+                except Exception:  # pragma: no cover - DB may be the original failure
+                    logger.exception(
+                        "summary_worker.unexpected_error_persist_failed",
+                        function_id=item.function_id,
+                    )
             finally:
                 if not requeued:
                     self._queue.complete(item.function_id)
@@ -287,6 +306,7 @@ async def run_one_item(
     caller must NOT call `queue.complete()` in that case — the item is back
     on the queue, not finished), ``False`` otherwise."""
     function_id = item.function_id
+    started_at = time.monotonic()
 
     async with session_factory() as session:
         req = await build_summary_request(session, function_id=function_id)
@@ -313,6 +333,8 @@ async def run_one_item(
                     result_listener=result_listener,
                     adapter_name=adapter.name,
                     reason=f"timeout after {_SUMMARIZE_TIMEOUT_SECONDS}s x{attempt}",
+                    duration_ms=(time.monotonic() - started_at) * 1000,
+                    attempt_count=attempt,
                 )
                 return False
             await asyncio.sleep(_backoff_seconds(attempt))
@@ -325,6 +347,9 @@ async def run_one_item(
                 function_id=function_id,
                 adapter=adapter.name,
                 outcome="rate_limited",
+                duration_ms=(time.monotonic() - started_at) * 1000,
+                attempt_count=attempt + 1,
+                retry_after_seconds=exc.retry_after_seconds,
             )
             # Requeue at the item's original priority, preserving its demand
             # refcount; do not consume a retry attempt or mark the function
@@ -341,6 +366,8 @@ async def run_one_item(
                     result_listener=result_listener,
                     adapter_name=adapter.name,
                     reason=f"{type(exc).__name__}: {exc}",
+                    duration_ms=(time.monotonic() - started_at) * 1000,
+                    attempt_count=attempt,
                 )
                 return False
             await asyncio.sleep(_backoff_seconds(attempt))
@@ -353,6 +380,8 @@ async def run_one_item(
                 result_listener=result_listener,
                 adapter_name=adapter.name,
                 reason=f"{type(exc).__name__}: {exc}",
+                duration_ms=(time.monotonic() - started_at) * 1000,
+                attempt_count=attempt + 1,
             )
             return False
         else:
@@ -363,6 +392,8 @@ async def run_one_item(
                 input_hash=input_hash,
                 adapter_name=adapter.name,
                 result_listener=result_listener,
+                duration_ms=(time.monotonic() - started_at) * 1000,
+                attempt_count=attempt + 1,
             )
             return False
 
@@ -375,6 +406,8 @@ async def _succeed(
     input_hash: str,
     adapter_name: str,
     result_listener: ResultListener | None,
+    duration_ms: float,
+    attempt_count: int,
 ) -> None:
     generated_at = utc_now_iso()
     async with unit_of_work(session_factory) as session:
@@ -394,6 +427,8 @@ async def _succeed(
         adapter=adapter_name,
         model=result.model,
         outcome="success",
+        duration_ms=duration_ms,
+        attempt_count=attempt_count,
     )
     if result_listener is not None:
         await result_listener(
@@ -417,6 +452,8 @@ async def _fail(
     result_listener: ResultListener | None,
     adapter_name: str | None = None,
     reason: str | None = None,
+    duration_ms: float | None = None,
+    attempt_count: int | None = None,
 ) -> None:
     async with unit_of_work(session_factory) as session:
         binary_id = await _persist_failure(session, function_id=function_id, error_code=error_code)
@@ -428,6 +465,8 @@ async def _fail(
         adapter=adapter_name,
         outcome="error",
         error_code=error_code,
+        duration_ms=duration_ms,
+        attempt_count=attempt_count,
         # The provider's own message. Without it a `SUMMARY_PROVIDER_ERROR`
         # is undiagnosable from logs alone (which cost a debugging session
         # when DeepseSeek-via-OpenRouter returned fenced JSON).

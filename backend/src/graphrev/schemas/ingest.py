@@ -12,6 +12,8 @@ of the API, TAD §4) and ``snake_case`` in Python via :class:`ApiModel`.
 
 from __future__ import annotations
 
+from enum import StrEnum
+
 from pydantic import Field
 
 from graphrev.db.enums import FunctionKind
@@ -103,3 +105,37 @@ class ImportResultDto(ApiModel):
     edges_inserted: int
     placeholders_created: int
     failures: list[str] = Field(default_factory=list)
+
+
+class ImportJobPhase(StrEnum):
+    """Observable phases for a staged Ghidra import."""
+
+    UPLOADING = "uploading"
+    QUEUED = "queued"
+    IMPORTING = "importing"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class ImportJobAcceptedDto(ApiModel):
+    """Returned as soon as a raw export has been staged safely."""
+
+    job_id: str
+    phase: ImportJobPhase
+    bytes_received: int
+
+
+class ImportJobStatusDto(ApiModel):
+    """Process-local import-job state.
+
+    Jobs intentionally do not survive an API process restart in this first
+    scalable-import iteration. `failure_samples` is bounded by configuration.
+    """
+
+    job_id: str
+    phase: ImportJobPhase
+    bytes_received: int
+    result: ImportResultDto | None = None
+    error_message: str | None = None
+    failure_samples: list[str] = Field(default_factory=list)

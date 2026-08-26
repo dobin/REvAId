@@ -6,35 +6,36 @@ the same repositories either way, so A3's idempotency rule has exactly one
 implementation (TAD §1.3).
 
 Transaction/failure model:
-  * One `unit_of_work` transaction **per binary** — a failure ingesting one
-    binary does not roll back another binary already committed in the same
-    run.
-  * Within a binary, each function/edge upsert runs inside its own
-    `session.begin_nested()` SAVEPOINT. An unexpected failure there rolls
-    back only that savepoint and is recorded in the report (A4); the rest of
-    the binary's ingestion continues and is committed at the end. This
-    satisfies "no partially-written function rows" for the ones that
-    succeeded, while still capturing failures without aborting the whole run.
+    * One `unit_of_work` transaction **per binary** — a failure ingesting one
+        binary does not roll back another binary already committed in the same
+        run.
+    * Normal functions and edges use bounded multi-row UPSERT batches. A batch
+        failure falls back to per-item SAVEPOINTs so A4 diagnostics remain
+        best-effort without paying a SAVEPOINT for every healthy record.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from graphrev.adapters.ghidra.base import GhidraAdapter, RawBinaryRef
+from graphrev.adapters.ghidra.base import GhidraAdapter, RawBinaryRef, RawEdge, RawFunction
 from graphrev.core.config import Settings
 from graphrev.core.logging import get_logger, log_event
 from graphrev.db.models import Function, View
 from graphrev.db.seed import create_default_view
 from graphrev.db.uow import unit_of_work
-from graphrev.ingestion.placeholders import ensure_placeholder_function
+from graphrev.ingestion.placeholders import placeholder_name
 from graphrev.ingestion.report import BinaryIngestionReport
 from graphrev.repositories.binaries import get_or_create_binary
-from graphrev.repositories.edges import upsert_edge
+from graphrev.repositories.edges import upsert_edge, upsert_edges_batch
 from graphrev.repositories.functions import (
+    FunctionBatchValues,
     recompute_fan_in_fan_out_and_utility,
     upsert_function,
+    upsert_functions_batch,
 )
 
 logger = get_logger(__name__)
@@ -43,6 +44,32 @@ logger = get_logger(__name__)
 #: exactly, so an API startup immediately after ingestion does not spuriously
 #: re-trigger the F1b recompute for a threshold ingestion already applied.
 _UTILITY_THRESHOLD_KEY = "utility_fanin_threshold"
+
+
+def _batched[T](items: Iterator[T], size: int) -> Iterator[list[T]]:
+    """Yield bounded groups without materialising an adapter's full output."""
+    batch: list[T] = []
+    for item in items:
+        batch.append(item)
+        if len(batch) == size:
+            yield batch
+            batch = []
+    if batch:
+        yield batch
+
+
+def _function_values(raw_fn: RawFunction) -> FunctionBatchValues:
+    return {
+        "address": raw_fn.address,
+        "name_ghidra": raw_fn.name,
+        "parameters": [dict(p) for p in raw_fn.parameters],
+        "signature": raw_fn.signature,
+        "assembly": raw_fn.assembly,
+        "code_c": raw_fn.code_c,
+        "kind": raw_fn.kind,
+        "has_indirect_calls": raw_fn.has_indirect_calls,
+        "is_entry_point": raw_fn.is_entry_point,
+    }
 
 
 async def _ingest_one_binary(
@@ -59,13 +86,10 @@ async def _ingest_one_binary(
     )
 
     # -- functions -------------------------------------------------------
-    # Manual iteration (rather than a plain `for`) so an exception raised by
-    # the adapter's generator itself mid-iteration (e.g. a decompilation
-    # failure surfaced lazily) is isolated exactly like an upsert failure,
-    # per A4 "reports ... per-function failures without aborting the whole
-    # run" — a raise from `next()` would otherwise escape any `try` wrapped
-    # only around the loop body.
+    # The adapter may raise while yielding. Preserve the historic A4 behaviour
+    # for that rare case while batching normal records below.
     function_iter = iter(adapter.iter_functions(binary_ref))
+    function_batch: list[RawFunction] = []
     while True:
         try:
             raw_fn = next(function_iter)
@@ -85,45 +109,12 @@ async def _ingest_one_binary(
                 error=str(exc),
             )
             continue
-
-        try:
-            async with session.begin_nested():
-                _fn_id, was_created = await upsert_function(
-                    session,
-                    binary_id=binary.id,
-                    address=raw_fn.address,
-                    name_ghidra=raw_fn.name,
-                    parameters=[dict(p) for p in raw_fn.parameters],
-                    signature=raw_fn.signature,
-                    assembly=raw_fn.assembly,
-                    code_c=raw_fn.code_c,
-                    kind=raw_fn.kind,
-                    has_indirect_calls=raw_fn.has_indirect_calls,
-                    is_entry_point=raw_fn.is_entry_point,
-                )
-            if was_created:
-                report.functions_inserted += 1
-            else:
-                report.functions_updated += 1
-            # Per-function success is intentionally NOT logged: at INFO level
-            # it fires ~1 line per function (hundreds per binary) and the
-            # structlog call itself is a measurable slice of ingest wall time.
-            # Aggregate counts live in the returned BinaryIngestionReport;
-            # per-item *failures* are still logged below.
-        except Exception as exc:
-            message = f"function 0x{raw_fn.address:x} ({raw_fn.name}): {exc}"
-            report.failures.append(message)
-            log_event(
-                logger,
-                "ingestion.function_failed",
-                function_id=None,
-                binary_id=binary.id,
-                duration_ms=0,
-                adapter="mock",
-                model=None,
-                outcome="error",
-                error=str(exc),
-            )
+        function_batch.append(raw_fn)
+        if len(function_batch) == settings.import_function_batch_size:
+            await _ingest_function_batch(session, binary.id, function_batch, report)
+            function_batch = []
+    if function_batch:
+        await _ingest_function_batch(session, binary.id, function_batch, report)
 
     # Address -> id lookup for edge resolution, built once after all
     # functions for this binary have been upserted.
@@ -137,55 +128,9 @@ async def _ingest_one_binary(
     )
 
     # -- edges -------------------------------------------------------------
-    for raw_edge in adapter.iter_edges(binary_ref):
-        try:
-            async with session.begin_nested():
-                caller_id = address_to_id.get(raw_edge.caller_address)
-                if caller_id is None:
-                    # The caller itself is always expected to be known (it
-                    # belongs to the binary being ingested); if not, treat it
-                    # like an unresolved edge endpoint rather than crashing.
-                    caller_id = await ensure_placeholder_function(
-                        session,
-                        binary_id=binary.id,
-                        address=raw_edge.caller_address,
-                        module=None,
-                    )
-                    address_to_id[raw_edge.caller_address] = caller_id
-                    report.placeholders_created += 1
-
-                callee_id = address_to_id.get(raw_edge.callee_address)
-                if callee_id is None:
-                    callee_id = await ensure_placeholder_function(
-                        session,
-                        binary_id=binary.id,
-                        address=raw_edge.callee_address,
-                        module=raw_edge.callee_module,
-                    )
-                    address_to_id[raw_edge.callee_address] = callee_id
-                    report.placeholders_created += 1
-
-                inserted = await upsert_edge(
-                    session, binary_id=binary.id, caller_id=caller_id, callee_id=callee_id
-                )
-            if inserted:
-                report.edges_inserted += 1
-            else:
-                report.edges_skipped_duplicate += 1
-        except Exception as exc:
-            message = f"edge 0x{raw_edge.caller_address:x} -> 0x{raw_edge.callee_address:x}: {exc}"
-            report.failures.append(message)
-            log_event(
-                logger,
-                "ingestion.edge_failed",
-                function_id=None,
-                binary_id=binary.id,
-                duration_ms=0,
-                adapter="mock",
-                model=None,
-                outcome="error",
-                error=str(exc),
-            )
+    edge_batches = _batched(iter(adapter.iter_edges(binary_ref)), settings.import_edge_batch_size)
+    for edge_batch in edge_batches:
+        await _ingest_edge_batch(session, binary.id, edge_batch, address_to_id, report)
 
     # -- A7a/F1b: fan_in/fan_out/is_utility, scoped to this binary ---------
     await recompute_fan_in_fan_out_and_utility(
@@ -200,6 +145,129 @@ async def _ingest_one_binary(
         await create_default_view(session, binary.id)
 
     return report
+
+
+async def _ingest_function_batch(
+    session: AsyncSession,
+    binary_id: int,
+    functions: list[RawFunction],
+    report: BinaryIngestionReport,
+) -> None:
+    """Fast-path a healthy function batch, isolating only a failed batch."""
+    try:
+        _ids, inserted, updated = await upsert_functions_batch(
+            session, binary_id=binary_id, functions=[_function_values(fn) for fn in functions]
+        )
+        report.functions_inserted += inserted
+        report.functions_updated += updated
+    except Exception:
+        for raw_fn in functions:
+            try:
+                async with session.begin_nested():
+                    _function_id, was_created = await upsert_function(
+                        session,
+                        binary_id=binary_id,
+                        address=raw_fn.address,
+                        name_ghidra=raw_fn.name,
+                        parameters=[dict(p) for p in raw_fn.parameters],
+                        signature=raw_fn.signature,
+                        assembly=raw_fn.assembly,
+                        code_c=raw_fn.code_c,
+                        kind=raw_fn.kind,
+                        has_indirect_calls=raw_fn.has_indirect_calls,
+                        is_entry_point=raw_fn.is_entry_point,
+                    )
+                if was_created:
+                    report.functions_inserted += 1
+                else:
+                    report.functions_updated += 1
+            except Exception as exc:
+                message = f"function 0x{raw_fn.address:x} ({raw_fn.name}): {exc}"
+                report.failures.append(message)
+                log_event(
+                    logger,
+                    "ingestion.function_failed",
+                    function_id=None,
+                    binary_id=binary_id,
+                    duration_ms=0,
+                    adapter="ghidra",
+                    model=None,
+                    outcome="error",
+                    error=str(exc),
+                )
+
+
+async def _ingest_edge_batch(
+    session: AsyncSession,
+    binary_id: int,
+    edges: list[RawEdge],
+    address_to_id: dict[int, int],
+    report: BinaryIngestionReport,
+) -> None:
+    """Resolve placeholders once per batch, then bulk-insert edges."""
+    placeholders: dict[int, str | None] = {}
+    for edge in edges:
+        if edge.caller_address not in address_to_id:
+            placeholders.setdefault(edge.caller_address, None)
+        if edge.callee_address not in address_to_id:
+            placeholders.setdefault(edge.callee_address, edge.callee_module)
+    if placeholders:
+        try:
+            ids, inserted, _updated = await upsert_functions_batch(
+                session,
+                binary_id=binary_id,
+                functions=[
+                    FunctionBatchValues(
+                        address=address,
+                        name_ghidra=placeholder_name(address, module),
+                        kind="placeholder",
+                        placeholder_module=module,
+                    )
+                    for address, module in placeholders.items()
+                ],
+            )
+            address_to_id.update(ids)
+            report.placeholders_created += inserted
+        except Exception:
+            # The ordinary edge fallback below preserves best-effort handling.
+            pass
+    try:
+        pairs = [
+            (address_to_id[edge.caller_address], address_to_id[edge.callee_address])
+            for edge in edges
+        ]
+        inserted, skipped = await upsert_edges_batch(session, binary_id=binary_id, edges=pairs)
+        report.edges_inserted += inserted
+        report.edges_skipped_duplicate += skipped
+    except Exception:
+        for edge in edges:
+            try:
+                caller_id = address_to_id[edge.caller_address]
+                callee_id = address_to_id[edge.callee_address]
+                async with session.begin_nested():
+                    inserted = await upsert_edge(
+                        session, binary_id=binary_id, caller_id=caller_id, callee_id=callee_id
+                    )
+                if inserted:
+                    report.edges_inserted += 1
+                else:
+                    report.edges_skipped_duplicate += 1
+            except Exception as exc:
+                message = (
+                    f"edge 0x{edge.caller_address:x} -> 0x{edge.callee_address:x}: {exc}"
+                )
+                report.failures.append(message)
+                log_event(
+                    logger,
+                    "ingestion.edge_failed",
+                    function_id=None,
+                    binary_id=binary_id,
+                    duration_ms=0,
+                    adapter="ghidra",
+                    model=None,
+                    outcome="error",
+                    error=str(exc),
+                )
 
 
 async def _write_utility_threshold_bookkeeping(session: AsyncSession, settings: Settings) -> None:

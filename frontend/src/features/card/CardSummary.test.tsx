@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { CardSummary } from "./CardSummary";
@@ -63,6 +64,54 @@ describe("CardSummary", () => {
       />,
     );
     expect(screen.getByText(/entry point/i)).toBeInTheDocument();
+  });
+
+  it("opens a popover with the full long summary on click", async () => {
+    const user = userEvent.setup();
+    renderWithClient(
+      <CardSummary
+        fn={{
+          ...baseFn,
+          summary: {
+            ...baseFn.summary,
+            status: "ready",
+            short: "Entry point.",
+            long: "Sets up the runtime then dispatches to the real main.",
+          },
+        }}
+      />,
+    );
+    // The long text is not shown inline (the card only clamps the short line).
+    expect(
+      screen.queryByText(/sets up the runtime then dispatches/i),
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /show full summary/i }));
+
+    expect(
+      await screen.findByText(/sets up the runtime then dispatches/i),
+    ).toBeInTheDocument();
+  });
+
+  it("does not bubble the click that opens the popover (card stays unselected)", async () => {
+    const user = userEvent.setup();
+    const onParentClick = vi.fn();
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        {/* Mirrors FunctionCardNode's click-to-select wrapper around the summary. */}
+        <div onClick={onParentClick}>
+          <CardSummary
+            fn={{
+              ...baseFn,
+              summary: { ...baseFn.summary, status: "ready", short: "Entry point.", long: "More." },
+            }}
+          />
+        </div>
+      </QueryClientProvider>,
+    );
+
+    await user.click(screen.getByRole("button", { name: /show full summary/i }));
+    expect(onParentClick).not.toHaveBeenCalled();
   });
 
   it("renders a shimmering generating message when pending", () => {

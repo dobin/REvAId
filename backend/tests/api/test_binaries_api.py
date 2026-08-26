@@ -4,8 +4,13 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
+
 import pytest
 from httpx import AsyncClient
+
+from graphrev.core.config import Settings
 
 
 @pytest.mark.asyncio
@@ -195,15 +200,36 @@ def _import_document() -> dict:
     }
 
 
+async def _wait_for_import(client: AsyncClient, job_id: str) -> dict:
+    """Wait briefly for an in-process job in an ASGI integration test."""
+    for _ in range(100):
+        body = (await client.get(f"/api/v1/binaries/imports/{job_id}")).json()
+        if body["phase"] in {"completed", "failed", "cancelled"}:
+            return body
+        await asyncio.sleep(0.01)
+    raise AssertionError("import job did not reach a terminal state")
+
+
+async def _submit_import(client: AsyncClient, document: dict) -> dict:
+    response = await client.post(
+        "/api/v1/binaries/import",
+        content=json.dumps(document),
+        headers={"content-type": "application/json"},
+    )
+    assert response.status_code == 202
+    return await _wait_for_import(client, response.json()["jobId"])
+
+
 @pytest.mark.asyncio
 async def test_import_binary_creates_new_binary(client: AsyncClient) -> None:
-    response = await client.post("/api/v1/binaries/import", json=_import_document())
-    assert response.status_code == 201
-    body = response.json()
-    assert body["name"] == "imported.exe"
-    assert body["version"] == "2.0"
-    assert body["functionsInserted"] == 2
-    assert body["edgesInserted"] == 1
+    body = await _submit_import(client, _import_document())
+    assert body["phase"] == "completed"
+    result = body["result"]
+    assert result is not None
+    assert result["name"] == "imported.exe"
+    assert result["version"] == "2.0"
+    assert result["functionsInserted"] == 2
+    assert result["edgesInserted"] == 1
 
     listing = (await client.get("/api/v1/binaries")).json()
     names = {b["name"] for b in listing}
@@ -212,9 +238,13 @@ async def test_import_binary_creates_new_binary(client: AsyncClient) -> None:
 
 @pytest.mark.asyncio
 async def test_import_binary_is_idempotent(client: AsyncClient) -> None:
-    first = (await client.post("/api/v1/binaries/import", json=_import_document())).json()
-    second = (await client.post("/api/v1/binaries/import", json=_import_document())).json()
+    first_status = await _submit_import(client, _import_document())
+    second_status = await _submit_import(client, _import_document())
+    first = first_status["result"]
+    second = second_status["result"]
 
+    assert first is not None
+    assert second is not None
     assert second["binaryId"] == first["binaryId"]
     assert second["functionsInserted"] == 0
     assert second["functionsUpdated"] > 0
@@ -227,12 +257,35 @@ async def test_import_binary_is_idempotent(client: AsyncClient) -> None:
 async def test_import_binary_rejects_unsupported_schema(client: AsyncClient) -> None:
     doc = _import_document()
     doc["schemaVersion"] = 999
-    response = await client.post("/api/v1/binaries/import", json=doc)
-    assert response.status_code == 422
-    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+    body = await _submit_import(client, doc)
+    assert body["phase"] == "failed"
+    assert "schemaVersion" in body["errorMessage"]
 
 
 @pytest.mark.asyncio
 async def test_import_binary_rejects_malformed_body(client: AsyncClient) -> None:
-    response = await client.post("/api/v1/binaries/import", json={"not": "an export"})
-    assert response.status_code == 422
+    body = await _submit_import(client, {"not": "an export"})
+    assert body["phase"] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_import_binary_rejects_oversized_stream(
+    client: AsyncClient, settings: Settings
+) -> None:
+    # The client and app share the cached test settings; constrain it so this
+    # verifies the in-stream cap rather than only Content-Length preflight.
+    settings.import_max_upload_bytes = 8
+    response = await client.post(
+        "/api/v1/binaries/import",
+        content=b'{"large": true}',
+        headers={"content-type": "application/json"},
+    )
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "IMPORT_TOO_LARGE"
+
+
+@pytest.mark.asyncio
+async def test_import_status_404_for_unknown_job(client: AsyncClient) -> None:
+    response = await client.get("/api/v1/binaries/imports/not-a-job")
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "IMPORT_JOB_NOT_FOUND"

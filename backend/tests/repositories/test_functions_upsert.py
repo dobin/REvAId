@@ -10,6 +10,7 @@ from graphrev.core.clock import utc_now_iso
 from graphrev.db.models import Binary, Function
 from graphrev.repositories.functions import (
     upsert_function,
+    upsert_functions_batch,
 )
 
 
@@ -126,6 +127,49 @@ async def test_upsert_function_placeholder_kind_has_no_code(session: AsyncSessio
     assert fn.assembly is None
     assert fn.code_c is None
     assert fn.placeholder_module == "libparse.dll"
+
+
+@pytest.mark.asyncio
+async def test_batch_upsert_counts_and_preserves_protected_fields(session: AsyncSession) -> None:
+    binary = await _make_binary(session)
+    first_ids, inserted, updated = await upsert_functions_batch(
+        session,
+        binary_id=binary.id,
+        functions=[
+            {"address": 0x1000, "name_ghidra": "first"},
+            {"address": 0x1010, "name_ghidra": "second"},
+        ],
+    )
+    await session.commit()
+    assert inserted == 2
+    assert updated == 0
+
+    protected = await session.get(Function, first_ids[0x1000])
+    assert protected is not None
+    protected.name_analyst = "analyst_name"
+    protected.notes = "keep this"
+    protected.summary_short = "existing summary"
+    await session.commit()
+
+    second_ids, inserted, updated = await upsert_functions_batch(
+        session,
+        binary_id=binary.id,
+        functions=[
+            {"address": 0x1000, "name_ghidra": "renamed", "code_c": "void renamed(void) {}"},
+            {"address": 0x1020, "name_ghidra": "third"},
+        ],
+    )
+    await session.commit()
+    assert inserted == 1
+    assert updated == 1
+    assert second_ids[0x1000] == first_ids[0x1000]
+
+    await session.refresh(protected)
+    assert protected.name_ghidra == "renamed"
+    assert protected.code_c == "void renamed(void) {}"
+    assert protected.name_analyst == "analyst_name"
+    assert protected.notes == "keep this"
+    assert protected.summary_short == "existing summary"
 
 
 @pytest.mark.asyncio

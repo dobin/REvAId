@@ -46,6 +46,7 @@ from graphrev.core.logging import (
 from graphrev.db.engine import create_engine, create_session_factory, dispose_engine
 from graphrev.db.startup import recompute_utility_if_threshold_changed, recover_pending_summaries
 from graphrev.events.bus import InProcessEventBus
+from graphrev.ingestion.import_jobs import ImportJobManager
 from graphrev.services.queue_service import queue_event_payload_with_items
 from graphrev.summarization.queue import SummaryQueue
 from graphrev.summarization.worker import SummaryWorkerPool
@@ -71,6 +72,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.settings = settings
     app.state.engine = engine
     app.state.session_factory = session_factory
+
+    import_job_manager = ImportJobManager(session_factory, settings)
+    await import_job_manager.start()
+    app.state.import_job_manager = import_job_manager
 
     async with session_factory() as session:
         try:
@@ -169,6 +174,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     yield
 
+    await import_job_manager.stop()
     await worker_pool.stop()
     await dispose_engine(engine)
 

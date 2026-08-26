@@ -156,6 +156,17 @@ async def test_pop_blocks_until_item_available() -> None:
     assert item.function_id == 42
 
 
+async def test_pop_waits_for_an_active_rate_limit_pause() -> None:
+    q = SummaryQueue(max_depth=10)
+    q.enqueue(42, priority=0)
+    q.pause(retry_after_seconds=0.02)
+
+    item = await asyncio.wait_for(q.pop(), timeout=0.2)
+
+    assert item.function_id == 42
+    assert q.paused_until() is None
+
+
 def test_snapshot_reflects_queued_and_inflight() -> None:
     q = SummaryQueue(max_depth=10)
     q.enqueue(1, priority=0)

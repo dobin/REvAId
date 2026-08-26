@@ -3,6 +3,11 @@ and Ghidra JSON-export import (I12)."""
 
 from __future__ import annotations
 
+import asyncio
+import json
+from pathlib import Path
+
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from graphrev.adapters.ghidra import create_file_adapter
@@ -28,6 +33,30 @@ from graphrev.schemas.search import EntryPointDto, EntryPointsDto, entry_point_d
 #: whatever a caller might request, since there is no query parameter for it
 #: in the TAD endpoint index.
 _MAX_ENTRY_POINTS = 5
+
+
+async def load_ghidra_export_file(path: Path) -> GhidraExportDocument:
+    """Load one staged export without retaining HTTP request bytes.
+
+    This is deliberately a compatibility bridge for the first streaming-upload
+    slice. The following chunked-parser slice will replace this full-document
+    decode; keeping it here makes that remaining memory limitation explicit
+    and confines it to the background worker rather than the request handler.
+    """
+
+    def _load() -> GhidraExportDocument:
+        with path.open(encoding="utf-8") as export_file:
+            payload = json.load(export_file)
+        return GhidraExportDocument.model_validate(payload)
+
+    try:
+        return await asyncio.to_thread(_load)
+    except (OSError, json.JSONDecodeError, ValidationError) as exc:
+        raise AppError(
+            ErrorCode.VALIDATION_ERROR,
+            "The staged export is not a valid GraphRev Ghidra JSON document.",
+            details={"reason": str(exc)},
+        ) from exc
 
 
 async def list_binaries_dto(session: AsyncSession) -> list[BinarySummaryDto]:

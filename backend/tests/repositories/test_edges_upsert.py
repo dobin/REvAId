@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from graphrev.core.clock import utc_now_iso
 from graphrev.db.models import Binary, Function
-from graphrev.repositories.edges import upsert_edge
+from graphrev.repositories.edges import upsert_edge, upsert_edges_batch
 from graphrev.repositories.functions import (
     recompute_fan_in_fan_out_and_utility,
     upsert_function,
@@ -48,6 +48,32 @@ async def test_upsert_edge_allows_self_edge(session: AsyncSession) -> None:
     await session.commit()
 
     assert inserted is True
+
+
+@pytest.mark.asyncio
+async def test_batch_upsert_edges_deduplicates_input_and_existing_rows(
+    session: AsyncSession,
+) -> None:
+    binary = await _make_binary(session)
+    a_id, _ = await upsert_function(session, binary_id=binary.id, address=0x1, name_ghidra="a")
+    b_id, _ = await upsert_function(session, binary_id=binary.id, address=0x2, name_ghidra="b")
+    c_id, _ = await upsert_function(session, binary_id=binary.id, address=0x3, name_ghidra="c")
+    await session.commit()
+
+    inserted, skipped = await upsert_edges_batch(
+        session,
+        binary_id=binary.id,
+        edges=[(a_id, b_id), (a_id, b_id), (b_id, c_id)],
+    )
+    await session.commit()
+    assert inserted == 2
+    assert skipped == 1
+
+    inserted, skipped = await upsert_edges_batch(
+        session, binary_id=binary.id, edges=[(a_id, b_id), (b_id, c_id)]
+    )
+    assert inserted == 0
+    assert skipped == 2
 
 
 @pytest.mark.asyncio

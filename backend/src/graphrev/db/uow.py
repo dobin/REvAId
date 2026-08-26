@@ -22,6 +22,19 @@ _write_lock = asyncio.Lock()
 
 
 @asynccontextmanager
+async def write_lock() -> AsyncIterator[None]:
+    """Serialise a database write with ingestion and background workers.
+
+    Request-scoped sessions are normally safe for reads, but SQLite permits
+    only one writer. Write endpoints must hold this lock across their
+    read-modify-write transaction so they queue behind a long import instead
+    of eventually failing with ``database is locked``.
+    """
+    async with _write_lock:
+        yield
+
+
+@asynccontextmanager
 async def unit_of_work(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> AsyncIterator[AsyncSession]:
@@ -29,7 +42,7 @@ async def unit_of_work(
 
     Commits on clean exit, rolls back on exception, always releases the lock.
     """
-    async with _write_lock, session_factory() as session:
+    async with write_lock(), session_factory() as session:
         try:
             yield session
             await session.commit()
