@@ -1,8 +1,8 @@
-# Revealm - reverse + realm, mapping an unknown world
+# REvAId
 
 **I cant code but i must reverse**
 
-Revealm is a semantic function graph explorer for binary reverse
+REvAId is a semantic function graph explorer for binary reverse
 engineering: it renders a binary's call graph as interactive cards, lazily
 summarizes functions with an LLM, and lets an analyst annotate what they
 find. 
