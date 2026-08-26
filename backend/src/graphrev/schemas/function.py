@@ -36,6 +36,11 @@ class FunctionDto(ApiModel):
     display_name: str
     name_ghidra: str
     name_analyst: str | None
+    #: C13 auto-display: the LLM-proposed name, when one exists. Display
+    #: precedence is `name_analyst ?? name_llm ?? name_ghidra` (server-side,
+    #: in `display_name`) — exposed so the UI can show the raw Ghidra name
+    #: as a secondary label when the LLM name overrides it.
+    name_llm: str | None
     is_renamed: bool
     parameters: list[FunctionParamDto]
     signature: str | None
@@ -65,9 +70,10 @@ def function_dto_from_row(fn: Function) -> FunctionDto:
         id=fn.id,
         binary_id=fn.binary_id,
         address=fn.address,
-        display_name=fn.name_analyst or fn.name_ghidra,
+        display_name=fn.name_analyst or fn.name_llm or fn.name_ghidra,
         name_ghidra=fn.name_ghidra,
         name_analyst=fn.name_analyst,
+        name_llm=fn.name_llm,
         is_renamed=fn.name_analyst is not None,
         parameters=parameters,
         signature=fn.signature,

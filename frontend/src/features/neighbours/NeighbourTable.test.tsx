@@ -29,6 +29,7 @@ function makeRow(id: number, overrides: Partial<NeighbourRowDto> = {}): Neighbou
     address: 0x1000 + id,
     displayName: `fn_${String(id)}`,
     isRenamed: false,
+    nameLlm: null,
     summaryShort: null,
     summaryStatus: "none",
     summaryLowConfidence: false,

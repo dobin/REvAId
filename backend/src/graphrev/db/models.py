@@ -140,6 +140,11 @@ class Function(Base):
     summary_low_confidence: Mapped[bool] = mapped_column(default=False)
     summary_generated_at: Mapped[str | None] = mapped_column(default=None)
     summary_input_hash: Mapped[str | None] = mapped_column(default=None)  # C10
+    #: C13 (auto-display variant): the LLM-proposed function name. LLM-owned
+    #: like `summary_*` (never touched by ingestion, A3) but participates in
+    #: the *display* precedence `name_analyst ?? name_llm ?? name_ghidra` —
+    #: it never overwrites either stored name.
+    name_llm: Mapped[str | None] = mapped_column(default=None)
 
     # -- analyst-owned (NEVER touched by ingestion — A3) -------------------
     name_analyst: Mapped[str | None] = mapped_column(default=None)  # <=128 chars

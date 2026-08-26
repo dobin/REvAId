@@ -62,6 +62,46 @@ async def test_main_callees_primary_page_shape(
 
 
 @pytest.mark.asyncio
+async def test_neighbour_rows_use_llm_name_when_no_analyst_rename(
+    client: AsyncClient, session: AsyncSession, ingested: None
+) -> None:
+    """C13 auto-display: a neighbour row's `displayName` follows the
+    `name_analyst ?? name_llm ?? name_ghidra` precedence, and `nameLlm` is
+    exposed so the UI can badge the raw Ghidra name."""
+    from sqlalchemy import update
+
+    binary_id = await _get_binary_id(client, "acme.exe")
+    function_id = await _get_function_id_by_name(client, binary_id, "main")
+    view_id = await _get_view_id(session, binary_id)
+
+    # Give one callee an LLM-proposed name directly (the worker path is
+    # covered by test_summary_worker; this tests the read/display side).
+    response = await client.get(
+        f"/api/v1/functions/{function_id}/neighbours",
+        params={"viewId": view_id, "direction": "callees", "group": "primary"},
+    )
+    assert response.status_code == 200
+    rows = response.json()["rows"]
+    assert rows, "expected at least one callee row"
+    target = rows[0]
+    assert target["nameLlm"] is None  # nothing proposed yet
+
+    await session.execute(
+        update(Function).where(Function.id == target["id"]).values(name_llm="callee_proposed")
+    )
+    await session.commit()
+
+    response = await client.get(
+        f"/api/v1/functions/{function_id}/neighbours",
+        params={"viewId": view_id, "direction": "callees", "group": "primary"},
+    )
+    updated = next(r for r in response.json()["rows"] if r["id"] == target["id"])
+    assert updated["displayName"] == "callee_proposed"
+    assert updated["nameLlm"] == "callee_proposed"
+    assert updated["isRenamed"] is False
+
+
+@pytest.mark.asyncio
 async def test_dispatch_large_callees_are_capped_at_table_row_cap(
     client: AsyncClient, session: AsyncSession, ingested: None
 ) -> None:

@@ -13,6 +13,7 @@ const baseRow: NeighbourRowDto = {
   address: 4198432,
   displayName: "open_file",
   isRenamed: false,
+    nameLlm: null,
   summaryShort: null,
   summaryStatus: "none",
   summaryLowConfidence: false,

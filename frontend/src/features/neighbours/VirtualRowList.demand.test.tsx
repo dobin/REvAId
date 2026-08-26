@@ -32,6 +32,7 @@ function makeRow(id: number): NeighbourRowDto {
     address: 0x1000 + id,
     displayName: `fn_${String(id)}`,
     isRenamed: false,
+    nameLlm: null,
     summaryShort: null,
     summaryStatus: "none",
     summaryLowConfidence: false,

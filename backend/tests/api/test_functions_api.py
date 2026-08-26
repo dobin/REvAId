@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 async def _get_main_function_id(client: AsyncClient) -> int:
@@ -48,3 +49,46 @@ async def test_get_function_404_for_missing_function(client: AsyncClient) -> Non
     assert response.status_code == 404
     body = response.json()
     assert body["error"]["code"] == "FUNCTION_NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_display_name_precedence_analyst_beats_llm_beats_ghidra(
+    client: AsyncClient, session: AsyncSession, ingested: None
+) -> None:
+    """C13 auto-display: `displayName` is `name_analyst ?? name_llm ??
+    name_ghidra`, and neither stored name is overwritten. Verified through
+    the public API on one function across all three states."""
+    from sqlalchemy import update
+
+    from graphrev.db.models import Function
+
+    function_id = await _get_main_function_id(client)
+
+    async def _refreshed() -> dict:
+        return (await client.get(f"/api/v1/functions/{function_id}")).json()
+
+    # State 1: no analyst name, no LLM name -> Ghidra name.
+    body = await _refreshed()
+    assert body["displayName"] == "main"
+    assert body["nameLlm"] is None
+
+    # State 2: LLM proposes a name -> it becomes the display name.
+    await session.execute(
+        update(Function).where(Function.id == function_id).values(name_llm="program_bootstrap")
+    )
+    await session.commit()
+    body = await _refreshed()
+    assert body["displayName"] == "program_bootstrap"
+    assert body["nameLlm"] == "program_bootstrap"
+    assert body["nameGhidra"] == "main"  # never overwritten
+    assert body["isRenamed"] is False  # analyst rename is still what counts
+
+    # State 3: analyst renames -> analyst beats the LLM proposal.
+    await session.execute(
+        update(Function).where(Function.id == function_id).values(name_analyst="entry")
+    )
+    await session.commit()
+    body = await _refreshed()
+    assert body["displayName"] == "entry"
+    assert body["nameLlm"] == "program_bootstrap"  # still exposed, not overwritten
+    assert body["isRenamed"] is True

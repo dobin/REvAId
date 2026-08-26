@@ -50,7 +50,7 @@ from graphrev.adapters.ghidra.base import (
     RawFunction,
     RawParam,
 )
-from graphrev.adapters.mock_summaries import MOCK_SUMMARIES
+from graphrev.adapters.mock_summaries import MOCK_LLM_NAMES, MOCK_SUMMARIES
 
 #: A7: at least two distinct synthetic binaries.
 ACME_EXE = RawBinary(name="acme.exe", version="1.0")
@@ -353,6 +353,7 @@ async def seed_mock_summaries(session_factory: "async_sessionmaker") -> int:  # 
                     .values(
                         summary_short=short,
                         summary_long=long_,
+                        name_llm=MOCK_LLM_NAMES.get(name),
                         summary_status="ready",
                         summary_model="mock-llm-v1",
                         summary_generated_at="2026-08-22T00:00:00Z",

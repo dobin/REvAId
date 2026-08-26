@@ -81,6 +81,21 @@ async def test_corpus_hit_uses_hand_written_text_and_is_never_low_confidence() -
     assert "entry point" in result.summary_short
 
 
+async def test_name_llm_is_proposed_for_corpus_and_fallback() -> None:
+    """C13 auto-display: every successful mock result carries an LLM-proposed
+    name — the corpus name for a known function, a deterministic fallback
+    name otherwise — so the display precedence is observable in a mock demo."""
+    adapter = MockLlmAdapter(seed=99, simulate_latency=False, failure_rate=0.0)
+    corpus = await adapter.summarize(_req(name="main"))
+    assert corpus.name_llm == "program_bootstrap"
+    fallback = await adapter.summarize(_req(name="totally_unknown_function"))
+    assert fallback.name_llm is not None
+    assert len(fallback.name_llm) <= 64
+    # Deterministic per (name, address): same inputs, same proposal.
+    again = await adapter.summarize(_req(name="totally_unknown_function"))
+    assert again.name_llm == fallback.name_llm
+
+
 async def test_corpus_miss_uses_fallback_and_can_be_low_confidence() -> None:
     """An unknown function name falls back to `mock_summaries.fallback_summary`
     rather than the corpus, and may be marked low-confidence."""

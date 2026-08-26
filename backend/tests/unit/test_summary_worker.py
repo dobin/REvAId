@@ -100,6 +100,61 @@ async def test_successful_summarize_persists_ready_status(
     assert fn.summary_input_hash is not None
 
 
+async def test_successful_summarize_persists_name_llm(
+    session: AsyncSession, session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """C13 auto-display: the adapter's proposed name is persisted alongside
+    the summary, and participates in the display precedence (analyst beats
+    LLM beats Ghidra) without overwriting either stored name."""
+    fn = await _make_function(session, name="FUN_00001000")
+    queue = SummaryQueue(max_depth=10)
+    item = queue.enqueue(fn.id, priority=0)
+    await queue.pop()
+
+    adapter = _StubAdapter(
+        [
+            SummaryResult(
+                summary_short="short",
+                summary_long="long",
+                model="stub-v1",
+                name_llm="parse_header",
+            )
+        ]
+    )
+    await run_one_item(
+        item, queue=queue, adapter=adapter, session_factory=session_factory
+    )
+
+    await session.refresh(fn)
+    assert fn.name_llm == "parse_header"
+    # Neither stored name is overwritten.
+    assert fn.name_ghidra == "FUN_00001000"
+    assert fn.name_analyst is None
+
+
+async def test_successful_summarize_without_name_llm_leaves_column_null(
+    session: AsyncSession, session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """An adapter that omits `name_llm` (older adapter, model returned null)
+    must not fail the persist — the column simply stays NULL and the Ghidra
+    name remains the display name."""
+    fn = await _make_function(session, name="FUN_00001000")
+    queue = SummaryQueue(max_depth=10)
+    item = queue.enqueue(fn.id, priority=0)
+    await queue.pop()
+
+    adapter = _StubAdapter(
+        [SummaryResult(summary_short="short", summary_long="long", model="stub-v1")]
+    )
+    await run_one_item(
+        item, queue=queue, adapter=adapter, session_factory=session_factory
+    )
+
+    await session.refresh(fn)
+    assert fn.summary_status == "ready"
+    assert fn.name_llm is None
+
+
 async def test_permanent_failure_persists_error_and_caches_nothing(
     session: AsyncSession, session_factory: async_sessionmaker[AsyncSession]
 ) -> None:

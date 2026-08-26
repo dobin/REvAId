@@ -81,9 +81,13 @@ export interface FunctionDto {
   id: FunctionId;
   binaryId: BinaryId;
   address: number; // render as hex in UI only (AS7)
-  displayName: string; // name_analyst ?? name_ghidra (B6)
+  displayName: string; // name_analyst ?? name_llm ?? name_ghidra (B6 + C13 auto-display)
   nameGhidra: string;
   nameAnalyst: string | null;
+  // C13 auto-display: LLM-proposed name; displayName already reflects the
+  // precedence — exposed so the UI can show the raw Ghidra name as a
+  // secondary label when the LLM name overrides it.
+  nameLlm: string | null;
   isRenamed: boolean;
   parameters: FunctionParam[];
   signature: string | null;
@@ -120,6 +124,9 @@ export interface NeighbourRowDto {
   id: FunctionId;
   address: number;
   displayName: string;
+  // C13 auto-display: LLM-proposed name (displayName already reflects the
+  // name_analyst ?? name_llm ?? name_ghidra precedence).
+  nameLlm: string | null;
   isRenamed: boolean;
   summaryShort: string | null;
   summaryStatus: SummaryStatus;

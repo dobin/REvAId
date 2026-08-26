@@ -175,6 +175,29 @@ MOCK_SUMMARIES: dict[str, tuple[str, str]] = {
     ),
 }
 
+#: name_ghidra -> LLM-proposed name (C13 auto-display variant). The mock
+#: corpus functions already have meaningful Ghidra names, so the LLM names
+#: are deliberately *different* (what an LLM might propose from behaviour
+#: alone) — that way the UI precedence (`name_analyst ?? name_llm ??
+#: name_ghidra`) is actually observable in a mock demo.
+MOCK_LLM_NAMES: dict[str, str] = {
+    "main": "program_bootstrap",
+    "check_config": "validate_config_fields",
+    "dispatch_large": "opcode_jump_table_dispatch",
+    "dispatch_small": "compact_opcode_dispatch",
+    "mem_copy_block": "block_memcpy",
+    "mem_set_block": "block_memset",
+    "str_length": "cstr_len",
+    "walk_tree_recursive": "tree_dfs_walk",
+    "eval_expr": "expression_evaluator",
+    "eval_term": "term_evaluator",
+    "parse_document": "document_parser_entry",
+    "parse_section": "section_parser",
+    "parse_field": "field_parser",
+    "parse_value": "typed_value_decoder",
+    "parse_literal": "raw_byte_reader",
+}
+
 #: Generic phrasing templates for functions with no hand-written corpus
 #: entry. Picked deterministically per-name (via a hash) so a given function
 #: always gets the same fallback text, and different functions don't all
@@ -237,3 +260,26 @@ def fallback_summary(
     short = short_template.format(basis=basis, callee_note=callee_note)[:120]
     long_ = long_template.format(basis=basis, callee_clause=callee_clause)
     return short, long_
+
+
+#: Fallback LLM-name templates (C13 auto-display). Deterministic per
+#: (name, address) via the same digest as `fallback_summary` so a given
+#: function always proposes the same name across calls/processes.
+_FALLBACK_NAME_TEMPLATES: tuple[str, ...] = (
+    "unnamed_helper_{tag}",
+    "internal_routine_{tag}",
+    "support_func_{tag}",
+    "aux_logic_{tag}",
+)
+
+
+def fallback_llm_name(name: str, address: int) -> str:
+    """Deterministic LLM-proposed name for a function with no corpus entry.
+
+    The ``{tag}`` is a short hex digest of ``(name, address)`` so different
+    functions get distinguishable names (a demo full of `helper_3f2a`-style
+    names reads far more like real LLM output than 40 identical strings).
+    """
+    digest = hashlib.sha256(f"{name}:{address:x}".encode()).digest()
+    template = _FALLBACK_NAME_TEMPLATES[digest[2] % len(_FALLBACK_NAME_TEMPLATES)]
+    return template.format(tag=digest[:2].hex())[:64]

@@ -41,6 +41,7 @@ const mainFn: FunctionDto = {
   displayName: "main",
   nameGhidra: "main",
   nameAnalyst: null,
+    nameLlm: null,
   isRenamed: false,
   parameters: [],
   signature: null,

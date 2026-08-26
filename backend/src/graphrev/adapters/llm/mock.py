@@ -25,7 +25,12 @@ from graphrev.adapters.llm.base import (
     SummaryResult,
     TransientProviderError,
 )
-from graphrev.adapters.mock_summaries import MOCK_SUMMARIES, fallback_summary
+from graphrev.adapters.mock_summaries import (
+    MOCK_LLM_NAMES,
+    MOCK_SUMMARIES,
+    fallback_llm_name,
+    fallback_summary,
+)
 
 #: TAD §6.3 mock spec. Overridable via `Settings.mock_llm_*` (see
 #: `adapters/llm/__init__.py::create_adapter`) so a demo/manual-UI-testing
@@ -94,6 +99,7 @@ class MockLlmAdapter:
         corpus_entry = MOCK_SUMMARIES.get(req.name)
         if corpus_entry is not None:
             summary_short, summary_long = corpus_entry
+            name_llm = MOCK_LLM_NAMES.get(req.name)
             low_confidence = False
         else:
             summary_short, summary_long = fallback_summary(
@@ -102,12 +108,14 @@ class MockLlmAdapter:
                 has_code_c=req.code_c is not None,
                 callee_count=len(req.callee_summaries),
             )
+            name_llm = fallback_llm_name(req.name, req.address)
             low_confidence = low_confidence_draw < _LOW_CONFIDENCE_RATE
 
         return SummaryResult(
             summary_short=summary_short[:120],
             summary_long=summary_long,
             model="mock-llm-v1",
+            name_llm=name_llm,
             low_confidence=low_confidence,
             input_truncated=False,
         )

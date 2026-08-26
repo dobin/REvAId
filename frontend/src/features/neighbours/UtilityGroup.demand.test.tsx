@@ -36,6 +36,7 @@ const utilityPage: NeighbourPageDto = {
     address: 0x2000 + i,
     displayName: `utility_${String(i)}`,
     isRenamed: false,
+    nameLlm: null,
     summaryShort: null,
     summaryStatus: "none" as const,
     summaryLowConfidence: false,

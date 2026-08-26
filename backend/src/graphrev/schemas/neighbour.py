@@ -14,6 +14,10 @@ class NeighbourRowDto(ApiModel):
     id: int
     address: int
     display_name: str
+    #: C13 auto-display: the LLM-proposed name, when one exists (display_name
+    #: already reflects the `name_analyst ?? name_llm ?? name_ghidra`
+    #: precedence — exposed so the UI can badge/tooltip the raw Ghidra name).
+    name_llm: str | None
     is_renamed: bool
     summary_short: str | None
     summary_status: str

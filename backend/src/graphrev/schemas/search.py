@@ -51,7 +51,7 @@ def function_search_row_from_function(fn: Function) -> FunctionSearchRowDto:
     return FunctionSearchRowDto(
         id=fn.id,
         address=fn.address,
-        display_name=fn.name_analyst or fn.name_ghidra,
+        display_name=fn.name_analyst or fn.name_llm or fn.name_ghidra,
         is_renamed=fn.name_analyst is not None,
         kind=fn.kind,
         is_utility=fn.is_utility_effective,
@@ -65,7 +65,7 @@ def entry_point_dto_from_function(fn: Function) -> EntryPointDto:
     return EntryPointDto(
         id=fn.id,
         address=fn.address,
-        display_name=fn.name_analyst or fn.name_ghidra,
+        display_name=fn.name_analyst or fn.name_llm or fn.name_ghidra,
         fan_out=fn.fan_out,
         fan_in=fn.fan_in,
     )

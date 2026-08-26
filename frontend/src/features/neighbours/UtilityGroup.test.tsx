@@ -34,6 +34,7 @@ const utilityPage: NeighbourPageDto = {
       address: 0x2000,
       displayName: "memcpy_helper",
       isRenamed: false,
+    nameLlm: null,
       summaryShort: null,
       summaryStatus: "none",
       summaryLowConfidence: false,

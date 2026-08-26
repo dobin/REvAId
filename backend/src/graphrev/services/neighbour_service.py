@@ -29,7 +29,8 @@ def _neighbour_row_dto(row: NeighbourRow) -> NeighbourRowDto:
     return NeighbourRowDto(
         id=fn.id,
         address=fn.address,
-        display_name=fn.name_analyst or fn.name_ghidra,
+        display_name=fn.name_analyst or fn.name_llm or fn.name_ghidra,
+        name_llm=fn.name_llm,
         is_renamed=fn.name_analyst is not None,
         summary_short=fn.summary_short,
         summary_status=fn.summary_status,

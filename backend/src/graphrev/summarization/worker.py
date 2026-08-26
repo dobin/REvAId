@@ -99,6 +99,7 @@ async def _persist_success(
             UPDATE functions
             SET summary_short = :summary_short,
                 summary_long = :summary_long,
+                name_llm = :name_llm,
                 summary_status = 'ready',
                 summary_model = :model,
                 summary_adapter = :adapter,
@@ -114,6 +115,7 @@ async def _persist_success(
         {
             "summary_short": result.summary_short,
             "summary_long": result.summary_long,
+            "name_llm": result.name_llm,
             "model": result.model,
             "adapter": adapter_name,
             "low_confidence": result.low_confidence,

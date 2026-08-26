@@ -63,11 +63,18 @@ class SummaryResult:
 
     ``summary_short`` MUST already fit one table row (C4) — the adapter owns
     clamping it, not the caller; the DB column is what the UI trusts.
+
+    ``name_llm`` is the LLM-*proposed* function name (C13, auto-display
+    variant): shown when no analyst rename exists, precedence
+    ``name_analyst ?? name_llm ?? name_ghidra``. Optional/nullable — an
+    adapter or model that omits it simply leaves the Ghidra name in place,
+    and a missing key must NOT fail the payload validation.
     """
 
     summary_short: str
     summary_long: str
     model: str
+    name_llm: str | None = None
     low_confidence: bool = False
     input_truncated: bool = False
 
