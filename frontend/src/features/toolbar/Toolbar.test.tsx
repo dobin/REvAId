@@ -22,10 +22,6 @@ describe("Toolbar", () => {
       <QueryClientProvider client={queryClient}>
         <MemoryRouter>
           <Toolbar
-            binaryName="test.exe"
-            binaryId={null}
-            selectedViewId={null}
-            onSelectView={vi.fn()}
           />
         </MemoryRouter>
       </QueryClientProvider>,
@@ -34,6 +30,5 @@ describe("Toolbar", () => {
     const homeLink = screen.getByText("GraphRev");
     expect(homeLink).toBeInTheDocument();
     expect(homeLink.closest("a")).toHaveAttribute("href", "/");
-    expect(screen.getByText("test.exe")).toBeInTheDocument();
   });
 });

@@ -74,16 +74,14 @@ function BinaryWorkspace({ binaryName }: { binaryName: string }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       <Toolbar
-        binaryName={binary.name}
-        binaryId={selectedBinaryId}
-        selectedViewId={selectedViewId}
-        onSelectView={setSelectedViewId}
       />
       <CanvasActionsRegistryProvider value={actionsRegistry}>
         <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
           <Sidebar
+            binaryName={binary.name}
             binaryId={selectedBinaryId}
             viewId={selectedViewId}
+            onSelectView={setSelectedViewId}
             onImported={handleImported}
           />
           <main style={{ flex: 1, minWidth: 0 }}>

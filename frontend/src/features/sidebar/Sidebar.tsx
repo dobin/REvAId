@@ -12,6 +12,7 @@ import { QueuePanel } from "./QueuePanel";
 import { RebalanceButton } from "./RebalanceButton";
 import { ResetCanvasButton } from "./ResetCanvasButton";
 import { ResetSummariesButton } from "./ResetSummariesButton";
+import { ViewPicker } from "./ViewPicker";
 
 const sectionStyle: React.CSSProperties = {
   paddingTop: "0.875rem",
@@ -44,12 +45,16 @@ function SidebarSection({
 }
 
 export function Sidebar({
+  binaryName,
   binaryId,
   viewId,
+  onSelectView,
   onImported,
 }: {
+  binaryName: string | null;
   binaryId: BinaryId | null;
   viewId: ViewId | null;
+  onSelectView: (viewId: ViewId) => void;
   onImported: (binaryId: BinaryId) => void;
 }) {
   return (
@@ -65,6 +70,21 @@ export function Sidebar({
       <SidebarSection title="Binary">
         <ImportBinaryButton onImported={onImported} />
       </SidebarSection>
+      {binaryId !== null && binaryName !== null && (
+        <SidebarSection title="View">
+          <div
+            style={{
+              fontFamily: "var(--gr-font-mono, monospace)",
+              fontSize: "0.875rem",
+              color: "var(--gr-color-ground-truth, #111827)",
+              marginBottom: "0.5rem",
+            }}
+          >
+            {binaryName}
+          </div>
+          <ViewPicker binaryId={binaryId} value={viewId} onChange={onSelectView} />
+        </SidebarSection>
+      )}
       {binaryId !== null && (
         <SidebarSection title="Add Function">
           <FunctionSearchInput binaryId={binaryId} viewId={viewId} />
