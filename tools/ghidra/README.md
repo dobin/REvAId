@@ -57,6 +57,9 @@ Script arguments (both optional, positional):
 | 1 | output path   | `~/<program>_graphrev.json`    |
 | 2 | binary version | `""` (free text — PRD `AS11`) |
 
+The exporter appends `.json` when the selected or supplied output path does
+not already have that extension.
+
 ## Output schema (v1)
 
 ```jsonc
@@ -89,7 +92,7 @@ Script arguments (both optional, positional):
     {
       "callerAddress": 4198400,
       "calleeAddress": 4198688,
-      "calleeModule": null       // library name when the callee is external → B17 placeholder
+      "calleeModule": null       // library name for an external callee; used if no target row exists
     }
   ]
 }
@@ -103,13 +106,20 @@ Script arguments (both optional, positional):
   ingestion pipeline (`B17`) from edges whose `calleeModule` is set and whose
   target is not a real function in the binary — the exporter only reports the
   four observable kinds.
+- **Resolved imports are exported as functions.** The exporter walks Ghidra's
+  external-location registry as well as the ordinary listing, so imports such
+  as `ADVAPI32.DLL::EventRegister` are included with `kind: "external"`, no
+  body/decompilation, and a library-qualified name. Calls through a local
+  import thunk are emitted to that resolved external target.
 - **`assembly` / `codeC` are `null`** for functions with no body
   (`import` / `thunk` / `external`), matching `RawFunction`.
 - **Edges are de-duplicated** to one row per unique `(callerAddress,
   calleeAddress)` pair (multiple call sites collapse to one edge, per `D30`).
   Self-edges are kept for recursion.
 - **`calleeModule`** is set when the callee is external or a thunk to an
-  external — this is the exact signal ingestion uses to create a
+  external. The exporter normally includes that resolved external function,
+  so its edge resolves to the real `kind='external'` row. If a target is absent
+  (for example, an unresolved cross-module edge), ingestion instead creates a
   `kind='placeholder'` function so the call stays visible without violating
   edge foreign keys.
 - A decompilation error or timeout yields `codeC: null` and a warning on
