@@ -46,6 +46,7 @@ from graphrev.core.logging import (
 from graphrev.db.engine import create_engine, create_session_factory, dispose_engine
 from graphrev.db.startup import recompute_utility_if_threshold_changed, recover_pending_summaries
 from graphrev.events.bus import InProcessEventBus
+from graphrev.services.queue_service import queue_event_payload_with_items
 from graphrev.summarization.queue import SummaryQueue
 from graphrev.summarization.worker import SummaryWorkerPool
 
@@ -134,12 +135,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # and worker pool rather than sharing process-wide singletons.
     summary_queue = SummaryQueue(max_depth=settings.queue_max_depth)
     llm_adapter = create_llm_adapter(settings.llm_adapter, settings)
+
+    async def _publish_queue_event() -> None:
+        """Worker-driven `queue` SSE events (pop/complete transitions): the
+        sidebar's live "thinking" panel needs per-item detail the moment a
+        worker picks work up — not just on demand mutations or the 15s
+        fallback refetch. Best-effort by contract (the worker suppresses
+        errors); a fresh session per call keeps it off the hot path."""
+        async with session_factory() as session:
+            payload = await queue_event_payload_with_items(session, summary_queue)
+        event_bus.publish("queue", payload)
+
     worker_pool = SummaryWorkerPool(
         queue=summary_queue,
         adapter=llm_adapter,
         session_factory=session_factory,
         concurrency=settings.summary_concurrency,
         result_listener=_publish_summary_event,
+        queue_listener=_publish_queue_event,
     )
     app.state.summary_queue = summary_queue
     app.state.llm_adapter = llm_adapter

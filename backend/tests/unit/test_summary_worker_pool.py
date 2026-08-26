@@ -105,3 +105,78 @@ async def test_worker_pool_never_exceeds_adapter_max_concurrency(
     for fn in functions:
         await session.refresh(fn)
         assert fn.summary_status == "ready"
+
+
+async def test_worker_pool_publishes_queue_events_on_pop_and_complete(
+    session: AsyncSession, session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """The `queue_listener` fires on every worker-driven transition: once
+    when an item is popped (in-flight) and once when it completes — this is
+    what keeps the sidebar's live "thinking" panel current without waiting
+    for the 15s fallback refetch."""
+    functions = await _make_functions(session, 2)
+    queue = SummaryQueue(max_depth=10)
+    for fn in functions:
+        queue.enqueue(fn.id, priority=1)
+
+    calls = 0
+
+    async def queue_listener() -> None:
+        nonlocal calls
+        calls += 1
+
+    adapter = _ConcurrencyTrackingAdapter(max_concurrency=1, hold_seconds=0.01)
+    pool = SummaryWorkerPool(
+        queue=queue,
+        adapter=adapter,
+        session_factory=session_factory,
+        concurrency=1,
+        queue_listener=queue_listener,
+    )
+    pool.start()
+    try:
+        deadline = asyncio.get_event_loop().time() + 10
+        while len(queue) > 0 or any(queue.is_inflight(fn.id) for fn in functions):
+            if asyncio.get_event_loop().time() > deadline:
+                raise AssertionError("worker pool did not drain the queue in time")
+            await asyncio.sleep(0.02)
+    finally:
+        await pool.stop()
+
+    # 2 items x (1 pop event + 1 complete event) = 4 notifications.
+    assert calls == 4
+
+
+async def test_worker_pool_survives_a_failing_queue_listener(
+    session: AsyncSession, session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """A broken `queue_listener` must never kill a worker — the SSE panel
+    degrades to its fallback refetch, summaries still complete."""
+
+    async def bad_listener() -> None:
+        raise RuntimeError("listener exploded")
+
+    functions = await _make_functions(session, 1)
+    queue = SummaryQueue(max_depth=10)
+    queue.enqueue(functions[0].id, priority=1)
+
+    adapter = _ConcurrencyTrackingAdapter(max_concurrency=1, hold_seconds=0.01)
+    pool = SummaryWorkerPool(
+        queue=queue,
+        adapter=adapter,
+        session_factory=session_factory,
+        concurrency=1,
+        queue_listener=bad_listener,
+    )
+    pool.start()
+    try:
+        deadline = asyncio.get_event_loop().time() + 10
+        while len(queue) > 0 or any(queue.is_inflight(fn.id) for fn in functions):
+            if asyncio.get_event_loop().time() > deadline:
+                raise AssertionError("worker pool did not drain the queue in time")
+            await asyncio.sleep(0.02)
+    finally:
+        await pool.stop()
+
+    await session.refresh(functions[0])
+    assert functions[0].summary_status == "ready"

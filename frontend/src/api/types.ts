@@ -409,6 +409,13 @@ export interface QueueEvent {
   inFlightCount: number;
   queuedCount: number;
   pausedUntil: string | null;
+  // Optional per-item detail: present on worker-driven events (pop/
+  // complete transitions, published with the full GET /queue shape) and
+  // absent on the older counter-only events from demand mutations. When
+  // present the sidebar's live "thinking" panel updates instantly; when
+  // absent the cached lists stay and only the counts refresh.
+  inFlight?: InFlightItemDto[] | undefined;
+  queued?: QueuedItemDto[] | undefined;
 }
 
 export interface BinaryEvent {

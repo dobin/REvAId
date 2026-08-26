@@ -72,6 +72,14 @@ export function NeighbourRow({
           {row.isUtility && <Glyph name="utility" />}
           {row.hasNotes && <Glyph name="hasNotes" />}
           {row.isRenamed && <Glyph name="renamed" />}
+          {/* LLM "thinking" indicator: summaryStatus is SSE-patched live
+              (applySummaryEvent), so this appears the moment the function
+              is demanded and vanishes when its summary lands. */}
+          {row.summaryStatus === "pending" && (
+            <span className="gr-shimmer">
+              <Glyph name="generating" />
+            </span>
+          )}
           <FunctionInfoTooltip functionId={row.id}>
             <span
               className="gr-ground-truth"

@@ -8,6 +8,7 @@ import { GlyphLegend } from "./GlyphLegend";
 import { ImportBinaryButton } from "./ImportBinaryButton";
 import { OnCanvasSearch } from "./OnCanvasSearch";
 import { PlaceEntryPointButton } from "./PlaceEntryPointButton";
+import { QueuePanel } from "./QueuePanel";
 import { RebalanceButton } from "./RebalanceButton";
 import { ResetCanvasButton } from "./ResetCanvasButton";
 import { ResetSummariesButton } from "./ResetSummariesButton";
@@ -81,6 +82,9 @@ export function Sidebar({
       ) : null}
       <SidebarSection title="Find Function">
         <OnCanvasSearch binaryId={binaryId} viewId={viewId} />
+      </SidebarSection>
+      <SidebarSection title="LLM Activity">
+        <QueuePanel />
       </SidebarSection>
       <SidebarSection title="Legend">
         <GlyphLegend />

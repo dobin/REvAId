@@ -83,6 +83,16 @@ class ResultListener(Protocol):
     ) -> Awaitable[None]: ...
 
 
+class QueueListener(Protocol):
+    """SSE `queue`-event hook, fired on every worker-driven queue transition
+    (item popped -> in-flight, item completed/requeued). Without this the
+    frontend's queue chip/panel only updated on demand mutations or the 15s
+    fallback refetch — the "LLM is thinking" progress felt dead between
+    completions. Async so `main.py` can fetch display names for the payload."""
+
+    def __call__(self) -> Awaitable[None]: ...
+
+
 async def _persist_success(
     session: AsyncSession,
     *,
@@ -188,6 +198,7 @@ class SummaryWorkerPool:
         session_factory: async_sessionmaker[AsyncSession],
         concurrency: int,
         result_listener: ResultListener | None = None,
+        queue_listener: QueueListener | None = None,
     ) -> None:
         self._queue = queue
         self._adapter = adapter
@@ -195,6 +206,7 @@ class SummaryWorkerPool:
         #: AM1 — never exceed what the adapter itself declares safe.
         self._concurrency = max(1, min(concurrency, adapter.max_concurrency))
         self._result_listener = result_listener
+        self._queue_listener = queue_listener
         self._tasks: list[asyncio.Task[None]] = []
 
     @property
@@ -217,9 +229,22 @@ class SummaryWorkerPool:
                 await task
         self._tasks = []
 
+    async def _notify_queue_changed(self) -> None:
+        """Best-effort queue-event publish. A failure here must never kill a
+        worker — the SSE chip/panel degrades to its fallback refetch."""
+        if self._queue_listener is None:
+            return
+        try:
+            await self._queue_listener()
+        except Exception:  # pragma: no cover - defensive
+            logger.exception("summary_worker.queue_event_failed")
+
     async def _run_loop(self, *, worker_index: int) -> None:
         while True:
             item = await self._queue.pop()
+            # pop() marked the item in-flight — the UI's "thinking" list
+            # gains an entry the moment a worker picks the item up.
+            await self._notify_queue_changed()
             requeued = False
             try:
                 requeued = await self._process_item(item, worker_index=worker_index)
@@ -230,6 +255,10 @@ class SummaryWorkerPool:
             finally:
                 if not requeued:
                     self._queue.complete(item.function_id)
+                # complete() or requeue_inflight() changed the queue state —
+                # publish either way (a requeued item moved back to queued).
+                with contextlib.suppress(asyncio.CancelledError):
+                    await self._notify_queue_changed()
 
     async def _process_item(self, item: QueueItem, *, worker_index: int) -> bool:
         return await run_one_item(

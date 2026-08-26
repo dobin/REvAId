@@ -15,7 +15,15 @@
  */
 import { useEffect, useRef, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { BinaryEvent, QueueEvent, ReconcileEvent, ServerEvent, SummaryEvent } from "@/api/types";
+import type {
+  BinaryEvent,
+  InFlightItemDto,
+  QueuedItemDto,
+  QueueEvent,
+  ReconcileEvent,
+  ServerEvent,
+  SummaryEvent,
+} from "@/api/types";
 import { applyServerEvent, reconcileAfterReconnect } from "./applyEvents";
 
 const EVENTS_URL = "/api/v1/events";
@@ -41,11 +49,33 @@ function parseQueueEvent(raw: unknown): QueueEvent | null {
   if (typeof raw !== "object" || raw === null) return null;
   const data = raw as Record<string, unknown>;
   if (typeof data.inFlightCount !== "number" || typeof data.queuedCount !== "number") return null;
+  // Per-item lists are optional (counter-only events omit them); validate
+  // each entry's shape defensively since it crosses the wire.
+  const parseItems = <T,>(
+    value: unknown,
+    isItem: (item: unknown) => item is T,
+  ): T[] | undefined => {
+    if (!Array.isArray(value)) return undefined;
+    return value.every(isItem) ? value : undefined;
+  };
+  const isInFlightItem = (item: unknown): item is InFlightItemDto =>
+    typeof item === "object" &&
+    item !== null &&
+    typeof (item as InFlightItemDto).functionId === "number" &&
+    typeof (item as InFlightItemDto).displayName === "string";
+  const isQueuedItem = (item: unknown): item is QueuedItemDto =>
+    typeof item === "object" &&
+    item !== null &&
+    typeof (item as QueuedItemDto).functionId === "number" &&
+    typeof (item as QueuedItemDto).displayName === "string" &&
+    typeof (item as QueuedItemDto).priority === "number";
   return {
     type: "queue",
     inFlightCount: data.inFlightCount,
     queuedCount: data.queuedCount,
     pausedUntil: typeof data.pausedUntil === "string" ? data.pausedUntil : null,
+    inFlight: parseItems(data.inFlight, isInFlightItem),
+    queued: parseItems(data.queued, isQueuedItem),
   };
 }
 

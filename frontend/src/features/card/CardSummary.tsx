@@ -23,7 +23,9 @@ export function CardSummary({ fn }: { fn: FunctionDto }) {
   if (status === "pending") {
     return (
       <div style={{ padding: "0.375rem 0.75rem 0.25rem", fontSize: "0.75rem" }}>
-        <span className="gr-shimmer">Generating summary…</span>
+        <span className="gr-shimmer">
+          <Glyph name="generating" /> Generating summary…
+        </span>
       </div>
     );
   }

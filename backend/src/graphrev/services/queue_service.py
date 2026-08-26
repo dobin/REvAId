@@ -31,6 +31,54 @@ def queue_event_payload(queue: SummaryQueue) -> dict[str, object]:
     }
 
 
+async def queue_event_payload_with_items(
+    session: AsyncSession, queue: SummaryQueue
+) -> dict[str, object]:
+    """The full `event: queue` SSE payload, including the per-function
+    `inFlight`/`queued` lists (mirroring `GET /queue`'s DTO shape).
+
+    Used by the worker pool's `queue_listener` (wired in `main.py`): the
+    counter-only payload is fine for the toolbar chip, but the sidebar's
+    live "thinking" panel needs to know *which* functions are in flight —
+    and only the worker knows the moment an item is popped or completed.
+    Display names follow the same precedence as `get_queue_snapshot`
+    (`name_analyst ?? name_llm ?? name_ghidra`)."""
+    snapshot = queue.snapshot()
+    ids = {item.function_id for item in snapshot.queued} | set(snapshot.inflight_function_ids)
+    display_names: dict[int, str] = {}
+    if ids:
+        rows = await session.execute(
+            select(
+                Function.id, Function.name_analyst, Function.name_llm, Function.name_ghidra
+            ).where(Function.id.in_(ids))
+        )
+        display_names = {
+            fn_id: name_analyst or name_llm or name_ghidra
+            for fn_id, name_analyst, name_llm, name_ghidra in rows
+        }
+    return {
+        "inFlightCount": len(snapshot.inflight_function_ids),
+        "queuedCount": len(snapshot.queued),
+        "pausedUntil": queue.paused_until_iso(),
+        "inFlight": [
+            {
+                "functionId": function_id,
+                "displayName": display_names.get(function_id, "?"),
+                "startedAt": snapshot.inflight_started_at.get(function_id),
+            }
+            for function_id in snapshot.inflight_function_ids
+        ],
+        "queued": [
+            {
+                "functionId": item.function_id,
+                "displayName": display_names.get(item.function_id, "?"),
+                "priority": item.priority,
+            }
+            for item in snapshot.queued
+        ],
+    }
+
+
 async def get_queue_snapshot(session: AsyncSession, queue: SummaryQueue) -> QueueSnapshotDto:
     snapshot = queue.snapshot()
 

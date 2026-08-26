@@ -77,6 +77,11 @@ export function applyQueueEvent(qc: QueryClient, e: QueueEvent): void {
           inFlightCount: e.inFlightCount,
           queuedCount: e.queuedCount,
           pausedUntil: e.pausedUntil,
+          // Worker-driven events carry the full per-item lists (the
+          // sidebar's "thinking" panel reads these); counter-only events
+          // from demand mutations leave the cached lists untouched.
+          ...(e.inFlight !== undefined ? { inFlight: e.inFlight } : {}),
+          ...(e.queued !== undefined ? { queued: e.queued } : {}),
         }
       : snapshot,
   );
