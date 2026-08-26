@@ -10,6 +10,7 @@ appears below (enforced by ``scripts/check-magic-numbers.sh``).
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field, model_validator
@@ -40,9 +41,13 @@ class Settings(BaseSettings):
     Env vars are prefixed ``GRAPHREV_`` (e.g. ``GRAPHREV_TABLE_ROW_CAP=8``).
     """
 
+    # Anchored to `backend/.env` (derived from this module's location), NOT
+    # cwd-relative: every entrypoint used to require cwd=backend/ for the
+    # file to be found, which is how a duplicate root `.env` crept in.
+    # A missing file is silently ignored by pydantic-settings.
     model_config = SettingsConfigDict(
         env_prefix="GRAPHREV_",
-        env_file=".env",
+        env_file=Path(__file__).resolve().parents[3] / ".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )

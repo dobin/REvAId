@@ -50,7 +50,8 @@ All tunable thresholds (`TABLE_ROW_CAP`, `CALLER_SUPPRESS_THRESHOLD`,
 `UTILITY_FANIN_THRESHOLD`, `FAN_OUT_ALL_HARD_CAP`, `NODE_COUNT_SOFT_WARNING`,
 plus adapter selection and everything else) live in
 `backend/src/graphrev/core/config.py` and are set via environment variables
-(prefix `GRAPHREV_`) or a `.env` file — see `.env.example`. They are exposed
+(prefix `GRAPHREV_`) or a `.env` file at `backend/.env` — see
+`backend/.env.example`. They are exposed
 to the frontend as a single payload from `GET /api/v1/config`; no component
 may hard-code a threshold (enforced by `scripts/check-magic-numbers.sh`,
 which also runs in CI).
@@ -77,7 +78,7 @@ config change, not a code change.
 | --- | --- |
 | `GRAPHREV_LLM_ADAPTER=litellm` | Select the litellm adapter |
 | `GRAPHREV_LLM_MODEL` | litellm router string, e.g. `anthropic/claude-sonnet-4-5`, `openai/gpt-4o`, `ollama/llama3` |
-| `GRAPHREV_LLM_API_KEY` | Provider API key (put it in `.env`, not the shell) |
+| `GRAPHREV_LLM_API_KEY` | Provider API key (put it in `backend/.env`, not the shell) |
 | `GRAPHREV_LLM_API_BASE` | Base URL for self-hosted/proxied endpoints (Ollama, vLLM, an LLM gateway); leave unset for hosted providers |
 | `GRAPHREV_SUMMARY_REQUEST_TIMEOUT_SECONDS` | Per-request bound (default `120`) so a hung provider cannot wedge a worker |
 | `GRAPHREV_LLM_TEMPERATURE` | Sampling temperature (default `0`). Summarising is structured extraction, not creative writing — a higher value makes models wrap their JSON in markdown fences or prose |
