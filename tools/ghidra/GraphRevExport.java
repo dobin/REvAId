@@ -29,6 +29,7 @@ import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -46,6 +47,8 @@ import ghidra.program.model.listing.InstructionIterator;
 import ghidra.program.model.listing.Listing;
 import ghidra.program.model.listing.Parameter;
 import ghidra.program.model.listing.Program;
+import ghidra.program.model.symbol.ExternalLocation;
+import ghidra.program.model.symbol.ExternalManager;
 import ghidra.program.model.symbol.Reference;
 import ghidra.program.model.symbol.RefType;
 
@@ -67,7 +70,7 @@ public class GraphRevExport extends GhidraScript {
             return;
         }
 
-        File outFile = resolveOutputFile(program);
+        File outFile = ensureJsonExtension(resolveOutputFile(program));
         String version = resolveVersion();
 
         println("GraphRevExport: exporting " + program.getName() + " -> " + outFile.getAbsolutePath());
@@ -128,6 +131,15 @@ public class GraphRevExport extends GhidraScript {
         }
     }
 
+    /** Ensure GUI-selected and headless output paths use the JSON extension. */
+    private File ensureJsonExtension(File file) {
+        String path = file.getPath();
+        if (path.toLowerCase().endsWith(".json")) {
+            return file;
+        }
+        return new File(path + ".json");
+    }
+
     /** Version is free text (AS11); optional second script arg overrides "". */
     private String resolveVersion() {
         String[] args = getScriptArgs();
@@ -137,13 +149,38 @@ public class GraphRevExport extends GhidraScript {
         return "";
     }
 
-    /** All functions in the program, in address order. */
+    /**
+     * All in-program functions followed by function-valued external locations.
+     *
+     * {@code Listing.getFunctions(true)} does not enumerate the EXTERNAL
+     * address space. Consequently, a PE import such as
+     * {@code ADVAPI32.DLL::EventRegister} could be Ghidra-resolved and appear
+     * as a call target, yet have no function object in the export. Walk the
+     * ExternalManager explicitly so those targets become GraphRev functions
+     * and their call edges can resolve to real rows rather than placeholders.
+     */
     private List<Function> collectFunctions(Program program) {
         Listing listing = program.getListing();
         FunctionIterator it = listing.getFunctions(true);
         List<Function> out = new ArrayList<>();
+        Set<Address> seenEntryPoints = new LinkedHashSet<>();
         while (it.hasNext()) {
-            out.add(it.next());
+            Function function = it.next();
+            if (seenEntryPoints.add(function.getEntryPoint())) {
+                out.add(function);
+            }
+        }
+
+        ExternalManager externalManager = program.getExternalManager();
+        for (String libraryName : externalManager.getExternalLibraryNames()) {
+            Iterator<ExternalLocation> locations = externalManager.getExternalLocations(libraryName);
+            while (locations.hasNext()) {
+                ExternalLocation location = locations.next();
+                Function function = location.getFunction();
+                if (function != null && seenEntryPoints.add(function.getEntryPoint())) {
+                    out.add(function);
+                }
+            }
         }
         return out;
     }
@@ -166,7 +203,7 @@ public class GraphRevExport extends GhidraScript {
         JsonWriter w = new JsonWriter(sb);
         w.beginObject();
         w.field("address", address);
-        w.field("name", fn.getName());
+        w.field("name", exportName(fn));
         appendParameters(w, fn);
         w.fieldOrNull("signature", fn.getPrototypeString(false, false));
         w.fieldOrNull("assembly", assembly);
@@ -175,6 +212,28 @@ public class GraphRevExport extends GhidraScript {
         w.field("hasIndirectCalls", detectIndirectCalls(fn));
         w.field("isEntryPoint", isEntryPoint(fn));
         w.endObject();
+    }
+
+    /**
+     * Give external symbols the same library-qualified name Ghidra displays,
+     * for example {@code ADVAPI32.DLL::EventRegister}. A plain
+     * {@link Function#getName()} drops that namespace and makes identically
+     * named imports from different DLLs indistinguishable in GraphRev.
+     */
+    private String exportName(Function fn) {
+        if (!fn.isExternal()) {
+            return fn.getName();
+        }
+        ExternalLocation location = fn.getExternalLocation();
+        if (location == null) {
+            return fn.getName();
+        }
+        String libraryName = location.getLibraryName();
+        String label = location.getLabel();
+        if (libraryName == null || libraryName.isEmpty()) {
+            return label == null || label.isEmpty() ? fn.getName() : label;
+        }
+        return libraryName + "::" + (label == null || label.isEmpty() ? fn.getName() : label);
     }
 
     private void appendParameters(JsonWriter w, Function fn) {
@@ -280,7 +339,12 @@ public class GraphRevExport extends GhidraScript {
     private int appendEdgesForFunction(
             StringBuilder sb, Set<String> emitted, int alreadyWritten, Function caller) {
         int written = 0;
-        for (Function callee : caller.getCalledFunctions(monitor)) {
+        for (Function called : caller.getCalledFunctions(monitor)) {
+            // PE/ELF imports are frequently represented as a local thunk. The
+            // resolved external function is the useful graph target; exporting
+            // the thunk address would leave ADVAPI32.DLL::EventRegister (etc.)
+            // disconnected despite Ghidra having resolved it.
+            Function callee = resolveEdgeCallee(called);
             long callerAddr = caller.getEntryPoint().getOffset();
             long calleeAddr = callee.getEntryPoint().getOffset();
             String dedupeKey = callerAddr + "->" + calleeAddr;
@@ -301,6 +365,15 @@ public class GraphRevExport extends GhidraScript {
             written++;
         }
         return written;
+    }
+
+    /** Return the final external target of an import thunk, otherwise {@code callee}. */
+    private Function resolveEdgeCallee(Function callee) {
+        if (!callee.isThunk()) {
+            return callee;
+        }
+        Function thunked = callee.getThunkedFunction(true);
+        return thunked != null && thunked.isExternal() ? thunked : callee;
     }
 
     /**
