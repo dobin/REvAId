@@ -64,6 +64,7 @@ public class GraphRevExport extends GhidraScript {
 
     @Override
     protected void run() throws Exception {
+        long startedAt = System.nanoTime();
         Program program = currentProgram;
         if (program == null) {
             printerr("GraphRevExport: no program is open.");
@@ -72,16 +73,24 @@ public class GraphRevExport extends GhidraScript {
 
         File outFile = ensureJsonExtension(resolveOutputFile(program));
         String version = resolveVersion();
+        boolean skipDecompilation = shouldSkipDecompilation();
 
         println("GraphRevExport: exporting " + program.getName() + " -> " + outFile.getAbsolutePath());
+        println(
+                "GraphRevExport: mode = "
+                        + (skipDecompilation ? "fast (no decompiled C)" : "complete"));
 
-        decompiler = new DecompInterface();
-        DecompileOptions options = new DecompileOptions();
-        decompiler.setOptions(options);
-        decompiler.openProgram(program);
+        if (!skipDecompilation) {
+            decompiler = new DecompInterface();
+            DecompileOptions options = new DecompileOptions();
+            decompiler.setOptions(options);
+            decompiler.openProgram(program);
+        }
 
         try {
+            long collectionStartedAt = System.nanoTime();
             List<Function> functions = collectFunctions(program);
+            long collectionNanos = System.nanoTime() - collectionStartedAt;
             monitor.initialize(functions.size());
             monitor.setMessage("Exporting functions");
 
@@ -91,22 +100,37 @@ public class GraphRevExport extends GhidraScript {
             int functionCount = 0;
             int edgeCount = 0;
 
+            long exportStartedAt = System.nanoTime();
             for (Function fn : functions) {
                 monitor.checkCancelled();
                 monitor.setMessage("Exporting " + fn.getName());
 
-                appendFunctionJson(functionsJson, functionCount, fn);
+                appendFunctionJson(functionsJson, functionCount, fn, skipDecompilation);
                 functionCount++;
 
                 edgeCount += appendEdgesForFunction(edgesJson, emittedEdges, edgeCount, fn);
 
                 monitor.incrementProgress(1);
             }
+            long exportNanos = System.nanoTime() - exportStartedAt;
 
+            long writeStartedAt = System.nanoTime();
             writeJson(outFile, program, version, functionsJson, edgesJson, functionCount, edgeCount);
+            long writeNanos = System.nanoTime() - writeStartedAt;
             println("GraphRevExport: wrote " + functionCount + " functions, " + edgeCount + " edges.");
+            println(
+                    "GraphRevExport: timings — collect "
+                            + formatMillis(collectionNanos)
+                            + ", export "
+                            + formatMillis(exportNanos)
+                            + ", write "
+                            + formatMillis(writeNanos)
+                            + ", total "
+                            + formatMillis(System.nanoTime() - startedAt));
         } finally {
-            decompiler.dispose();
+            if (decompiler != null) {
+                decompiler.dispose();
+            }
         }
     }
 
@@ -138,6 +162,27 @@ public class GraphRevExport extends GhidraScript {
             return file;
         }
         return new File(path + ".json");
+    }
+
+    /**
+     * Ask GUI users whether to omit decompiled C for a faster export. In
+     * headless mode the prompt is unavailable, so preserve the complete export
+     * as the backward-compatible default.
+     */
+    private boolean shouldSkipDecompilation() {
+        try {
+            return askYesNo(
+                    "GraphRev export mode",
+                    "Skip decompilation?\n\n"
+                            + "Yes: fast export with assembly and call graph, but codeC is null.\n"
+                            + "No: complete export with decompiled C.");
+        } catch (Exception headless) {
+            return false;
+        }
+    }
+
+    private String formatMillis(long nanos) {
+        return String.format("%.1f ms", nanos / 1_000_000.0);
     }
 
     /** Version is free text (AS11); optional second script arg overrides "". */
@@ -188,17 +233,17 @@ public class GraphRevExport extends GhidraScript {
     // -------------------------------------------------------------- functions
 
     /** Emit one RawFunction-shaped object into {@code sb}. */
-    private void appendFunctionJson(StringBuilder sb, int index, Function fn) {
+    private void appendFunctionJson(
+            StringBuilder sb, int index, Function fn, boolean skipDecompilation) {
         if (index > 0) {
             sb.append(",\n");
         }
 
         long address = fn.getEntryPoint().getOffset();
         String kind = classifyKind(fn);
-        boolean hasBody = !fn.isExternal() && !fn.isThunk();
-
-        String assembly = hasBody ? disassemble(fn) : null;
-        String codeC = hasBody ? decompile(fn) : null;
+        boolean hasBody = hasExportableBody(fn);
+        FunctionBodyData bodyData = hasBody ? inspectBody(fn) : FunctionBodyData.EMPTY;
+        String codeC = hasBody && !skipDecompilation ? decompile(fn) : null;
 
         JsonWriter w = new JsonWriter(sb);
         w.beginObject();
@@ -206,12 +251,20 @@ public class GraphRevExport extends GhidraScript {
         w.field("name", exportName(fn));
         appendParameters(w, fn);
         w.fieldOrNull("signature", fn.getPrototypeString(false, false));
-        w.fieldOrNull("assembly", assembly);
+        w.fieldOrNull("assembly", bodyData.assembly);
         w.fieldOrNull("codeC", codeC);
         w.field("kind", kind);
-        w.field("hasIndirectCalls", detectIndirectCalls(fn));
+        w.field("hasIndirectCalls", bodyData.hasIndirectCalls);
         w.field("isEntryPoint", isEntryPoint(fn));
         w.endObject();
+    }
+
+    /** True only for functions whose body can provide assembly and decompiled C. */
+    private boolean hasExportableBody(Function fn) {
+        return !fn.isExternal()
+                && !fn.isThunk()
+                && fn.getBody() != null
+                && !fn.getBody().isEmpty();
     }
 
     /**
@@ -294,12 +347,16 @@ public class GraphRevExport extends GhidraScript {
 
     // --------------------------------------------------------------- assembly
 
-    /** Body instructions joined one per line: "<hex addr>  <mnemonic operands>". */
-    private String disassemble(Function fn) {
+    /**
+     * Traverse a function body once to build its assembly and detect computed
+     * or indirect calls. The JSON assembly format is intentionally unchanged.
+     */
+    private FunctionBodyData inspectBody(Function fn) {
         Listing listing = fn.getProgram().getListing();
         InstructionIterator it = listing.getInstructions(fn.getBody(), true);
         StringBuilder sb = new StringBuilder();
         boolean first = true;
+        boolean hasIndirectCalls = false;
         while (it.hasNext()) {
             Instruction ins = it.next();
             if (!first) {
@@ -307,8 +364,17 @@ public class GraphRevExport extends GhidraScript {
             }
             first = false;
             sb.append(ins.getAddress().toString()).append("  ").append(ins.toString());
+            if (!hasIndirectCalls) {
+                for (Reference ref : ins.getReferencesFrom()) {
+                    RefType rt = ref.getReferenceType();
+                    if (rt.isCall() && (rt.isComputed() || rt.isIndirect())) {
+                        hasIndirectCalls = true;
+                        break;
+                    }
+                }
+            }
         }
-        return sb.length() == 0 ? null : sb.toString();
+        return new FunctionBodyData(sb.length() == 0 ? null : sb.toString(), hasIndirectCalls);
     }
 
     // ---------------------------------------------------------- decompilation
@@ -400,27 +466,16 @@ public class GraphRevExport extends GhidraScript {
         return null;
     }
 
-    /**
-     * True when the function contains a call whose target is computed/indirect
-     * (register or memory indirect) — feeds RawFunction.hasIndirectCalls and
-     * the neighbour-table "may be incomplete" hint.
-     */
-    private boolean detectIndirectCalls(Function fn) {
-        Listing listing = fn.getProgram().getListing();
-        InstructionIterator it = listing.getInstructions(fn.getBody(), true);
-        while (it.hasNext()) {
-            Instruction ins = it.next();
-            for (Reference ref : ins.getReferencesFrom()) {
-                RefType rt = ref.getReferenceType();
-                if (rt.isCall() && rt.isComputed()) {
-                    return true;
-                }
-                if (rt.isIndirect() && rt.isCall()) {
-                    return true;
-                }
-            }
+    private static final class FunctionBodyData {
+        static final FunctionBodyData EMPTY = new FunctionBodyData(null, false);
+
+        final String assembly;
+        final boolean hasIndirectCalls;
+
+        FunctionBodyData(String assembly, boolean hasIndirectCalls) {
+            this.assembly = assembly;
+            this.hasIndirectCalls = hasIndirectCalls;
         }
-        return false;
     }
 
     // ----------------------------------------------------------------- output
