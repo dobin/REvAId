@@ -19,7 +19,7 @@ async def test_config_returns_camel_case_defaults(client: AsyncClient) -> None:
     assert body["utilityFanInThreshold"] == 50
     assert body["fanOutAllHardCap"] == 50
     assert body["nodeCountSoftWarning"] == 150
-    assert body["cardWidthPx"] == 380
+    assert body["cardWidthPx"] == 440
     assert body["summaryConcurrency"] == 4
     assert body["summaryDemandDebounceMs"] == 250
     assert "red" in body["nodeColorPalette"]

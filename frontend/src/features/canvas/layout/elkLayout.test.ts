@@ -19,7 +19,7 @@ import {
   type LayoutPositions,
 } from "./elkLayout";
 
-const CARD_WIDTH = 380;
+const CARD_WIDTH = 440;
 
 interface Rect {
   x: number;

@@ -117,7 +117,7 @@ class Settings(BaseSettings):
     node_count_soft_warning: int = Field(default=150, gt=0, description="§5.1 / F1a.")
 
     # -- TAD-invented additions (docs/adr/0003-invented-constants.md) ------
-    card_width_px: int = Field(default=380, gt=0, description="AS23: card width is fixed.")
+    card_width_px: int = Field(default=440, gt=0, description="AS23: card width is fixed.")
     name_analyst_max_length: int = Field(default=128, gt=0, description="§5.1 stated assumption.")
 
     #: I3 — `GET /binaries/{id}/functions` search pagination (B11/E1a). Not

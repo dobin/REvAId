@@ -14,7 +14,7 @@ const config: AppConfigDto = {
   utilityFanInThreshold: 50,
   fanOutAllHardCap: 50,
   nodeCountSoftWarning: 150,
-  cardWidthPx: 380,
+  cardWidthPx: 440,
   summaryConcurrency: 4,
   layoutHeightChangeThresholdPx: 8,
   layoutAnimationMs: 400,
