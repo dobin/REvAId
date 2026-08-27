@@ -45,13 +45,13 @@ export function PlaceEntryPointButton({
       }}
       title={
         topEntryPoint
-          ? `Place ${topEntryPoint.displayName} on the canvas`
+          ? `Place entry-point on the canvas`
           : "No entry-point suggestions for this binary"
       }
     >
       {patchNodes.isPending
         ? "Placing…"
-        : `+ Place ${topEntryPoint ? topEntryPoint.displayName : "entry point"}`}
+        : `+ Place entry point`}
     </button>
   );
 }

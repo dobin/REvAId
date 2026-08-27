@@ -70,6 +70,15 @@ export function Sidebar({
       <SidebarSection title="Binary">
         <ImportBinaryButton onImported={onImported} />
       </SidebarSection>
+      {binaryId !== null && (
+        <SidebarSection title="Add Function">
+          <FunctionSearchInput binaryId={binaryId} viewId={viewId} />
+        </SidebarSection>
+      )}
+      <SidebarSection title="Find Function">
+        <OnCanvasSearch binaryId={binaryId} viewId={viewId} />
+      </SidebarSection>
+
       {binaryId !== null && binaryName !== null && (
         <SidebarSection title="View">
           <div
@@ -85,11 +94,7 @@ export function Sidebar({
           <ViewPicker binaryId={binaryId} value={viewId} onChange={onSelectView} />
         </SidebarSection>
       )}
-      {binaryId !== null && (
-        <SidebarSection title="Add Function">
-          <FunctionSearchInput binaryId={binaryId} viewId={viewId} />
-        </SidebarSection>
-      )}
+
       {viewId !== null ? (
         <SidebarSection title="Actions">
           {binaryId !== null && (
@@ -100,15 +105,11 @@ export function Sidebar({
           {binaryId !== null && <ResetSummariesButton binaryId={binaryId} />}
         </SidebarSection>
       ) : null}
-      <SidebarSection title="Find Function">
-        <OnCanvasSearch binaryId={binaryId} viewId={viewId} />
-      </SidebarSection>
+
       <SidebarSection title="LLM Activity">
         <QueuePanel />
       </SidebarSection>
-      <SidebarSection title="Legend">
-        <GlyphLegend />
-      </SidebarSection>
+
     </aside>
   );
 }

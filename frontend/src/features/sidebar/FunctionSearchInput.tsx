@@ -82,7 +82,7 @@ export function FunctionSearchInput({
       <input
         type="text"
         aria-label="Search functions"
-        placeholder="Search name or address…"
+        placeholder="Search function to add to canvas"
         value={text}
         disabled={binaryId === null || viewId === null}
         onChange={(e) => {

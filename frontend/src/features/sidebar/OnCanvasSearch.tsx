@@ -80,7 +80,7 @@ export function OnCanvasSearch({
       <input
         type="text"
         aria-label="Search functions on canvas"
-        placeholder="Jump to function on canvas…"
+        placeholder="Jump to function on canvas"
         value={text}
         disabled={binaryId === null || viewId === null}
         onChange={(e) => {
