@@ -68,6 +68,10 @@ class Binary(Base):
     name: Mapped[str] = mapped_column()
     version: Mapped[str] = mapped_column(default="")  # free text (AS11)
     source_path: Mapped[str | None] = mapped_column(default=None)
+    # Ghidra's static program image base captured at export time. This is
+    # ingestion-owned metadata used to translate ASLR runtime VAs; it is
+    # nullable for legacy/non-Ghidra imports that did not report it.
+    analysis_image_base: Mapped[int | None] = mapped_column(default=None)
     # Circular FK with `views` (B16 <-> B10): declared with use_alter so Alembic
     # emits it as a separate ALTER after `views` exists.
     last_view_id: Mapped[int | None] = mapped_column(

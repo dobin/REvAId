@@ -5,11 +5,21 @@ import { apiClient } from "@/api/client";
 import type { FunctionSearchPageDto, ViewNodesPatchResponse } from "@/api/types";
 import { FunctionSearchInput } from "./FunctionSearchInput";
 
-function renderInput(binaryId: number | null = 1, viewId: number | null = 1) {
+function renderInput(
+  binaryId: number | null = 1,
+  viewId: number | null = 1,
+  runtimeBase: number | null = null,
+  analysisImageBase: number | null = 0x180000000,
+) {
   const queryClient = new QueryClient();
   render(
     <QueryClientProvider client={queryClient}>
-      <FunctionSearchInput binaryId={binaryId} viewId={viewId} />
+      <FunctionSearchInput
+        binaryId={binaryId}
+        viewId={viewId}
+        runtimeBase={runtimeBase}
+        analysisImageBase={analysisImageBase}
+      />
     </QueryClientProvider>,
   );
 }
@@ -95,6 +105,46 @@ describe("FunctionSearchInput", () => {
       query: null,
     });
     renderInput();
+    expect(getSpy).not.toHaveBeenCalled();
+  });
+
+  it("translates a runtime VA before resolving and adding its function", async () => {
+    const resolved = {
+      id: 7,
+      address: 0x180a4cb90,
+      displayName: "parse_config",
+    };
+    const getSpy = vi.spyOn(apiClient, "get").mockResolvedValue(resolved);
+    const patchSpy = vi.spyOn(apiClient, "patch").mockResolvedValue({ nodes: [] });
+
+    renderInput(1, 1, 0x7ffeefb40000, 0x168d7b8cc);
+    fireEvent.change(screen.getByLabelText("Search functions"), {
+      target: { value: "0x7fff078112c4" },
+    });
+
+    await waitFor(() => {
+      expect(getSpy).toHaveBeenCalledWith(
+        "/binaries/1/functions/by-address?address=0x180a4cb90",
+      );
+    });
+    fireEvent.click(await screen.findByText("parse_config"));
+    await waitFor(() => {
+      expect(patchSpy).toHaveBeenCalledWith("/views/1/nodes", {
+        upsert: [{ functionId: 7, visible: true, originKind: "root" }],
+      });
+    });
+  });
+
+  it("requires a recorded Ghidra base for runtime address lookup", async () => {
+    const getSpy = vi.spyOn(apiClient, "get");
+    renderInput(1, 1, 0x7ffeefb40000, null);
+    fireEvent.change(screen.getByLabelText("Search functions"), {
+      target: { value: "0x7fff078112c4" },
+    });
+
+    expect(
+      await screen.findByText(/re-export and re-ingest/i),
+    ).toBeInTheDocument();
     expect(getSpy).not.toHaveBeenCalled();
   });
 });

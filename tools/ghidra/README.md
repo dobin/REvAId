@@ -78,6 +78,7 @@ not already have that extension.
     "name": "acme.exe",
     "version": "",              // free text; overridable via arg 2
     "sourcePath": "/path/to/acme.exe",   // may be null
+    "analysisImageBase": 4194304, // Ghidra's static program image base
     "sha256": "…",              // may be null
     "functionCount": 182,
     "edgeCount": 431
@@ -109,8 +110,13 @@ not already have that extension.
 
 ### Field notes
 
-- **Addresses are integers** (the function entry-point offset). The UI renders
-  them as hex; storage is integer (`AS7`).
+- **Addresses are integers** from Ghidra's normal program address space: static
+  virtual addresses (not RVAs) for ordinary loaded-memory functions. The UI
+  renders them as hex; storage is integer (`AS7`).
+- **`analysisImageBase`** is Ghidra's image base captured at export time. It
+  lets GraphRev translate a debugger's ASLR runtime VA to the stored static VA:
+  `staticVA = runtimeVA - runtimeLoadBase + analysisImageBase`. It is not a
+  runtime process load base.
 - **`kind` is never `placeholder`.** Placeholder rows are materialised by the
   ingestion pipeline (`B17`) from edges whose `calleeModule` is set and whose
   target is not a real function in the binary — the exporter only reports the

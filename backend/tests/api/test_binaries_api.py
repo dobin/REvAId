@@ -27,6 +27,7 @@ async def test_list_binaries_returns_both_mock_binaries_with_counts(
         assert b["edgeCount"] > 0
         assert "lastViewId" in b
         assert "createdAt" in b
+        assert b["analysisImageBase"] is None
 
 
 @pytest.mark.asyncio
@@ -174,7 +175,12 @@ def _import_document() -> dict:
     """A minimal Ghidra export document (schema v1) for the import endpoint."""
     return {
         "schemaVersion": 1,
-        "binary": {"name": "imported.exe", "version": "2.0", "sourcePath": "/tmp/imported.exe"},
+        "binary": {
+            "name": "imported.exe",
+            "version": "2.0",
+            "sourcePath": "/tmp/imported.exe",
+            "analysisImageBase": 0x400000,
+        },
         "functions": [
             {
                 "address": 0x401000,
@@ -234,6 +240,8 @@ async def test_import_binary_creates_new_binary(client: AsyncClient) -> None:
     listing = (await client.get("/api/v1/binaries")).json()
     names = {b["name"] for b in listing}
     assert "imported.exe" in names
+    imported = next(b for b in listing if b["name"] == "imported.exe")
+    assert imported["analysisImageBase"] == 0x400000
 
 
 @pytest.mark.asyncio

@@ -10,6 +10,7 @@ class BinarySummaryDto(ApiModel):
     id: int
     name: str
     version: str
+    analysis_image_base: int | None
     function_count: int
     edge_count: int
     last_view_id: int | None
@@ -22,6 +23,7 @@ def binary_summary_from_row(row: BinaryWithCounts) -> BinarySummaryDto:
         id=row.binary.id,
         name=row.binary.name,
         version=row.binary.version,
+        analysis_image_base=row.binary.analysis_image_base,
         function_count=row.function_count,
         edge_count=row.edge_count,
         last_view_id=row.binary.last_view_id,

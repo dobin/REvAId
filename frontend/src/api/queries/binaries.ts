@@ -7,6 +7,7 @@ import type {
   BinaryId,
   BinarySummaryDto,
   EntryPointsDto,
+  FunctionDto,
   FunctionSearchPageDto,
   GhidraExportDocument,
   ImportResultDto,
@@ -57,6 +58,23 @@ export function useFunctionSearchQuery(binaryId: BinaryId | null, query: string)
     queryKey: ["function-search", binaryId, trimmed],
     queryFn: () => fetchFunctionSearch(binaryId as BinaryId, trimmed),
     enabled: binaryId !== null && trimmed.length > 0,
+  });
+}
+
+async function fetchFunctionByAddress(binaryId: BinaryId, address: number): Promise<FunctionDto> {
+  const params = new URLSearchParams({ address: `0x${address.toString(16)}` });
+  return apiClient.get<FunctionDto>(
+    `/binaries/${String(binaryId)}/functions/by-address?${params.toString()}`,
+  );
+}
+
+/** Resolve a canonical Ghidra static address to its nearest known function. */
+export function useFunctionAddressQuery(binaryId: BinaryId | null, address: number | null) {
+  return useQuery({
+    queryKey: ["function-address", binaryId, address],
+    queryFn: () => fetchFunctionByAddress(binaryId as BinaryId, address as number),
+    enabled: binaryId !== null && address !== null,
+    retry: false,
   });
 }
 

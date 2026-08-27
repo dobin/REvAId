@@ -7,10 +7,12 @@
  */
 import { useMemo, useState } from "react";
 import { useViewQuery } from "@/api/queries/views";
-import { useFunctionSearchQuery } from "@/api/queries/binaries";
+import { useFunctionAddressQuery, useFunctionSearchQuery } from "@/api/queries/binaries";
 import type { BinaryId, ViewId } from "@/api/types";
 import { useCanvasActionsFromRegistry } from "@/features/canvas/CanvasActions";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { resolveAddressLookup } from "@/lib/address";
+import { toHex } from "@/lib/hex";
 
 const DEBOUNCE_MS = 250;
 
@@ -48,14 +50,23 @@ const rowButtonStyle: React.CSSProperties = {
 export function OnCanvasSearch({
   binaryId,
   viewId,
+  analysisImageBase,
+  runtimeBase,
 }: {
   binaryId: BinaryId | null;
   viewId: ViewId | null;
+  analysisImageBase: number | null;
+  runtimeBase: number | null;
 }) {
   const [text, setText] = useState("");
   const debounced = useDebouncedValue(text, DEBOUNCE_MS);
   const view = useViewQuery(viewId);
-  const search = useFunctionSearchQuery(binaryId, debounced);
+  const lookup = resolveAddressLookup(debounced, runtimeBase, analysisImageBase);
+  const search = useFunctionSearchQuery(binaryId, lookup.kind === "text" ? debounced : "");
+  const address = useFunctionAddressQuery(
+    binaryId,
+    lookup.kind === "address" ? lookup.canonicalAddress : null,
+  );
   const canvasActions = useCanvasActionsFromRegistry();
 
   const onCanvasIds = useMemo(() => {
@@ -67,6 +78,7 @@ export function OnCanvasSearch({
   }, [view.data]);
 
   const rows = (search.data?.rows ?? []).filter((row) => onCanvasIds.has(row.id));
+  const resolvedFunction = address.data;
   const showResults =
     debounced.trim().length > 0 && binaryId !== null && viewId !== null;
 
@@ -90,7 +102,32 @@ export function OnCanvasSearch({
       />
       {showResults && (
         <div style={resultsBoxStyle} role="listbox" aria-label="On-canvas search results">
-          {search.isPending ? (
+          {lookup.kind === "invalid" ? (
+            <p role="alert" style={{ fontSize: "0.75rem", color: "#b91c1c", padding: "0.25rem 0.5rem", margin: 0 }}>
+              {lookup.message}
+            </p>
+          ) : lookup.kind === "address" && address.isPending ? (
+            <p style={{ fontSize: "0.75rem", color: "#6b7280", padding: "0.25rem 0.5rem", margin: 0 }}>
+              Resolving {lookup.displayAddress}…
+            </p>
+          ) : lookup.kind === "address" && (address.isError || resolvedFunction === undefined) ? (
+            <p role="alert" style={{ fontSize: "0.75rem", color: "#b91c1c", padding: "0.25rem 0.5rem", margin: 0 }}>
+              No function could be resolved at {lookup.displayAddress}.
+            </p>
+          ) : lookup.kind === "address" && !onCanvasIds.has(resolvedFunction!.id) ? (
+            <p style={{ fontSize: "0.75rem", color: "#6b7280", padding: "0.25rem 0.5rem", margin: 0 }}>
+              {resolvedFunction!.displayName} is not on this canvas.
+            </p>
+          ) : lookup.kind === "address" ? (
+            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              <li>
+                <button type="button" role="option" aria-selected={false} onClick={() => jumpTo(resolvedFunction!.id)} style={rowButtonStyle} title={`Jump to ${resolvedFunction!.displayName}`}>
+                  <span className="gr-ground-truth">{resolvedFunction!.displayName}</span>
+                  <span style={{ color: "#6b7280" }}>{toHex(resolvedFunction!.address)}</span>
+                </button>
+              </li>
+            </ul>
+          ) : search.isPending ? (
             <p style={{ fontSize: "0.75rem", color: "#6b7280", padding: "0.25rem 0.5rem", margin: 0 }}>
               Searching…
             </p>
@@ -113,9 +150,7 @@ export function OnCanvasSearch({
                     title={`Jump to ${row.displayName}`}
                   >
                     <span className="gr-ground-truth">{row.displayName}</span>
-                    <span style={{ color: "#6b7280" }}>
-                      0x{row.address.toString(16)}
-                    </span>
+                    <span style={{ color: "#6b7280" }}>{toHex(row.address)}</span>
                   </button>
                 </li>
               ))}

@@ -78,11 +78,16 @@ async def _ingest_one_binary(
     settings: Settings,
     binary_ref: RawBinaryRef,
     binary_source_path: str | None,
+    analysis_image_base: int | None,
 ) -> BinaryIngestionReport:
     report = BinaryIngestionReport(binary_name=binary_ref.name)
 
     binary, _created = await get_or_create_binary(
-        session, name=binary_ref.name, version=binary_ref.version, source_path=binary_source_path
+        session,
+        name=binary_ref.name,
+        version=binary_ref.version,
+        source_path=binary_source_path,
+        analysis_image_base=analysis_image_base,
     )
 
     # -- functions -------------------------------------------------------
@@ -308,7 +313,12 @@ async def run_ingestion(
         try:
             async with unit_of_work(session_factory) as session:
                 report = await _ingest_one_binary(
-                    session, adapter, settings, binary_ref, raw_binary.source_path
+                    session,
+                    adapter,
+                    settings,
+                    binary_ref,
+                    raw_binary.source_path,
+                    raw_binary.analysis_image_base,
                 )
                 await _write_utility_threshold_bookkeeping(session, settings)
             reports.append(report)

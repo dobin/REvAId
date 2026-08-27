@@ -9,11 +9,13 @@
  * user can see what they are about to add before committing.
  */
 import { useState } from "react";
-import { useFunctionSearchQuery } from "@/api/queries/binaries";
+import { useFunctionAddressQuery, useFunctionSearchQuery } from "@/api/queries/binaries";
 import { usePatchViewNodesMutation } from "@/api/queries/viewNodes";
-import type { BinaryId, FunctionSearchRowDto, ViewId } from "@/api/types";
+import type { BinaryId, ViewId } from "@/api/types";
 import { useCanvasActionsFromRegistry } from "@/features/canvas/CanvasActions";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
+import { resolveAddressLookup } from "@/lib/address";
+import { toHex } from "@/lib/hex";
 
 const DEBOUNCE_MS = 250;
 
@@ -51,26 +53,36 @@ const rowButtonStyle: React.CSSProperties = {
 export function FunctionSearchInput({
   binaryId,
   viewId,
+  analysisImageBase,
+  runtimeBase,
 }: {
   binaryId: BinaryId | null;
   viewId: ViewId | null;
+  analysisImageBase: number | null;
+  runtimeBase: number | null;
 }) {
   const [text, setText] = useState("");
   const debounced = useDebouncedValue(text, DEBOUNCE_MS);
-  const search = useFunctionSearchQuery(binaryId, debounced);
+  const lookup = resolveAddressLookup(debounced, runtimeBase, analysisImageBase);
+  const search = useFunctionSearchQuery(binaryId, lookup.kind === "text" ? debounced : "");
+  const address = useFunctionAddressQuery(
+    binaryId,
+    lookup.kind === "address" ? lookup.canonicalAddress : null,
+  );
   const patchNodes = usePatchViewNodesMutation(viewId ?? 0);
   const canvasActions = useCanvasActionsFromRegistry();
 
   const rows = search.data?.rows ?? [];
+  const resolvedFunction = address.data;
   const showResults = debounced.trim().length > 0 && binaryId !== null;
 
-  const placeFunction = (row: FunctionSearchRowDto) => {
+  const placeFunction = (functionId: number) => {
     if (viewId === null) return;
     patchNodes.mutate(
-      { upsert: [{ functionId: row.id, visible: true, originKind: "root" }] },
+      { upsert: [{ functionId, visible: true, originKind: "root" }] },
       {
         onSuccess: () => {
-          canvasActions?.focusFunction(row.id);
+          canvasActions?.focusFunction(functionId);
         },
       },
     );
@@ -92,7 +104,36 @@ export function FunctionSearchInput({
       />
       {showResults && (
         <div style={resultsBoxStyle} role="listbox" aria-label="Function search results">
-          {search.isPending ? (
+          {lookup.kind === "invalid" ? (
+            <p role="alert" style={{ fontSize: "0.75rem", color: "#b91c1c", padding: "0.25rem 0.5rem", margin: 0 }}>
+              {lookup.message}
+            </p>
+          ) : lookup.kind === "address" && address.isPending ? (
+            <p style={{ fontSize: "0.75rem", color: "#6b7280", padding: "0.25rem 0.5rem", margin: 0 }}>
+              Resolving {lookup.displayAddress}…
+            </p>
+          ) : lookup.kind === "address" && (address.isError || resolvedFunction === undefined) ? (
+            <p role="alert" style={{ fontSize: "0.75rem", color: "#b91c1c", padding: "0.25rem 0.5rem", margin: 0 }}>
+              No function could be resolved at {lookup.displayAddress}.
+            </p>
+          ) : lookup.kind === "address" ? (
+            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              <li>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={false}
+                  disabled={patchNodes.isPending}
+                  onClick={() => placeFunction(resolvedFunction!.id)}
+                  style={rowButtonStyle}
+                  title={`Add ${resolvedFunction!.displayName} to the canvas`}
+                >
+                  <span className="gr-ground-truth">{resolvedFunction!.displayName}</span>
+                  <span style={{ color: "#6b7280" }}>{toHex(resolvedFunction!.address)}</span>
+                </button>
+              </li>
+            </ul>
+          ) : search.isPending ? (
             <p style={{ fontSize: "0.75rem", color: "#6b7280", padding: "0.25rem 0.5rem", margin: 0 }}>
               Searching…
             </p>
@@ -110,15 +151,13 @@ export function FunctionSearchInput({
                     aria-selected={false}
                     disabled={patchNodes.isPending}
                     onClick={() => {
-                      placeFunction(row);
+                      placeFunction(row.id);
                     }}
                     style={rowButtonStyle}
                     title={`Add ${row.displayName} to the canvas`}
                   >
                     <span className="gr-ground-truth">{row.displayName}</span>
-                    <span style={{ color: "#6b7280" }}>
-                      0x{row.address.toString(16)}
-                    </span>
+                    <span style={{ color: "#6b7280" }}>{toHex(row.address)}</span>
                   </button>
                 </li>
               ))}

@@ -32,6 +32,7 @@ export interface BinarySummaryDto {
   id: BinaryId;
   name: string;
   version: string;
+  analysisImageBase: number | null;
   functionCount: number;
   edgeCount: number;
   lastViewId: ViewId | null;
@@ -50,6 +51,7 @@ export interface GhidraExportDocument {
     name: string;
     version?: string;
     sourcePath?: string | null;
+    analysisImageBase?: number | null;
     sha256?: string | null;
     functionCount?: number | null;
     edgeCount?: number | null;

@@ -76,6 +76,9 @@ class GhidraExportBinary(ApiModel):
     name: str
     version: str = ""
     source_path: str | None = None
+    #: Static Ghidra image base captured by the exporter. Nullable for legacy
+    #: schema-v1 files, which cannot be rebased from runtime process VAs.
+    analysis_image_base: int | None = None
     sha256: str | None = None
     function_count: int | None = None
     edge_count: int | None = None

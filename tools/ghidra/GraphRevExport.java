@@ -501,6 +501,10 @@ public class GraphRevExport extends GhidraScript {
         b.field("name", program.getName());
         b.field("version", version);
         b.fieldOrNull("sourcePath", program.getExecutablePath());
+        // Function addresses remain static Ghidra VAs. Capturing the image
+        // base lets GraphRev translate a debugger's ASLR runtime VA back into
+        // that stable address space without changing function identities.
+        b.field("analysisImageBase", program.getImageBase().getOffset());
         b.fieldOrNull("sha256", program.getExecutableSHA256());
         b.field("functionCount", functionCount);
         b.field("edgeCount", edgeCount);

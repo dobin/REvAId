@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from graphrev.core.config import Settings
 from graphrev.core.errors import AppError, ErrorCode
-from graphrev.db.models import Function
+from graphrev.db.models import Binary, Function
 from graphrev.schemas.ingest import (
     GhidraExportBinary,
     GhidraExportDocument,
@@ -28,7 +28,12 @@ from graphrev.services import binary_service
 def _document() -> GhidraExportDocument:
     return GhidraExportDocument(
         schema_version=1,
-        binary=GhidraExportBinary(name="sample.exe", version="1.0", source_path="/tmp/sample.exe"),
+        binary=GhidraExportBinary(
+            name="sample.exe",
+            version="1.0",
+            source_path="/tmp/sample.exe",
+            analysis_image_base=0x400000,
+        ),
         functions=[
             GhidraExportFunction(
                 address=0x401000,
@@ -93,6 +98,24 @@ async def test_import_creates_binary_with_functions_and_placeholder(
     # 3 real (normal/normal/import) + 1 placeholder.
     assert "placeholder" in kinds
     assert len([k for k in kinds if k != "placeholder"]) == 3
+
+    binary = await session.get(Binary, result.binary_id)
+    assert binary is not None
+    assert binary.analysis_image_base == 0x400000
+
+
+@pytest.mark.asyncio
+async def test_import_legacy_document_leaves_analysis_image_base_null(
+    session_factory: async_sessionmaker[AsyncSession], settings: Settings
+) -> None:
+    doc = _document()
+    doc.binary.analysis_image_base = None
+    result = await binary_service.import_ghidra_export(session_factory, settings, doc)
+
+    async with session_factory() as session:
+        binary = await session.get(Binary, result.binary_id)
+    assert binary is not None
+    assert binary.analysis_image_base is None
 
 
 @pytest.mark.asyncio

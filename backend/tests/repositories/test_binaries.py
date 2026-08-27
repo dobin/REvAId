@@ -38,6 +38,24 @@ async def test_get_or_create_binary_is_idempotent(session: AsyncSession) -> None
 
 
 @pytest.mark.asyncio
+async def test_get_or_create_binary_refreshes_analysis_image_base(session: AsyncSession) -> None:
+    binary, created = await get_or_create_binary(
+        session, name="acme.exe", version="1.0", analysis_image_base=0x140000000
+    )
+    await session.commit()
+
+    refreshed, was_created = await get_or_create_binary(
+        session, name="acme.exe", version="1.0", analysis_image_base=0x180000000
+    )
+    await session.commit()
+
+    assert created is True
+    assert was_created is False
+    assert refreshed.id == binary.id
+    assert refreshed.analysis_image_base == 0x180000000
+
+
+@pytest.mark.asyncio
 async def test_get_or_create_binary_distinguishes_by_version(session: AsyncSession) -> None:
     b1, _ = await get_or_create_binary(session, name="acme.exe", version="1.0")
     b2, _ = await get_or_create_binary(session, name="acme.exe", version="2.0")

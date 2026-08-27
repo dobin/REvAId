@@ -22,11 +22,12 @@ async def get_or_create_binary(
     name: str,
     version: str,
     source_path: str | None = None,
+    analysis_image_base: int | None = None,
 ) -> tuple[Binary, bool]:
     """Return the `Binary` row for `(name, version)`, creating it if absent.
 
-    Returns `(binary, created)`. On an existing row, only `updated_at` and
-    `source_path` are refreshed — `last_view_id` is never written here.
+    Returns `(binary, created)`. On an existing row, ingestion-owned source
+    metadata is refreshed — `last_view_id` is never written here.
     """
     result = await session.execute(
         select(Binary).where(Binary.name == name, Binary.version == version)
@@ -36,6 +37,7 @@ async def get_or_create_binary(
 
     if existing is not None:
         existing.source_path = source_path
+        existing.analysis_image_base = analysis_image_base
         existing.updated_at = now
         await session.flush()
         return existing, False
@@ -44,6 +46,7 @@ async def get_or_create_binary(
         name=name,
         version=version,
         source_path=source_path,
+        analysis_image_base=analysis_image_base,
         created_at=now,
         updated_at=now,
     )

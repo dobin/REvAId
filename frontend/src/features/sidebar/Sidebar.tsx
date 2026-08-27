@@ -4,7 +4,6 @@
  */
 import type { BinaryId, ViewId } from "@/api/types";
 import { FunctionSearchInput } from "./FunctionSearchInput";
-import { GlyphLegend } from "./GlyphLegend";
 import { ImportBinaryButton } from "./ImportBinaryButton";
 import { OnCanvasSearch } from "./OnCanvasSearch";
 import { PlaceEntryPointButton } from "./PlaceEntryPointButton";
@@ -12,6 +11,7 @@ import { QueuePanel } from "./QueuePanel";
 import { RebalanceButton } from "./RebalanceButton";
 import { ResetCanvasButton } from "./ResetCanvasButton";
 import { ResetSummariesButton } from "./ResetSummariesButton";
+import { RuntimeBaseControl } from "./RuntimeBaseControl";
 import { ViewPicker } from "./ViewPicker";
 
 const sectionStyle: React.CSSProperties = {
@@ -47,12 +47,18 @@ function SidebarSection({
 export function Sidebar({
   binaryName,
   binaryId,
+  analysisImageBase,
+  runtimeBase,
+  onRuntimeBaseChange,
   viewId,
   onSelectView,
   onImported,
 }: {
   binaryName: string | null;
   binaryId: BinaryId | null;
+  analysisImageBase: number | null;
+  runtimeBase: number | null;
+  onRuntimeBaseChange: (value: number | null) => void;
   viewId: ViewId | null;
   onSelectView: (viewId: ViewId) => void;
   onImported: (binaryId: BinaryId) => void;
@@ -71,12 +77,32 @@ export function Sidebar({
         <ImportBinaryButton onImported={onImported} />
       </SidebarSection>
       {binaryId !== null && (
+        <SidebarSection title="Runtime Address">
+          <RuntimeBaseControl
+            key={binaryId}
+            analysisImageBase={analysisImageBase}
+            runtimeBase={runtimeBase}
+            onRuntimeBaseChange={onRuntimeBaseChange}
+          />
+        </SidebarSection>
+      )}
+      {binaryId !== null && (
         <SidebarSection title="Add Function">
-          <FunctionSearchInput binaryId={binaryId} viewId={viewId} />
+          <FunctionSearchInput
+            binaryId={binaryId}
+            viewId={viewId}
+            analysisImageBase={analysisImageBase}
+            runtimeBase={runtimeBase}
+          />
         </SidebarSection>
       )}
       <SidebarSection title="Find Function">
-        <OnCanvasSearch binaryId={binaryId} viewId={viewId} />
+        <OnCanvasSearch
+          binaryId={binaryId}
+          viewId={viewId}
+          analysisImageBase={analysisImageBase}
+          runtimeBase={runtimeBase}
+        />
       </SidebarSection>
 
       {binaryId !== null && binaryName !== null && (

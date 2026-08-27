@@ -24,6 +24,7 @@ function BinaryWorkspace({ binaryName }: { binaryName: string }) {
   const navigate = useNavigate();
   const { data: binaries, isPending, isError } = useBinariesQuery();
   const [selectedViewId, setSelectedViewId] = useState<ViewId | null>(null);
+  const [runtimeBase, setRuntimeBase] = useState<number | null>(null);
 
   const binary = binaries?.find((candidate) => candidate.name === binaryName) ?? null;
   const selectedBinaryId: BinaryId | null = binary?.id ?? null;
@@ -40,6 +41,7 @@ function BinaryWorkspace({ binaryName }: { binaryName: string }) {
   // Reset the view selection when navigating to a different binary.
   useEffect(() => {
     setSelectedViewId(null);
+    setRuntimeBase(null);
   }, [binaryName]);
 
   if (isPending) {
@@ -80,6 +82,9 @@ function BinaryWorkspace({ binaryName }: { binaryName: string }) {
           <Sidebar
             binaryName={binary.name}
             binaryId={selectedBinaryId}
+            analysisImageBase={binary.analysisImageBase}
+            runtimeBase={runtimeBase}
+            onRuntimeBaseChange={setRuntimeBase}
             viewId={selectedViewId}
             onSelectView={setSelectedViewId}
             onImported={handleImported}

@@ -65,6 +65,7 @@ class FileGhidraAdapter:
             name=document.binary.name,
             version=document.binary.version,
             source_path=document.binary.source_path,
+            analysis_image_base=document.binary.analysis_image_base,
         )
         self._functions: list[RawFunction] = [_to_raw_function(fn) for fn in document.functions]
         self._edges: list[RawEdge] = [_to_raw_edge(edge) for edge in document.edges]
