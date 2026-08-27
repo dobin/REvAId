@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ConfigProvider } from "@/config/ConfigProvider";
@@ -123,6 +123,22 @@ function callerPageWithOneRow(): NeighbourPageDto {
         fanIn: 1,
         isSelf: false,
         hasNotes: false,
+      },
+    ],
+    total: 1,
+    totalPrimary: 1,
+  };
+}
+
+function calleePageWithOneRow(onCanvas: boolean): NeighbourPageDto {
+  return {
+    ...emptyPage("callees"),
+    rows: [
+      {
+        ...callerPageWithOneRow().rows[0],
+        id: 7,
+        displayName: "the_callee",
+        onCanvas,
       },
     ],
     total: 1,
@@ -286,5 +302,93 @@ describe("CanvasView", () => {
         },
       ],
     });
+  });
+
+  it("refreshes a callee row after fan-out so its next click hides the card", async () => {
+    const patchBodies: unknown[] = [];
+    let calleeOnCanvas = false;
+    vi.unstubAllGlobals();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL | Request, init?: RequestInit) => {
+        const url = input instanceof Request ? input.url : String(input);
+        if (url.endsWith("/api/v1/config")) {
+          return Promise.resolve(new Response(JSON.stringify(config), { status: 200 }));
+        }
+        if (url.endsWith("/api/v1/views/5/nodes") && init?.method === "PATCH") {
+          const body = JSON.parse(String(init.body));
+          patchBodies.push(body);
+          const isVisible = body.upsert[0]?.visible === true;
+          calleeOnCanvas = isVisible;
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({
+                nodes: isVisible
+                  ? [
+                      ...view.nodes,
+                      {
+                        functionId: 7,
+                        visible: true,
+                        collapsed: false,
+                        color: null,
+                        posX: 0,
+                        posY: 0,
+                        pinned: false,
+                        originFunctionId: 1,
+                        originKind: "fanout",
+                        originImplied: false,
+                      },
+                    ]
+                  : view.nodes,
+              }),
+              { status: 200 },
+            ),
+          );
+        }
+        if (url.endsWith("/api/v1/views/5")) {
+          return Promise.resolve(new Response(JSON.stringify(view), { status: 200 }));
+        }
+        if (url.includes("/api/v1/functions/1/neighbours")) {
+          const page = url.includes("direction=callees")
+            ? calleePageWithOneRow(calleeOnCanvas)
+            : emptyPage("callers");
+          return Promise.resolve(new Response(JSON.stringify(page), { status: 200 }));
+        }
+        if (url.includes("/api/v1/functions/7/neighbours")) {
+          const direction = url.includes("direction=callers") ? "callers" : "callees";
+          return Promise.resolve(
+            new Response(JSON.stringify({ ...emptyPage(direction), functionId: 7 }), { status: 200 }),
+          );
+        }
+        if (url.endsWith("/api/v1/functions/1")) {
+          return Promise.resolve(new Response(JSON.stringify(mainFn), { status: 200 }));
+        }
+        if (url.endsWith("/api/v1/functions/7")) {
+          return Promise.resolve(
+            new Response(JSON.stringify({ ...mainFn, id: 7, displayName: "the_callee" }), { status: 200 }),
+          );
+        }
+        return Promise.reject(new Error(`Unexpected fetch: ${url}`));
+      }),
+    );
+
+    renderWithProviders(1, 5);
+    const calleeRow = (await screen.findByText("the_callee")).closest("[role='row']");
+    const fanOutButton = calleeRow?.querySelector<HTMLButtonElement>(
+      "button[aria-label='fan-out-or-focus']",
+    );
+    expect(fanOutButton).not.toBeNull();
+
+    fireEvent.click(fanOutButton!);
+    await waitFor(() => {
+      expect(patchBodies).toHaveLength(1);
+      expect(fanOutButton?.title).toBe("Hide — remove from canvas");
+    });
+
+    fireEvent.click(fanOutButton!);
+    await waitFor(() => {
+      expect(patchBodies).toHaveLength(2);
+    });
+    expect(patchBodies[1]).toEqual({ upsert: [{ functionId: 7, visible: false }] });
   });
 });
