@@ -3,6 +3,10 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import { Sidebar } from "./Sidebar";
 
+vi.mock("./LlmConnectionStatus", () => ({
+  LlmConnectionStatus: () => <div>LLM connector status</div>,
+}));
+
 describe("Sidebar", () => {
   it("renders the binary section", () => {
     const queryClient = new QueryClient();
@@ -21,6 +25,8 @@ describe("Sidebar", () => {
       </QueryClientProvider>,
     );
     expect(screen.getByText("Binary")).toBeInTheDocument();
+    expect(screen.getByText("LLM Connection")).toBeInTheDocument();
+    expect(screen.getByText("LLM connector status")).toBeInTheDocument();
   });
 
   it("renders the binary name and view controls in the View section", () => {

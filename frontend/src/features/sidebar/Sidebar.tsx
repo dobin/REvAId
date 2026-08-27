@@ -5,6 +5,7 @@
 import type { BinaryId, ViewId } from "@/api/types";
 import { FunctionSearchInput } from "./FunctionSearchInput";
 import { ImportBinaryButton } from "./ImportBinaryButton";
+import { LlmConnectionStatus } from "./LlmConnectionStatus";
 import { PlaceEntryPointButton } from "./PlaceEntryPointButton";
 import { QueuePanel } from "./QueuePanel";
 import { RebalanceButton } from "./RebalanceButton";
@@ -121,6 +122,10 @@ export function Sidebar({
           {binaryId !== null && <ResetSummariesButton binaryId={binaryId} />}
         </SidebarSection>
       ) : null}
+
+      <SidebarSection title="LLM Connection">
+        <LlmConnectionStatus />
+      </SidebarSection>
 
       <SidebarSection title="LLM Activity">
         <QueuePanel />
