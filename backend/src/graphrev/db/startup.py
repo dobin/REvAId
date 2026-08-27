@@ -6,36 +6,53 @@ serving traffic.
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import cast
 
-from sqlalchemy import CursorResult, text
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from graphrev.core.config import Settings
 from graphrev.core.logging import get_logger
+from graphrev.summarization.queue import MAX_PRIORITY, SummaryQueue
 
 logger = get_logger(__name__)
 
 _UTILITY_THRESHOLD_KEY = "utility_fanin_threshold"
 
 
-async def recover_pending_summaries(session: AsyncSession) -> int:
+async def recover_pending_summaries(session: AsyncSession, queue: SummaryQueue) -> int:
     """C5b: no function may display "Analyzing..." with no worker behind it.
 
-    Any row left ``pending`` from a previous process (crash, restart) is reset
-    to ``none``; the client will re-request on next render.
+    The queue is process-local, so any durable ``pending`` rows left by a
+    previous process must be restored into the new queue before workers
+    start. Their original priority and demand count are not durable; restart
+    recovery uses the lowest priority and one demand. A later visible request
+    can promote the item using normal queue semantics.
+
+    If the configured queue capacity was lowered since the previous process,
+    an evicted item cannot truthfully remain ``pending``. Reset only those
+    un-restorable rows to ``none`` so they can be requested again.
     """
-    result = cast(
-        "CursorResult[Any]",
+    result = await session.execute(text("SELECT id FROM functions WHERE summary_status = 'pending'"))
+    function_ids = [cast(int, function_id) for function_id in result.scalars()]
+    for function_id in function_ids:
+        queue.enqueue(function_id, MAX_PRIORITY)
+
+    # `enqueue` evicts a queued item if capacity was reduced. Preserve
+    # `pending` only for the IDs that are actually backed by this new queue.
+    unqueued_ids = [function_id for function_id in function_ids if not queue.is_queued(function_id)]
+    for function_id in unqueued_ids:
         await session.execute(
-            text("UPDATE functions SET summary_status = 'none' WHERE summary_status = 'pending'")
-        ),
-    )
+            text("UPDATE functions SET summary_status = 'none' WHERE id = :function_id"),
+            {"function_id": function_id},
+        )
     await session.commit()
-    count = result.rowcount or 0
-    if count:
-        logger.info("startup.recovered_pending_summaries", count=count)
-    return count
+    restored_count = len(function_ids) - len(unqueued_ids)
+    if restored_count:
+        logger.info("startup.recovered_pending_summaries", count=restored_count)
+    if unqueued_ids:
+        logger.warning("startup.pending_summaries_not_requeued", count=len(unqueued_ids))
+    return restored_count
 
 
 async def recompute_utility_if_threshold_changed(session: AsyncSession, settings: Settings) -> bool:

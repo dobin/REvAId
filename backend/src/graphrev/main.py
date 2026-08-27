@@ -73,6 +73,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.engine = engine
     app.state.session_factory = session_factory
 
+    # This queue is process-local. Construct it before restart recovery so
+    # durable pending rows are backed by work before any worker can begin.
+    summary_queue = SummaryQueue(max_depth=settings.queue_max_depth)
+
     import_job_manager = ImportJobManager(session_factory, settings)
     await import_job_manager.start()
     app.state.import_job_manager = import_job_manager
@@ -92,11 +96,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 "Database has no applied migration. Run `just migrate` first."
             )
 
-        # C5b: no function may display "Analyzing..." with no worker behind
-        # it. Must run BEFORE the worker pool starts, or an orphaned
-        # `pending` row from the recovery scan itself could race with a
-        # fresh worker starting to process it.
-        await recover_pending_summaries(session)
+        # C5b: restore pending work BEFORE the worker pool starts, so every
+        # "Analyzing..." row has an item in the new process-local queue.
+        await recover_pending_summaries(session, summary_queue)
         await recompute_utility_if_threshold_changed(session, settings)
 
     # I8: the event bus. Constructed before the worker pool so the pool's
@@ -138,7 +140,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # I7: the summarization plane. Constructed here (not at import time) so
     # each `create_app()` call — including one per test — gets its own queue
     # and worker pool rather than sharing process-wide singletons.
-    summary_queue = SummaryQueue(max_depth=settings.queue_max_depth)
     llm_adapter = create_llm_adapter(settings.llm_adapter, settings)
 
     async def _publish_queue_event() -> None:
