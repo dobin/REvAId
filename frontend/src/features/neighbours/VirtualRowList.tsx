@@ -1,7 +1,14 @@
 /**
- * Row virtualisation as a cost control — only rendered rows may be
- * summarised. The virtualizer's `overscan: 4` below is the lookahead: demand
- * is acquired for exactly its virtual rows, not every row in a large table.
+ * Row virtualisation for RENDER performance (only visible rows + overscan are
+ * mounted into the DOM).
+ *
+ * Summary DEMAND, however, is acquired for EVERY loaded row in the list, not
+ * just the visible virtual window — the user wants all callees/callers
+ * resolved up front without having to scroll. This stays bounded because the
+ * table only ever loads one page (`table_row_cap`, default 64) unless the
+ * user clicks "Load more", so "all loaded rows" is at most a page's worth,
+ * well within the summary queue's depth. (Fetching every page automatically
+ * is deliberately NOT done here — that could exceed the queue bound.)
  */
 import { useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
@@ -30,8 +37,8 @@ export function VirtualRowList({
   /** Fan-out provenance for every row in this list (the card + which table).
    * Optional so isolated row rendering (e.g. in a test) still works. */
   origin?: FanOutOrigin | undefined;
-  /** Omit demand for isolated rendering; cards pass it to resolve only their
-   * visible caller/callee rows. */
+  /** Omit demand for isolated rendering; cards pass it to resolve all their
+   * loaded caller/callee rows (not just the visible window). */
   demand?: { surface: SurfaceId; priority: Priority } | undefined;
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
@@ -43,13 +50,10 @@ export function VirtualRowList({
   });
 
   const virtualItems = virtualizer.getVirtualItems();
-  const visibleFunctionIds = useMemo(
-    () =>
-      virtualItems
-        .map((virtualRow) => rows[virtualRow.index]?.id)
-        .filter((id): id is number => id !== undefined),
-    [virtualItems, rows],
-  );
+  // Demand summaries for ALL loaded rows (not only the visible virtual
+  // window) so callees/callers resolve without the user scrolling. Bounded
+  // by the single fetched page (`table_row_cap`).
+  const demandFunctionIds = useMemo(() => rows.map((row) => row.id), [rows]);
 
   const height = Math.min(rows.length * ROW_HEIGHT_PX, MAX_LIST_HEIGHT_PX);
   const canScroll = rows.length * ROW_HEIGHT_PX > MAX_LIST_HEIGHT_PX;
@@ -103,7 +107,7 @@ export function VirtualRowList({
       </div>
       {demand && (
         <RowDemand
-          functionIds={visibleFunctionIds}
+          functionIds={demandFunctionIds}
           surface={demand.surface}
           priority={demand.priority}
         />

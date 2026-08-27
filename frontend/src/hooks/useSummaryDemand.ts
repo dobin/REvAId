@@ -21,7 +21,7 @@
  * - Unmount releases this surface's demand unconditionally.
  */
 import { useEffect, useMemo, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import type { FunctionDto, FunctionId, NeighbourPageDto, Priority } from "@/api/types";
 import { useConfig } from "@/config/ConfigProvider";
 import { useAppStore } from "@/store";
@@ -45,13 +45,29 @@ function isAlreadySettled(
     return fn.summary.status === "ready" || fn.summary.status === "pending";
   }
 
-  const neighbourCaches = queryClient.getQueriesData<NeighbourPageDto>({
+  // Check both neighbour caches: the bare single-page cache
+  // (`useNeighboursQuery`, key `["neighbours", ...]`) and the paginated one
+  // (`useInfiniteNeighboursQuery`, an `InfiniteData<NeighbourPageDto>` under
+  // `["neighbours-infinite", ...]`) that the card tables actually read from —
+  // a prefix match on `["neighbours"]` does NOT reach the `-infinite` key.
+  const barePages = queryClient.getQueriesData<NeighbourPageDto>({
     queryKey: ["neighbours"],
   });
-  for (const [, page] of neighbourCaches) {
+  for (const [, page] of barePages) {
     const row = page?.rows.find((r) => r.id === functionId);
     if (row) {
       return row.summaryStatus === "ready" || row.summaryStatus === "pending";
+    }
+  }
+  const infinitePages = queryClient.getQueriesData<InfiniteData<NeighbourPageDto>>({
+    queryKey: ["neighbours-infinite"],
+  });
+  for (const [, data] of infinitePages) {
+    for (const page of data?.pages ?? []) {
+      const row = page.rows.find((r) => r.id === functionId);
+      if (row) {
+        return row.summaryStatus === "ready" || row.summaryStatus === "pending";
+      }
     }
   }
   return false;
