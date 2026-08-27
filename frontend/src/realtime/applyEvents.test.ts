@@ -5,10 +5,22 @@
  * no refetch, no reload (the bug this locks in: neighbour tables showed
  * `FUN_…` until a manual page reload).
  */
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, type InfiniteData } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { FunctionDto, NeighbourPageDto, SummaryEvent } from "@/api/types";
 import { applySummaryEvent } from "./applyEvents";
+
+// The card tables read from `useInfiniteNeighboursQuery`, whose cache key is
+// `["neighbours-infinite", ...]` and whose value is `InfiniteData<
+// NeighbourPageDto>` (`{ pages: [...] }`), NOT a bare page under
+// `["neighbours", ...]`. Seeding the WRONG shape/key is exactly what let the
+// original bug ship green — these keys/shapes mirror the real queries.
+const INFINITE_KEY = ["neighbours-infinite", 1, 1, "callees", "primary"] as const;
+const BARE_KEY = ["neighbours", 1, 1, "callees", "primary"] as const;
+
+function makeInfinite(page = makeNeighbourPage()): InfiniteData<NeighbourPageDto> {
+  return { pages: [page], pageParams: [0] };
+}
 
 let qc: QueryClient;
 
@@ -131,17 +143,21 @@ describe("applySummaryEvent name patching (C13 auto-display)", () => {
     expect(fn?.nameLlm).toBe("parse_header"); // still exposed
   });
 
-  it("patches the matching row in every cached neighbour page", () => {
-    qc.setQueryData(["neighbours", 1, 1, "callees", "primary"], makeNeighbourPage());
+  it("patches the matching row in the infinite neighbour cache", () => {
+    // This is the shape the app actually uses (useInfiniteNeighboursQuery).
+    qc.setQueryData(INFINITE_KEY, makeInfinite());
     applySummaryEvent(qc, summaryEvent());
-    const page = qc.getQueryData<NeighbourPageDto>([
-      "neighbours",
-      1,
-      1,
-      "callees",
-      "primary",
-    ]);
-    const row = page?.rows[0];
+    const row = qc.getQueryData<InfiniteData<NeighbourPageDto>>(INFINITE_KEY)?.pages[0]?.rows[0];
+    expect(row?.nameLlm).toBe("parse_header");
+    expect(row?.displayName).toBe("parse_header");
+    expect(row?.summaryShort).toBe("Parses the header.");
+    expect(row?.summaryStatus).toBe("ready");
+  });
+
+  it("also patches the bare (single-page) neighbour cache", () => {
+    qc.setQueryData(BARE_KEY, makeNeighbourPage());
+    applySummaryEvent(qc, summaryEvent());
+    const row = qc.getQueryData<NeighbourPageDto>(BARE_KEY)?.rows[0];
     expect(row?.nameLlm).toBe("parse_header");
     expect(row?.displayName).toBe("parse_header");
     expect(row?.summaryShort).toBe("Parses the header.");
@@ -152,21 +168,19 @@ describe("applySummaryEvent name patching (C13 auto-display)", () => {
     const renamed = page.rows[0]!;
     renamed.isRenamed = true;
     renamed.displayName = "analyst_name";
-    qc.setQueryData(["neighbours", 1, 1, "callees", "primary"], page);
+    qc.setQueryData(INFINITE_KEY, makeInfinite(page));
     applySummaryEvent(qc, summaryEvent());
-    const row = qc.getQueryData<NeighbourPageDto>(["neighbours", 1, 1, "callees", "primary"])
-      ?.rows[0];
+    const row = qc.getQueryData<InfiniteData<NeighbourPageDto>>(INFINITE_KEY)?.pages[0]?.rows[0];
     expect(row?.displayName).toBe("analyst_name");
     expect(row?.nameLlm).toBe("parse_header");
   });
 
   it("an event without a proposal (nameLlm null) keeps existing names", () => {
     qc.setQueryData(["function", 17], makeFunction());
-    qc.setQueryData(["neighbours", 1, 1, "callees", "primary"], makeNeighbourPage());
+    qc.setQueryData(INFINITE_KEY, makeInfinite());
     applySummaryEvent(qc, summaryEvent({ nameLlm: null }));
     expect(qc.getQueryData<FunctionDto>(["function", 17])?.displayName).toBe("FUN_00001000");
-    const row = qc.getQueryData<NeighbourPageDto>(["neighbours", 1, 1, "callees", "primary"])
-      ?.rows[0];
+    const row = qc.getQueryData<InfiniteData<NeighbourPageDto>>(INFINITE_KEY)?.pages[0]?.rows[0];
     expect(row?.displayName).toBe("FUN_00001000");
     expect(row?.summaryStatus).toBe("ready"); // summary fields still patched
   });

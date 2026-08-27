@@ -6,7 +6,7 @@
  * (T1: card geometry derives from row count, known before any summary
  * exists; summaries must never trigger a layout pass).
  */
-import type { QueryClient } from "@tanstack/react-query";
+import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 import type {
   FunctionDto,
   NeighbourPageDto,
@@ -16,6 +16,37 @@ import type {
   SummaryEvent,
 } from "@/api/types";
 import { QUEUE_QUERY_KEY } from "@/api/queries/queue";
+
+/**
+ * Patch a single neighbour page's rows for one summary event. Shared by the
+ * bare-page cache (`useNeighboursQuery`, key `["neighbours", ...]`) and the
+ * paginated cache (`useInfiniteNeighboursQuery`, key
+ * `["neighbours-infinite", ...]`) — the card tables use the latter, so
+ * patching only the former (the original bug) left row names showing `FUN_…`
+ * until a manual reload.
+ *
+ * `NeighbourRowDto` carries no `nameAnalyst`, but `isRenamed` gates the LLM
+ * name server-side (analyst beats LLM), so a renamed row keeps its analyst
+ * display name untouched.
+ */
+function patchNeighbourPage(page: NeighbourPageDto, e: SummaryEvent): NeighbourPageDto {
+  if (!page.rows.some((r) => r.id === e.functionId)) return page;
+  return {
+    ...page,
+    rows: page.rows.map((r) =>
+      r.id === e.functionId
+        ? {
+            ...r,
+            nameLlm: e.nameLlm ?? r.nameLlm,
+            displayName: !r.isRenamed && e.nameLlm ? e.nameLlm : r.displayName,
+            summaryShort: e.summaryShort ?? r.summaryShort,
+            summaryStatus: e.summaryStatus,
+            summaryLowConfidence: e.lowConfidence,
+          }
+        : r,
+    ),
+  };
+}
 
 export function applySummaryEvent(qc: QueryClient, e: SummaryEvent): void {
   qc.setQueryData<FunctionDto>(["function", e.functionId], (fn) =>
@@ -45,27 +76,25 @@ export function applySummaryEvent(qc: QueryClient, e: SummaryEvent): void {
   // Patch the row wherever it appears, in every cached neighbour page —
   // this is the "one event updates all surfaces" requirement (E5a): the
   // same function can be a row in several open cards' tables at once.
-  // `NeighbourRowDto` carries no `nameAnalyst`, but `isRenamed` gates the
-  // LLM name server-side (analyst beats LLM), so a renamed row keeps its
-  // analyst display name untouched.
+  //
+  // Two distinct caches hold neighbour rows and BOTH must be patched:
+  //  - `["neighbours", ...]`         — `useNeighboursQuery` (single page).
+  //  - `["neighbours-infinite", ...]` — `useInfiniteNeighboursQuery`, whose
+  //    value is `InfiniteData<NeighbourPageDto>` (`{ pages: [...] }`), NOT a
+  //    bare page. The card tables (`NeighbourTable`) use THIS one; a prefix
+  //    match on `["neighbours"]` does not reach the `-infinite` key, so it
+  //    was silently skipped before (the reason row names only fixed on
+  //    reload). Note the `exact: false` default still won't cross the
+  //    differing first key segment, hence two explicit `setQueriesData`.
   qc.setQueriesData<NeighbourPageDto>({ queryKey: ["neighbours"] }, (page) =>
-    page && page.rows.some((r) => r.id === e.functionId)
-      ? {
-          ...page,
-          rows: page.rows.map((r) =>
-            r.id === e.functionId
-              ? {
-                  ...r,
-                  nameLlm: e.nameLlm ?? r.nameLlm,
-                  displayName: !r.isRenamed && e.nameLlm ? e.nameLlm : r.displayName,
-                  summaryShort: e.summaryShort ?? r.summaryShort,
-                  summaryStatus: e.summaryStatus,
-                  summaryLowConfidence: e.lowConfidence,
-                }
-              : r,
-          ),
-        }
-      : page,
+    page ? patchNeighbourPage(page, e) : page,
+  );
+  qc.setQueriesData<InfiniteData<NeighbourPageDto>>(
+    { queryKey: ["neighbours-infinite"] },
+    (data) =>
+      data
+        ? { ...data, pages: data.pages.map((page) => patchNeighbourPage(page, e)) }
+        : data,
   );
 }
 
@@ -97,6 +126,9 @@ export function applyQueueEvent(qc: QueryClient, e: QueueEvent): void {
 export function reconcileAfterReconnect(qc: QueryClient): void {
   void qc.invalidateQueries({ queryKey: ["function"] });
   void qc.invalidateQueries({ queryKey: ["neighbours"] });
+  // Separate key segment ("neighbours-infinite") — not covered by the
+  // "neighbours" invalidation's prefix match, so invalidate it explicitly.
+  void qc.invalidateQueries({ queryKey: ["neighbours-infinite"] });
   void qc.invalidateQueries({ queryKey: QUEUE_QUERY_KEY });
 }
 
