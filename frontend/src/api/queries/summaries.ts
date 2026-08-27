@@ -18,7 +18,6 @@ import type {
   SummaryDemandRequest,
   SummaryDemandResponseDto,
 } from "@/api/types";
-import { QUEUE_QUERY_KEY } from "./queue";
 
 async function demandSummary(
   functionId: FunctionId,
@@ -31,24 +30,16 @@ async function demandSummary(
 }
 
 export function useDemandSummaryMutation() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ functionId, ...request }: { functionId: FunctionId } & SummaryDemandRequest) =>
       demandSummary(functionId, request),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: QUEUE_QUERY_KEY });
-    },
   });
 }
 
 export function useReleaseSummaryDemandMutation() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (functionId: FunctionId) =>
       apiClient.delete<void>(`/functions/${String(functionId)}/summary`),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: QUEUE_QUERY_KEY });
-    },
   });
 }
 
@@ -61,7 +52,6 @@ export function useRegenerateSummaryMutation() {
       ),
     onSuccess: (_result, functionId) => {
       void queryClient.invalidateQueries({ queryKey: ["function", functionId] });
-      void queryClient.invalidateQueries({ queryKey: QUEUE_QUERY_KEY });
     },
   });
 }
@@ -79,7 +69,6 @@ export function useClearBinarySummariesMutation() {
       apiClient.delete(`/binaries/${String(binaryId)}/summaries`),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["function"] });
-      void queryClient.invalidateQueries({ queryKey: QUEUE_QUERY_KEY });
     },
   });
 }
