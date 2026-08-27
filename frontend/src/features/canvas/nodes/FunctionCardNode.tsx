@@ -105,7 +105,7 @@ export function FunctionCardNode({ data }: { data: FunctionCardNodeData }) {
     >
       <NodeHandles />
       <div style={{ display: "flex", alignItems: "center" }}>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <CardHeader
             fn={fn}
             color={data.viewNode.color}

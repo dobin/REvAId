@@ -60,7 +60,16 @@ export function CardHeader({
         />
       )}
       {fn.isRenamed && <Glyph name="renamed" />}
-      <span className="gr-ground-truth" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+      <span
+        className="gr-ground-truth"
+        style={{
+          minWidth: 0,
+          flex: 1,
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          whiteSpace: "nowrap",
+        }}
+      >
         {fn.displayName}
       </span>
       <span className="gr-ground-truth" style={{ fontSize: "0.75rem", color: "#6b7280" }}>
