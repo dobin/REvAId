@@ -31,7 +31,7 @@ import type { FunctionDto, FunctionId } from "@/api/types";
 
 // Small delay so a quick pass over the name doesn't fire a fetch or flash the
 // popup — only a deliberate hover surfaces it.
-const HOVER_OPEN_DELAY_MS = 200;
+const HOVER_OPEN_DELAY_MS = 400;
 // Grace period after the pointer leaves the anchor so it can travel onto the
 // popup (to scroll / select) before we close. Cancelled on re-enter.
 const HOVER_CLOSE_DELAY_MS = 120;
