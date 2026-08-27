@@ -14,5 +14,6 @@ describe("TableFooter", () => {
   it("hides Load more when every row is loaded", () => {
     render(<TableFooter shown={34} total={34} onLoadMore={vi.fn()} />);
     expect(screen.queryByRole("button", { name: "Load more" })).not.toBeInTheDocument();
+    expect(screen.queryByText("showing 34 of 34")).not.toBeInTheDocument();
   });
 });

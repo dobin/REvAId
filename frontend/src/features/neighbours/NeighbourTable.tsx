@@ -10,6 +10,7 @@
 import { useState } from "react";
 import { useInfiniteNeighboursQuery } from "@/api/queries/neighbours";
 import type { FunctionId, ViewId } from "@/api/types";
+import { useConfig } from "@/config/ConfigProvider";
 import { useAppStore } from "@/store";
 import { FilterInput } from "./FilterInput";
 import { SortControl, type SortKey, type SortOrder } from "./SortControl";
@@ -28,6 +29,7 @@ export function NeighbourTable({
   viewId: ViewId;
   direction: "callees" | "callers";
 }) {
+  const config = useConfig();
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortKey>("name");
   const [order, setOrder] = useState<SortOrder>("asc");
@@ -39,6 +41,7 @@ export function NeighbourTable({
     viewId,
     direction,
     group: "primary",
+    limit: direction === "callers" ? 5 : config.tableRowCap,
     sort,
     order,
     ...(filter ? { filter } : {}),
@@ -96,7 +99,7 @@ export function NeighbourTable({
         shown={rows.length}
         total={firstPage.total}
         isLoadingMore={isFetchingNextPage}
-        {...(hasNextPage ? { onLoadMore: () => void fetchNextPage() } : {})}
+        {...(direction === "callees" && hasNextPage ? { onLoadMore: () => void fetchNextPage() } : {})}
       />
       <UtilityGroup
         functionId={functionId}

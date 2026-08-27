@@ -40,7 +40,7 @@ export function SortControl({
           onOrderChange(order === "asc" ? "desc" : "asc");
         }}
       >
-        <Glyph name="sort" /> {order}
+        <Glyph name={order === "asc" ? "sortAsc" : "sortDesc"} />
       </button>
     </span>
   );

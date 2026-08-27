@@ -23,9 +23,7 @@ export function TableFooter({
         padding: "0.25rem 0",
       }}
     >
-      <span>
-        showing {shown} of {total}
-      </span>
+      {shown < total && <span>showing {shown} of {total}</span>}
       {shown < total && onLoadMore && (
         <button type="button" onClick={onLoadMore} disabled={isLoadingMore}>
           {isLoadingMore ? "Loading…" : "Load more"}

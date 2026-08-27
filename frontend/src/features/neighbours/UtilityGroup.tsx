@@ -5,6 +5,7 @@
  */
 import { useState } from "react";
 import { Glyph } from "@/components/Glyph";
+import { useConfig } from "@/config/ConfigProvider";
 import { useInfiniteNeighboursQuery } from "@/api/queries/neighbours";
 import type { FunctionId, Priority, ViewId } from "@/api/types";
 import type { FanOutOrigin } from "@/features/canvas/CanvasActions";
@@ -79,11 +80,13 @@ function UtilityGroupRows({
   origin?: FanOutOrigin | undefined;
   priority: Priority;
 }) {
+  const config = useConfig();
   const { data, isPending, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteNeighboursQuery({
     functionId,
     viewId,
     direction,
     group: "utility",
+    limit: direction === "callers" ? 5 : config.tableRowCap,
   });
 
   if (isPending) return <p style={{ fontSize: "0.75rem" }}>Loading…</p>;

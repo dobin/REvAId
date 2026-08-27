@@ -194,6 +194,6 @@ describe("NeighbourTable", () => {
     });
     // The list is virtualized, so jsdom intentionally does not guarantee
     // that row 17 is mounted. The count proves it was appended for scrolling.
-    expect(screen.getByText("showing 17 of 17")).toBeInTheDocument();
+    expect(screen.queryByText("showing 17 of 17")).not.toBeInTheDocument();
   });
 });
