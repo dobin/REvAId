@@ -5,7 +5,6 @@
 import type { BinaryId, ViewId } from "@/api/types";
 import { FunctionSearchInput } from "./FunctionSearchInput";
 import { ImportBinaryButton } from "./ImportBinaryButton";
-import { OnCanvasSearch } from "./OnCanvasSearch";
 import { PlaceEntryPointButton } from "./PlaceEntryPointButton";
 import { QueuePanel } from "./QueuePanel";
 import { RebalanceButton } from "./RebalanceButton";
@@ -87,7 +86,7 @@ export function Sidebar({
         </SidebarSection>
       )}
       {binaryId !== null && (
-        <SidebarSection title="Add Function">
+        <SidebarSection title="Functions">
           <FunctionSearchInput
             binaryId={binaryId}
             viewId={viewId}
@@ -96,15 +95,6 @@ export function Sidebar({
           />
         </SidebarSection>
       )}
-      <SidebarSection title="Find Function">
-        <OnCanvasSearch
-          binaryId={binaryId}
-          viewId={viewId}
-          analysisImageBase={analysisImageBase}
-          runtimeBase={runtimeBase}
-        />
-      </SidebarSection>
-
       {binaryId !== null && binaryName !== null && (
         <SidebarSection title="View">
           <div

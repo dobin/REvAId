@@ -8,6 +8,7 @@ import type {
   NeighbourRowDto,
   ViewNodesPatchResponse,
 } from "@/api/types";
+import { CanvasActionsProvider, type CanvasActions } from "@/features/canvas/CanvasActions";
 import { FunctionSearchInput } from "./FunctionSearchInput";
 
 function neighbourRow(overrides: Partial<NeighbourRowDto> & { id: number }): NeighbourRowDto {
@@ -55,16 +56,19 @@ function renderInput(
   viewId: number | null = 1,
   runtimeBase: number | null = null,
   analysisImageBase: number | null = 0x180000000,
+  canvasActions: CanvasActions | null = null,
 ) {
   const queryClient = new QueryClient();
   render(
     <QueryClientProvider client={queryClient}>
-      <FunctionSearchInput
-        binaryId={binaryId}
-        viewId={viewId}
-        runtimeBase={runtimeBase}
-        analysisImageBase={analysisImageBase}
-      />
+      <CanvasActionsProvider value={canvasActions}>
+        <FunctionSearchInput
+          binaryId={binaryId}
+          viewId={viewId}
+          runtimeBase={runtimeBase}
+          analysisImageBase={analysisImageBase}
+        />
+      </CanvasActionsProvider>
     </QueryClientProvider>,
   );
 }
@@ -150,7 +154,8 @@ describe("FunctionSearchInput", () => {
       query: null,
     });
     renderInput();
-    expect(getSpy).not.toHaveBeenCalled();
+    expect(getSpy).toHaveBeenCalledWith("/views/1");
+    expect(getSpy).not.toHaveBeenCalledWith(expect.stringContaining("/functions?"));
   });
 
   it("translates a runtime VA before resolving and adding its function", async () => {
@@ -327,6 +332,45 @@ describe("FunctionSearchInput", () => {
     });
   });
 
+  it("jumps to an already-visible function instead of adding it again", async () => {
+    const page: FunctionSearchPageDto = {
+      rows: [{
+        id: 7,
+        address: 0x401000,
+        displayName: "parse_config",
+        isRenamed: false,
+        kind: "normal",
+        isUtility: false,
+        fanIn: 2,
+        hasNotes: false,
+        isEntryPoint: false,
+      }],
+      total: 1,
+      limit: 50,
+      offset: 0,
+      query: "parse",
+    };
+    vi.spyOn(apiClient, "get").mockImplementation((url: string) => {
+      if (url === "/views/1") {
+        return Promise.resolve({ nodes: [{ functionId: 7, visible: true }] });
+      }
+      return Promise.resolve(page);
+    });
+    const patchSpy = vi.spyOn(apiClient, "patch");
+    const focusFunction = vi.fn();
+
+    renderInput(1, 1, null, 0x180000000, {
+      fanOutFunction: vi.fn(),
+      focusFunction,
+      hideFunction: vi.fn(),
+    });
+    fireEvent.change(screen.getByLabelText("Search functions"), { target: { value: "parse" } });
+    fireEvent.click(await screen.findByText("parse_config"));
+
+    expect(focusFunction).toHaveBeenCalledWith(7);
+    expect(patchSpy).not.toHaveBeenCalled();
+  });
+
   it("requires a recorded Ghidra base for runtime address lookup", async () => {
     const getSpy = vi.spyOn(apiClient, "get");
     renderInput(1, 1, 0x7ffeefb40000, null);
@@ -337,6 +381,7 @@ describe("FunctionSearchInput", () => {
     expect(
       await screen.findByText(/re-export and re-ingest/i),
     ).toBeInTheDocument();
-    expect(getSpy).not.toHaveBeenCalled();
+    expect(getSpy).toHaveBeenCalledWith("/views/1");
+    expect(getSpy).not.toHaveBeenCalledWith(expect.stringContaining("/functions"));
   });
 });

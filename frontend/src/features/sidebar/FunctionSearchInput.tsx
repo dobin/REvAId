@@ -1,16 +1,18 @@
 /**
  * Sidebar function search (D9/I11 stopgap) — a single text field that
  * searches `name_ghidra`, `name_analyst`, and `address` (via
- * `GET /binaries/{id}/functions?q=`, B11/E1a) and lets the user place any
- * matching function onto the canvas, closing the long-standing gap where
- * `PlaceEntryPointButton` only ever offered the binary's #1 entry point.
+ * `GET /binaries/{id}/functions?q=`, B11/E1a). Picking a match focuses it
+ * when it is already visible on the canvas; otherwise it places the function,
+ * closing the gap where `PlaceEntryPointButton` only offered the binary's #1
+ * entry point.
  *
  * A single hit is still shown in the results box (not auto-selected) so the
- * user can see what they are about to add before committing.
+ * user can see whether selecting it will jump to or add the function.
  */
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useFunctionAddressQuery, useFunctionSearchQuery } from "@/api/queries/binaries";
 import { usePatchViewNodesMutation } from "@/api/queries/viewNodes";
+import { useViewQuery } from "@/api/queries/views";
 import type { BinaryId, ViewId, ViewNodeUpsertRequest } from "@/api/types";
 import { useCanvasActionsFromRegistry } from "@/features/canvas/CanvasActions";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
@@ -65,6 +67,7 @@ export function FunctionSearchInput({
   const [text, setText] = useState("");
   const debounced = useDebouncedValue(text, DEBOUNCE_MS);
   const lookup = resolveAddressLookup(debounced, runtimeBase, analysisImageBase);
+  const view = useViewQuery(viewId);
   const search = useFunctionSearchQuery(binaryId, lookup.kind === "text" ? debounced : "");
   const address = useFunctionAddressQuery(
     binaryId,
@@ -77,10 +80,22 @@ export function FunctionSearchInput({
   const rows = search.data?.rows ?? [];
   const resolvedFunction = address.data;
   const showResults = debounced.trim().length > 0 && binaryId !== null;
+  const onCanvasIds = useMemo(() => {
+    const ids = new Set<number>();
+    for (const node of view.data?.nodes ?? []) {
+      if (node.visible) ids.add(node.functionId);
+    }
+    return ids;
+  }, [view.data]);
 
-  const placeFunction = (functionId: number) => {
+  const selectFunction = (functionId: number) => {
     if (viewId === null) return;
     setText("");
+
+    if (onCanvasIds.has(functionId)) {
+      canvasActions?.focusFunction(functionId);
+      return;
+    }
 
     // Auto-link to an already-on-canvas caller/callee (mirrors fan-out ⤢)
     // rather than always landing as a disconnected `root`. The lookup reuses
@@ -116,7 +131,7 @@ export function FunctionSearchInput({
       <input
         type="text"
         aria-label="Search functions"
-        placeholder="Search function to add to canvas"
+        placeholder="Find or add function"
         value={text}
         disabled={binaryId === null || viewId === null}
         onChange={(e) => {
@@ -145,10 +160,12 @@ export function FunctionSearchInput({
                   type="button"
                   role="option"
                   aria-selected={false}
-                  disabled={patchNodes.isPending}
-                  onClick={() => placeFunction(resolvedFunction!.id)}
+                  disabled={patchNodes.isPending || view.isPending}
+                  onClick={() => selectFunction(resolvedFunction!.id)}
                   style={rowButtonStyle}
-                  title={`Add ${resolvedFunction!.displayName} to the canvas`}
+                  title={onCanvasIds.has(resolvedFunction!.id)
+                    ? `Jump to ${resolvedFunction!.displayName}`
+                    : `Add ${resolvedFunction!.displayName} to the canvas`}
                 >
                   <span className="gr-ground-truth">{resolvedFunction!.displayName}</span>
                   <span style={{ color: "#6b7280" }}>{toHex(resolvedFunction!.address)}</span>
@@ -171,12 +188,14 @@ export function FunctionSearchInput({
                     type="button"
                     role="option"
                     aria-selected={false}
-                    disabled={patchNodes.isPending}
+                    disabled={patchNodes.isPending || view.isPending}
                     onClick={() => {
-                      placeFunction(row.id);
+                      selectFunction(row.id);
                     }}
                     style={rowButtonStyle}
-                    title={`Add ${row.displayName} to the canvas`}
+                    title={onCanvasIds.has(row.id)
+                      ? `Jump to ${row.displayName}`
+                      : `Add ${row.displayName} to the canvas`}
                   >
                     <span className="gr-ground-truth">{row.displayName}</span>
                     <span style={{ color: "#6b7280" }}>{toHex(row.address)}</span>
