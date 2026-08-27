@@ -11,11 +11,12 @@
 import { useState } from "react";
 import { useFunctionAddressQuery, useFunctionSearchQuery } from "@/api/queries/binaries";
 import { usePatchViewNodesMutation } from "@/api/queries/viewNodes";
-import type { BinaryId, ViewId } from "@/api/types";
+import type { BinaryId, ViewId, ViewNodeUpsertRequest } from "@/api/types";
 import { useCanvasActionsFromRegistry } from "@/features/canvas/CanvasActions";
 import { useDebouncedValue } from "@/hooks/useDebouncedValue";
 import { resolveAddressLookup } from "@/lib/address";
 import { toHex } from "@/lib/hex";
+import { useConnectNewNode } from "./useConnectNewNode";
 
 const DEBOUNCE_MS = 250;
 
@@ -71,6 +72,7 @@ export function FunctionSearchInput({
   );
   const patchNodes = usePatchViewNodesMutation(viewId ?? 0);
   const canvasActions = useCanvasActionsFromRegistry();
+  const connectNewNode = useConnectNewNode(viewId);
 
   const rows = search.data?.rows ?? [];
   const resolvedFunction = address.data;
@@ -78,15 +80,35 @@ export function FunctionSearchInput({
 
   const placeFunction = (functionId: number) => {
     if (viewId === null) return;
-    patchNodes.mutate(
-      { upsert: [{ functionId, visible: true, originKind: "root" }] },
-      {
-        onSuccess: () => {
-          canvasActions?.focusFunction(functionId);
-        },
-      },
-    );
     setText("");
+
+    // Auto-link to an already-on-canvas caller/callee (mirrors fan-out ⤢)
+    // rather than always landing as a disconnected `root`. The lookup reuses
+    // the `onCanvas` flag from the neighbours query; if it finds nothing (or
+    // fails), we place the node as a plain `root`. Placement itself never
+    // blocks on the lookup failing.
+    void connectNewNode(functionId)
+      .catch(() => null)
+      .then((origin) => {
+        const node: ViewNodeUpsertRequest = origin
+          ? {
+              functionId,
+              visible: true,
+              originFunctionId: origin.originFunctionId,
+              originKind: origin.originKind,
+              originImplied: false,
+            }
+          : { functionId, visible: true, originKind: "root" };
+
+        patchNodes.mutate(
+          { upsert: [node] },
+          {
+            onSuccess: () => {
+              canvasActions?.focusFunction(functionId);
+            },
+          },
+        );
+      });
   };
 
   return (

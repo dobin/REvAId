@@ -27,12 +27,12 @@ export function RuntimeBaseControl({
   return (
     <div>
       <p style={{ fontSize: "0.75rem", color: "#6b7280", margin: "0 0 0.375rem" }}>
-        Ghidra image base: {analysisImageBase === null ? "not recorded" : toHex(analysisImageBase)}
+        Default image base: {analysisImageBase === null ? "not recorded" : toHex(analysisImageBase)}
       </p>
       <input
         type="text"
         aria-label="Runtime load base"
-        placeholder="Runtime load base (e.g. 0x7ffeefb40000)"
+        placeholder="Your image base (optional)"
         value={text}
         onChange={(event) => {
           const next = event.target.value;
@@ -50,7 +50,6 @@ export function RuntimeBaseControl({
         </p>
       ) : (
         <p style={{ fontSize: "0.75rem", color: "#6b7280", margin: "0.25rem 0 0" }}>
-          Optional; applies to 0x address lookups for this browser session.
         </p>
       )}
     </div>
