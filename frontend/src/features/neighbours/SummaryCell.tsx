@@ -6,6 +6,7 @@
  * omit it for read-only/isolated rendering).
  */
 import { Glyph } from "@/components/Glyph";
+import { Spinner } from "@/components/Spinner";
 import type { FunctionId, SummaryStatus } from "@/api/types";
 import { useRegenerateSummaryMutation } from "@/api/queries/summaries";
 
@@ -29,8 +30,8 @@ export function SummaryCell({
       return <span style={{ color: "#9ca3af" }}>—</span>;
     case "pending":
       return (
-        <span style={{ color: "#6b7280" }}>
-          <Glyph name="generating" /> <span className="gr-shimmer">Generating…</span>
+        <span style={{ color: "#6b7280", display: "inline-flex", alignItems: "center", gap: "0.375rem" }}>
+          <Spinner label="Summary generating" /> Generating…
         </span>
       );
     case "ready":

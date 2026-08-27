@@ -53,9 +53,21 @@
   color: transparent;
 }
 
+/* I9 §5.3: real animated spinner for the "summary generating" state,
+ * replacing the static `◌` glyph + grey shimmer square. Same small inline
+ * footprint as a glyph. */
+@keyframes gr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .gr-shimmer {
     animation: none;
     background: #e5e7eb;
+  }
+  .gr-spinner {
+    animation: none;
   }
 }

@@ -19,6 +19,7 @@
  */
 import { useState } from "react";
 import { Glyph } from "@/components/Glyph";
+import { Spinner } from "@/components/Spinner";
 import { SummaryPopover } from "@/components/SummaryPopover";
 import { SummaryBody } from "@/components/SummaryBody";
 import type { FunctionDto } from "@/api/types";
@@ -33,10 +34,8 @@ export function CardSummary({ fn }: { fn: FunctionDto }) {
 
   if (status === "pending") {
     return (
-      <div style={{ padding: "0.375rem 0.75rem 0.25rem", fontSize: "0.75rem" }}>
-        <span className="gr-shimmer">
-          <Glyph name="generating" /> Generating summary…
-        </span>
+      <div style={{ padding: "0.375rem 0.75rem 0.25rem", fontSize: "0.75rem", display: "flex", alignItems: "center", gap: "0.375rem", color: "#6b7280" }}>
+        <Spinner label="Summary generating" /> Generating summary…
       </div>
     );
   }

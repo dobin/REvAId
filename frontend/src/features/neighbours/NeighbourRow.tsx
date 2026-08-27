@@ -9,6 +9,7 @@
  * line.
  */
 import { Glyph } from "@/components/Glyph";
+import { Spinner } from "@/components/Spinner";
 import { toHex } from "@/lib/hex";
 import type { NeighbourRowDto } from "@/api/types";
 import { useCanvasActions, type FanOutOrigin } from "@/features/canvas/CanvasActions";
@@ -76,9 +77,7 @@ export function NeighbourRow({
               (applySummaryEvent), so this appears the moment the function
               is demanded and vanishes when its summary lands. */}
           {row.summaryStatus === "pending" && (
-            <span className="gr-shimmer">
-              <Glyph name="generating" />
-            </span>
+            <Spinner label="Summary generating" />
           )}
           <FunctionInfoTooltip functionId={row.id}>
             <span

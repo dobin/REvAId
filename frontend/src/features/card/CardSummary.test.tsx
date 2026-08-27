@@ -114,13 +114,13 @@ describe("CardSummary", () => {
     expect(onParentClick).not.toHaveBeenCalled();
   });
 
-  it("renders a shimmering generating message when pending", () => {
+  it("renders a generating message with a spinner when pending", () => {
     renderWithClient(
       <CardSummary fn={{ ...baseFn, summary: { ...baseFn.summary, status: "pending" } }} />,
     );
-    const shimmer = screen.getByText(/generating/i);
-    expect(shimmer).toBeInTheDocument();
-    expect(shimmer).toHaveClass("gr-shimmer");
+    const message = screen.getByText(/generating/i);
+    expect(message).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /summary generating/i })).toBeInTheDocument();
   });
 
   it("renders a retry button on error and regenerates on click", async () => {

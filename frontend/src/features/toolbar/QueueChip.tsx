@@ -7,7 +7,7 @@
  * refetch interval.
  */
 import { useState } from "react";
-import { Glyph } from "@/components/Glyph";
+import { Spinner } from "@/components/Spinner";
 import { useCancelPendingMutation, useQueueQuery } from "@/api/queries/queue";
 
 export function QueueChip() {
@@ -40,7 +40,7 @@ export function QueueChip() {
           cursor: "pointer",
         }}
       >
-        <Glyph name="generating" /> {inFlight} of {total}
+        <Spinner label="Summary generating" /> {inFlight} of {total}
       </button>
       {open && (
         <div

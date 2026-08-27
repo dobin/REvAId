@@ -12,7 +12,7 @@
  * it?" without turning the sidebar into a log viewer.
  */
 import { useEffect, useState } from "react";
-import { Glyph } from "@/components/Glyph";
+import { Spinner } from "@/components/Spinner";
 import { useQueueQuery } from "@/api/queries/queue";
 
 const MAX_IN_FLIGHT_SHOWN = 5;
@@ -76,7 +76,7 @@ export function QueuePanel() {
   return (
     <div>
       <p style={{ margin: "0 0 0.25rem", fontSize: "0.75rem", color: "#6b7280" }}>
-        <Glyph name="generating" /> {inFlight.length} analysing
+        <Spinner label="Summary generating" /> {inFlight.length} analysing
         {queued.length > 0 ? `, ${queued.length} queued` : ""}
         {data?.pausedUntil && (
           <span style={{ color: "#b45309" }}> — rate-limited, paused</span>
@@ -84,9 +84,7 @@ export function QueuePanel() {
       </p>
       {inFlight.slice(0, MAX_IN_FLIGHT_SHOWN).map((item) => (
         <div key={item.functionId} style={itemStyle} title={item.displayName}>
-          <span className="gr-shimmer">
-            <Glyph name="generating" />
-          </span>
+          <Spinner label="Summary generating" />
           <span style={nameStyle}>{item.displayName}</span>
           <span style={{ color: "#9ca3af", fontVariantNumeric: "tabular-nums" }}>
             {elapsedLabel(item.startedAt)}
