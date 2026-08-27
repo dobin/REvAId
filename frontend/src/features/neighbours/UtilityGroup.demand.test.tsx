@@ -1,6 +1,5 @@
 /**
- * Utility rows are passive: expanding and collapsing a group must not create
- * or release summary demands.
+ * Utility rows acquire demand while expanded and release it when collapsed.
  */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -97,18 +96,18 @@ function releaseCallCount(): number {
   }).length;
 }
 
-describe("UtilityGroup passive rendering", () => {
+describe("UtilityGroup demand acquisition", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("expanding and collapsing never requests summaries", async () => {
+  it("expanding demands its rows and collapsing releases them", async () => {
     mockFetch();
     const queryClient = new QueryClient();
     render(
       <QueryClientProvider client={queryClient}>
         <ConfigProvider fallback={null}>
-          <UtilityGroup functionId={1} viewId={1} direction="callees" totalUtility={7} />
+          <UtilityGroup functionId={1} viewId={1} direction="callees" totalUtility={7} priority={1} />
         </ConfigProvider>
       </QueryClientProvider>,
     );
@@ -118,12 +117,10 @@ describe("UtilityGroup passive rendering", () => {
     const expandButton = await screen.findByRole("button", { name: /utility calls/i });
     fireEvent.click(expandButton);
 
-    await screen.findByText("utility_0");
-    expect(demandCallCount()).toBe(0);
+    await waitFor(() => expect(demandCallCount()).toBe(7));
 
     fireEvent.click(expandButton);
 
-    await waitFor(() => expect(screen.queryByText("utility_0")).not.toBeInTheDocument());
-    expect(releaseCallCount()).toBe(0);
+    await waitFor(() => expect(releaseCallCount()).toBe(7));
   });
 });

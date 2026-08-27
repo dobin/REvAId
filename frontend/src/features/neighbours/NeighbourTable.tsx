@@ -4,12 +4,13 @@
  *
  * `callersSuppressed` short-circuits to just `SuppressedNotice` (D7/E2a) —
  * filter/sort/utility-group never render for a suppressed caller table,
- * matching the backend's own "never fetch 291 rows" guarantee. Neighbour
- * tables are read-only and never trigger summary generation.
+ * matching the backend's own "never fetch 291 rows" guarantee. Visible rows
+ * demand summaries at lower priority than the card itself.
  */
 import { useState } from "react";
 import { useInfiniteNeighboursQuery } from "@/api/queries/neighbours";
 import type { FunctionId, ViewId } from "@/api/types";
+import { useAppStore } from "@/store";
 import { FilterInput } from "./FilterInput";
 import { SortControl, type SortKey, type SortOrder } from "./SortControl";
 import { SuppressedNotice } from "./SuppressedNotice";
@@ -30,6 +31,8 @@ export function NeighbourTable({
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortKey>("name");
   const [order, setOrder] = useState<SortOrder>("asc");
+  const isSelected = useAppStore((s) => s.selectedFunctionId === functionId);
+  const rowPriority = isSelected ? 1 : 2;
 
   const { data, isPending, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteNeighboursQuery({
     functionId,
@@ -87,6 +90,7 @@ export function NeighbourTable({
       <VirtualRowList
         rows={rows}
         origin={origin}
+        demand={{ surface: `table:${String(functionId)}:${direction}:primary`, priority: rowPriority }}
       />
       <TableFooter
         shown={rows.length}
@@ -99,6 +103,7 @@ export function NeighbourTable({
         viewId={viewId}
         direction={direction}
         totalUtility={firstPage.totalUtility}
+        priority={rowPriority}
       />
       {firstPage.mayBeIncomplete && (
         <p style={{ fontSize: "0.6875rem", color: "#9ca3af", margin: "0.25rem 0 0" }}>

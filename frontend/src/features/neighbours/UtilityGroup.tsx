@@ -1,13 +1,12 @@
 /**
  * "▸ ▫ utility calls (N)" collapsed group (D34). Expanding fetches the
- * `group=utility` page for the first time. Neighbour-table reads and
- * scrolling are passive, so expanding and collapsing this group never
- * creates or releases summary work.
+ * `group=utility` page for the first time. Its rows acquire summary demand
+ * only while expanded, so collapsing releases unstarted work.
  */
 import { useState } from "react";
 import { Glyph } from "@/components/Glyph";
 import { useInfiniteNeighboursQuery } from "@/api/queries/neighbours";
-import type { FunctionId, ViewId } from "@/api/types";
+import type { FunctionId, Priority, ViewId } from "@/api/types";
 import type { FanOutOrigin } from "@/features/canvas/CanvasActions";
 import { VirtualRowList } from "./VirtualRowList";
 import { TableFooter } from "./TableFooter";
@@ -17,11 +16,13 @@ export function UtilityGroup({
   viewId,
   direction,
   totalUtility,
+  priority,
 }: {
   functionId: FunctionId;
   viewId: ViewId;
   direction: "callees" | "callers";
   totalUtility: number;
+  priority: Priority;
 }) {
   // Utility rows fan out exactly like primary rows: from this card, oriented
   // by direction (callees -> right, callers -> left). Resolved downstream.
@@ -58,6 +59,7 @@ export function UtilityGroup({
           viewId={viewId}
           direction={direction}
           origin={origin}
+          priority={priority}
         />
       )}
     </div>
@@ -69,11 +71,13 @@ function UtilityGroupRows({
   viewId,
   direction,
   origin,
+  priority,
 }: {
   functionId: FunctionId;
   viewId: ViewId;
   direction: "callees" | "callers";
   origin?: FanOutOrigin | undefined;
+  priority: Priority;
 }) {
   const { data, isPending, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteNeighboursQuery({
     functionId,
@@ -93,6 +97,7 @@ function UtilityGroupRows({
       <VirtualRowList
         rows={rows}
         origin={origin}
+        demand={{ surface: `table:${String(functionId)}:${direction}:utility`, priority }}
       />
       <TableFooter
         shown={rows.length}

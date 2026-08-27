@@ -1,6 +1,6 @@
 /**
- * A FunctionCardNode is the sole automatic summary-demand surface: placing a
- * card requests its own summary, while its neighbour rows remain passive.
+ * Placing a card requests its own summary and the bounded visible windows of
+ * its caller/callee tables.
  *
  * Note: React Flow marks its node subtree `aria-hidden`, so role queries
  * inside a `FunctionCardNode` need `{ hidden: true }` — see
@@ -174,7 +174,7 @@ describe("FunctionCardNode summary demand", () => {
     vi.unstubAllGlobals();
   });
 
-  it("demands only the placed card's summary, not summaries for its rows", async () => {
+  it("demands the placed card and its visible caller/callee rows", async () => {
     mockFetch();
     renderWithProviders();
 
@@ -184,14 +184,25 @@ describe("FunctionCardNode summary demand", () => {
 
     await waitFor(
       () => {
-        expect(demandCallCount()).toBe(1);
+        expect(demandCallCount()).toBeGreaterThan(1);
       },
       { timeout: 2000 },
     );
 
+    // The virtualizer determines how many rows are mounted (jsdom's viewport
+    // is smaller than a browser's), but demand must remain bounded to the
+    // card plus the two initial table windows.
+    expect(demandCallCount()).toBeLessThanOrEqual(20);
+
     const summaryUrls = vi.mocked(global.fetch).mock.calls
       .map(([input]) => (input instanceof Request ? input.url : String(input)))
       .filter((url) => url.includes("/summary"));
-    expect(summaryUrls).toEqual([expect.stringContaining("/functions/1/summary")]);
+    expect(summaryUrls).toEqual(
+      expect.arrayContaining([
+        expect.stringContaining("/functions/1/summary"),
+        expect.stringContaining("/functions/1000/summary"),
+        expect.stringContaining("/functions/1013/summary"),
+      ]),
+    );
   });
 });

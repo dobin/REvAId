@@ -1,12 +1,14 @@
 /**
- * Row virtualisation keeps large neighbour lists responsive. Rendering and
- * scrolling are read-only: summary generation is triggered only by placing a
- * FunctionCardNode on the canvas.
+ * Row virtualisation as a cost control — only rendered rows may be
+ * summarised. The virtualizer's `overscan: 4` below is the lookahead: demand
+ * is acquired for exactly its virtual rows, not every row in a large table.
  */
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import type { NeighbourRowDto } from "@/api/types";
+import type { NeighbourRowDto, Priority } from "@/api/types";
 import type { FanOutOrigin } from "@/features/canvas/CanvasActions";
+import { useSummaryDemand } from "@/hooks/useSummaryDemand";
+import type { SurfaceId } from "@/store/demandSlice";
 import { NeighbourRow } from "./NeighbourRow";
 
 const ROW_HEIGHT_PX = 32;
@@ -22,11 +24,15 @@ const SCROLLBAR_GUTTER_PX = 14;
 export function VirtualRowList({
   rows,
   origin,
+  demand,
 }: {
   rows: NeighbourRowDto[];
   /** Fan-out provenance for every row in this list (the card + which table).
    * Optional so isolated row rendering (e.g. in a test) still works. */
   origin?: FanOutOrigin | undefined;
+  /** Omit demand for isolated rendering; cards pass it to resolve only their
+   * visible caller/callee rows. */
+  demand?: { surface: SurfaceId; priority: Priority } | undefined;
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
@@ -35,6 +41,15 @@ export function VirtualRowList({
     estimateSize: () => ROW_HEIGHT_PX,
     overscan: 4,
   });
+
+  const virtualItems = virtualizer.getVirtualItems();
+  const visibleFunctionIds = useMemo(
+    () =>
+      virtualItems
+        .map((virtualRow) => rows[virtualRow.index]?.id)
+        .filter((id): id is number => id !== undefined),
+    [virtualItems, rows],
+  );
 
   const height = Math.min(rows.length * ROW_HEIGHT_PX, MAX_LIST_HEIGHT_PX);
   const canScroll = rows.length * ROW_HEIGHT_PX > MAX_LIST_HEIGHT_PX;
@@ -66,7 +81,7 @@ export function VirtualRowList({
       aria-label="neighbour-rows"
     >
       <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
-        {virtualizer.getVirtualItems().map((virtualRow) => {
+        {virtualItems.map((virtualRow) => {
           const row = rows[virtualRow.index];
           if (!row) return null;
           return (
@@ -86,6 +101,28 @@ export function VirtualRowList({
           );
         })}
       </div>
+      {demand && (
+        <RowDemand
+          functionIds={visibleFunctionIds}
+          surface={demand.surface}
+          priority={demand.priority}
+        />
+      )}
     </div>
   );
+}
+
+/** Isolated so the provider-dependent demand hook mounts only when a caller
+ * opts in, keeping standalone row rendering usable in tests. */
+function RowDemand({
+  functionIds,
+  surface,
+  priority,
+}: {
+  functionIds: readonly number[];
+  surface: SurfaceId;
+  priority: Priority;
+}) {
+  useSummaryDemand({ surface, functionIds, priority, enabled: true });
+  return null;
 }
