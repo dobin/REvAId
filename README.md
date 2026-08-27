@@ -7,10 +7,25 @@ engineering: it renders a binary's call graph as interactive cards, lazily
 summarizes functions with an LLM, and lets an analyst annotate what they
 find. 
 
-This is 100% vibe coded. Claude 5. See `IDEA.md`, `PRD.md`, `TAD.md`.
+Purpose: 
+* Reverse engineer binaries without reading C/ASM code, only LLM summaries in a function call graph (ai-assited reversing)
+* Manually verify the results of your super duper next generation AI reversing analysis (ai-reversing verification)
 
-Ghidra and LLM integrations ship as deterministic **mocks** in M0/M1 of this
-milestone — see `docs/adapters.md` for the real-adapter contract.
+This is 100% vibe coded. See `IDEA.md`, `PRD.md`, `TAD.md`.
+
+
+## Usage
+
+1) Let Ghidra analyze your binary
+2) Export Ghidra data with the included script to JSON
+3) Import JSON into REvAId
+4) Explore the code base
+
+There are two AI providers available: 
+* LLM based: Simple. Queries the LLM with the disassembled function code
+* Agent based: Complex. Queries OpenCode agent (using Ghidra-MCP) for function analysis
+
+
 
 ## Prerequisites
 
@@ -29,6 +44,19 @@ just dev      # runs the API (uvicorn, :8000) and the SPA (Vite, :5173) together
 Then open http://127.0.0.1:5173 — you should see a small panel showing live
 `/health` and `/config` data, proving the frontend, backend, and database are
 wired together end to end.
+
+
+## Ghidra Export 
+
+1) Click "Window" -> "Script Manager"
+2) Add a new file Java with filename `GraphRevExport.java`
+3) Paste [GraphRevExport.java](https://github.com/dobin/REvAId/blob/main/tools/ghidra/GraphRevExport.java)
+4) Run the script
+5) If asked to skip disassembly, say NO (except if you want to use AI Agent, not AI LLM)
+6) Grab a cuppa and wait till the export is finished
+
+Then in REvAId, click "import binary", and select that JSON. 
+
 
 ## Everyday commands
 
@@ -107,26 +135,3 @@ queue-pause behaviour. Which adapter produced each summary is recorded in
 `functions.summary_adapter` and exposed on the API, but not surfaced in the
 UI yet.
 
-## Adding a migration
-
-The database schema is created **exclusively** through Alembic — there is no
-`create_all()` path, even in tests (see `docs/adr/0002-alembic-in-v0.md`).
-After changing `backend/src/Revealm/db/models.py`:
-
-```sh
-just revision name="describe your change"
-just migrate
-```
-
-Then verify there is no drift between the models and the migration:
-
-```sh
-cd backend && uv run pytest tests/db/test_schema_snapshot.py
-```
-
-## Project layout
-
-See TAD §5 for the full directory structure. In short: `backend/` is a
-FastAPI + SQLAlchemy 2.0 (async) + Alembic service managed by `uv`;
-`frontend/` is a React 19 + TypeScript (strict) + Vite 6 SPA; `docs/adr/`
-records architectural decisions and deliberate deviations from the PRD.
