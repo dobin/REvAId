@@ -7,6 +7,7 @@ the exact same migration path as `just migrate`.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import subprocess
 import sys
@@ -53,6 +54,23 @@ def _purge_graphrev_env() -> None:
     developer's `.env` after this conftest was imported (see block above)."""
     for key in [k for k in os.environ if k.startswith("GRAPHREV_")]:
         del os.environ[key]
+
+
+@pytest.fixture(autouse=True)
+def _fresh_write_lock() -> Iterator[None]:
+    """Give every test a fresh SQLite writer lock.
+
+    ``graphrev.db.uow._write_lock`` is a module-level ``asyncio.Lock``. Such a
+    lock binds to the event loop that first has a waiter on it, so once one
+    test contends on it (e.g. the summary worker pool), a later test running
+    on pytest-asyncio's *next* function-scoped loop raises
+    ``RuntimeError: ... is bound to a different event loop``. Production uses a
+    single loop and never hits this; the suite just rebinds the lock per test.
+    """
+    import graphrev.db.uow as uow
+
+    uow._write_lock = asyncio.Lock()
+    yield
 
 
 @pytest.fixture

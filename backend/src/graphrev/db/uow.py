@@ -18,6 +18,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 #: Process-wide. At the write volumes this app produces (a handful/sec) this
 #: lock is effectively always free; it simply eliminates SQLITE_BUSY flakiness.
+#:
+#: An ``asyncio.Lock`` binds to an event loop once it has waiters, so a single
+#: module-level lock is unsafe under pytest-asyncio's function-scoped loops
+#: (a later test can raise ``RuntimeError: ... is bound to a different event
+#: loop`` while its summary workers persist results). Production runs a single
+#: loop, so nothing needs to change there — the test suite resets this lock
+#: per test instead (see ``tests/conftest.py::_fresh_write_lock``).
 _write_lock = asyncio.Lock()
 
 
