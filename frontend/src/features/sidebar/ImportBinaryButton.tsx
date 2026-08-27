@@ -6,9 +6,10 @@
  * binary via `onImported`. Feedback is inline (no toast system exists yet).
  */
 import { useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "@/api/client";
-import { useImportBinaryMutation } from "@/api/queries/binaries";
-import type { BinaryId, GhidraExportDocument, ImportResultDto } from "@/api/types";
+import { fetchImportJob, useImportBinaryMutation } from "@/api/queries/binaries";
+import type { BinaryId, GhidraExportDocument } from "@/api/types";
 import { Dialog } from "@/components/Dialog";
 
 const buttonStyle: React.CSSProperties = {
@@ -31,6 +32,8 @@ const primaryButtonStyle: React.CSSProperties = {
   cursor: "pointer",
 };
 
+const importPollIntervalMs = 500;
+
 function parseExport(text: string): GhidraExportDocument {
   const parsed = JSON.parse(text) as unknown;
   if (
@@ -49,17 +52,24 @@ export function ImportBinaryButton({
 }: {
   onImported: (binaryId: BinaryId) => void;
 }) {
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
   const [document, setDocument] = useState<GhidraExportDocument | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [isWaitingForImport, setIsWaitingForImport] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const importGeneration = useRef(0);
   const importMutation = useImportBinaryMutation();
 
   const reset = () => {
+    importGeneration.current += 1;
     setFileName(null);
     setDocument(null);
     setParseError(null);
+    setImportError(null);
+    setIsWaitingForImport(false);
     importMutation.reset();
     if (inputRef.current) inputRef.current.value = "";
   };
@@ -84,20 +94,55 @@ export function ImportBinaryButton({
 
   const handleImport = () => {
     if (!document) return;
+    const generation = importGeneration.current;
+    setImportError(null);
     importMutation.mutate(document, {
-      onSuccess: (result: ImportResultDto) => {
-        handleOpenChange(false);
-        onImported(result.binaryId);
+      onSuccess: (accepted) => {
+        if (generation !== importGeneration.current) return;
+        setIsWaitingForImport(true);
+        void (async () => {
+          try {
+            while (generation === importGeneration.current) {
+              const status = await fetchImportJob(accepted.jobId);
+              if (generation !== importGeneration.current) return;
+
+              if (status.phase === "completed" && status.result !== null) {
+                await queryClient.invalidateQueries({ queryKey: ["binaries"] });
+                if (generation !== importGeneration.current) return;
+                handleOpenChange(false);
+                onImported(status.result.binaryId);
+                return;
+              }
+              if (status.phase === "failed" || status.phase === "cancelled") {
+                setImportError(
+                  status.errorMessage ??
+                    (status.phase === "cancelled" ? "Import was cancelled." : "Import failed."),
+                );
+                setIsWaitingForImport(false);
+                return;
+              }
+
+              await new Promise<void>((resolve) => {
+                window.setTimeout(resolve, importPollIntervalMs);
+              });
+            }
+          } catch (err) {
+            if (generation !== importGeneration.current) return;
+            setImportError(err instanceof Error ? err.message : "Could not check import progress.");
+            setIsWaitingForImport(false);
+          }
+        })();
       },
     });
   };
 
   const apiErrorMessage =
-    importMutation.error instanceof ApiError
+    importError ??
+    (importMutation.error instanceof ApiError
       ? importMutation.error.message
       : importMutation.error
         ? "Import failed."
-        : null;
+        : null);
 
   return (
     <Dialog
@@ -159,13 +204,13 @@ export function ImportBinaryButton({
           type="button"
           style={{
             ...primaryButtonStyle,
-            cursor: document && !importMutation.isPending ? "pointer" : "not-allowed",
-            opacity: document && !importMutation.isPending ? 1 : 0.6,
+            cursor: document && !importMutation.isPending && !isWaitingForImport ? "pointer" : "not-allowed",
+            opacity: document && !importMutation.isPending && !isWaitingForImport ? 1 : 0.6,
           }}
-          disabled={!document || importMutation.isPending}
+          disabled={!document || importMutation.isPending || isWaitingForImport}
           onClick={handleImport}
         >
-          {importMutation.isPending ? "Importing…" : "Import"}
+          {importMutation.isPending || isWaitingForImport ? "Importing…" : "Import"}
         </button>
       </div>
     </Dialog>

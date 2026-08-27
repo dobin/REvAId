@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiClient } from "@/api/client";
-import type { ImportResultDto } from "@/api/types";
+import type { ImportJobAcceptedDto, ImportJobStatusDto } from "@/api/types";
 import { ImportBinaryButton } from "./ImportBinaryButton";
 
 function renderButton(onImported = vi.fn()) {
@@ -42,18 +42,31 @@ describe("ImportBinaryButton", () => {
     ).toBeInTheDocument();
   });
 
-  it("imports a valid export and calls onImported with the new binary id", async () => {
-    const result: ImportResultDto = {
-      binaryId: 42,
-      name: "sample.exe",
-      version: "1.0",
-      functionsInserted: 2,
-      functionsUpdated: 0,
-      edgesInserted: 1,
-      placeholdersCreated: 0,
-      failures: [],
+  it("refreshes after the import job completes, then calls onImported", async () => {
+    const accepted: ImportJobAcceptedDto = {
+      jobId: "job-1",
+      phase: "queued",
+      bytesReceived: 123,
     };
-    const post = vi.spyOn(apiClient, "post").mockResolvedValue(result);
+    const completed: ImportJobStatusDto = {
+      jobId: "job-1",
+      phase: "completed",
+      bytesReceived: 123,
+      result: {
+        binaryId: 42,
+        name: "sample.exe",
+        version: "1.0",
+        functionsInserted: 2,
+        functionsUpdated: 0,
+        edgesInserted: 1,
+        placeholdersCreated: 0,
+        failures: [],
+      },
+      errorMessage: null,
+      failureSamples: [],
+    };
+    const post = vi.spyOn(apiClient, "post").mockResolvedValue(accepted);
+    const get = vi.spyOn(apiClient, "get").mockResolvedValue(completed);
 
     const { onImported } = renderButton();
     const doc = JSON.stringify({
@@ -74,5 +87,35 @@ describe("ImportBinaryButton", () => {
       "/binaries/import",
       expect.objectContaining({ schemaVersion: 1 }),
     );
+    expect(get).toHaveBeenCalledWith("/binaries/imports/job-1");
+  });
+
+  it("shows an error rather than reporting success when the import job fails", async () => {
+    vi.spyOn(apiClient, "post").mockResolvedValue({
+      jobId: "job-1",
+      phase: "queued",
+      bytesReceived: 123,
+    });
+    vi.spyOn(apiClient, "get").mockResolvedValue({
+      jobId: "job-1",
+      phase: "failed",
+      bytesReceived: 123,
+      result: null,
+      errorMessage: "The export is invalid.",
+      failureSamples: ["missing functions"],
+    });
+
+    const { onImported } = renderButton();
+    const doc = JSON.stringify({
+      schemaVersion: 1,
+      binary: { name: "sample.exe", version: "1.0" },
+      functions: [],
+      edges: [],
+    });
+    openDialogAndUpload(jsonFile("sample.json", doc));
+    fireEvent.click(await screen.findByText("Import"));
+
+    expect(await screen.findByText("The export is invalid.")).toBeInTheDocument();
+    expect(onImported).not.toHaveBeenCalled();
   });
 });

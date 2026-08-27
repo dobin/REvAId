@@ -60,7 +60,7 @@ export interface GhidraExportDocument {
   edges: unknown[];
 }
 
-/** `POST /binaries/import` response (I12). */
+/** Completed import result, included in a completed import-job status. */
 export interface ImportResultDto {
   binaryId: BinaryId;
   name: string;
@@ -70,6 +70,25 @@ export interface ImportResultDto {
   edgesInserted: number;
   placeholdersCreated: number;
   failures: string[];
+}
+
+export type ImportJobPhase = "uploading" | "queued" | "importing" | "completed" | "failed" | "cancelled";
+
+/** `POST /binaries/import` response. The import continues asynchronously. */
+export interface ImportJobAcceptedDto {
+  jobId: string;
+  phase: ImportJobPhase;
+  bytesReceived: number;
+}
+
+/** `GET /binaries/imports/{jobId}` response. */
+export interface ImportJobStatusDto {
+  jobId: string;
+  phase: ImportJobPhase;
+  bytesReceived: number;
+  result: ImportResultDto | null;
+  errorMessage: string | null;
+  failureSamples: string[];
 }
 
 export interface FunctionParam {

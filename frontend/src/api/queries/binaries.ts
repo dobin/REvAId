@@ -10,7 +10,8 @@ import type {
   FunctionDto,
   FunctionSearchPageDto,
   GhidraExportDocument,
-  ImportResultDto,
+  ImportJobAcceptedDto,
+  ImportJobStatusDto,
 } from "@/api/types";
 
 async function fetchBinaries(): Promise<BinarySummaryDto[]> {
@@ -99,12 +100,13 @@ export function useDeleteBinaryMutation() {
  * Refreshes the binary picker on success; the caller selects the new binary.
  */
 export function useImportBinaryMutation() {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (document: GhidraExportDocument) =>
-      apiClient.post<ImportResultDto>("/binaries/import", document),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["binaries"] });
-    },
+      apiClient.post<ImportJobAcceptedDto>("/binaries/import", document),
   });
+}
+
+/** Read the progress and final outcome of an asynchronous binary import. */
+export function fetchImportJob(jobId: string): Promise<ImportJobStatusDto> {
+  return apiClient.get<ImportJobStatusDto>(`/binaries/imports/${encodeURIComponent(jobId)}`);
 }
