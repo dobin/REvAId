@@ -73,12 +73,12 @@ public class GraphRevExport extends GhidraScript {
 
         File outFile = ensureJsonExtension(resolveOutputFile(program));
         String version = resolveVersion();
-        boolean skipDecompilation = shouldSkipDecompilation();
+        boolean skipDecompilation = shouldUseMinimalExport();
 
         println("GraphRevExport: exporting " + program.getName() + " -> " + outFile.getAbsolutePath());
         println(
                 "GraphRevExport: mode = "
-                        + (skipDecompilation ? "fast (no decompiled C)" : "complete"));
+                    + (skipDecompilation ? "minimal (no decompiled C)" : "full"));
 
         if (!skipDecompilation) {
             decompiler = new DecompInterface();
@@ -164,18 +164,24 @@ public class GraphRevExport extends GhidraScript {
         return new File(path + ".json");
     }
 
-    /**
-     * Ask GUI users whether to omit decompiled C for a faster export. In
-     * headless mode the prompt is unavailable, so preserve the complete export
-     * as the backward-compatible default.
-     */
-    private boolean shouldSkipDecompilation() {
+        /**
+         * Ask GUI users to select an export mode. In headless mode the prompt is
+         * unavailable, so preserve the full export as the backward-compatible
+         * default.
+         */
+        private boolean shouldUseMinimalExport() {
         try {
-            return askYesNo(
-                    "GraphRev export mode",
-                    "Skip decompilation?\n\n"
-                            + "Yes: fast export with assembly and call graph, but codeC is null.\n"
-                            + "No: complete export with decompiled C.");
+            List<String> modes = new ArrayList<>();
+            modes.add("Full export (recommended)");
+            modes.add("Minimal export");
+            String selected = askChoice(
+                "GraphRev export mode",
+                "Choose the export mode:\n\n"
+                    + "Full export includes decompiled C, assembly, and the call graph.\n"
+                    + "Minimal export omits decompiled C for a faster export.",
+                modes,
+                modes.get(0));
+            return modes.get(1).equals(selected);
         } catch (Exception headless) {
             return false;
         }
