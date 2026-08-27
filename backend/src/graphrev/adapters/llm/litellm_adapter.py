@@ -100,6 +100,17 @@ _SYSTEM_PROMPT = (
 #: the UI trusts (same discipline as `summary_short`, C4).
 _NAME_LLM_MAX_CHARS = 64
 
+#: A missing decompilation is expected for imports, thunks, and external
+#: placeholders. There is no source material for the direct-completion path
+#: to analyse, so avoid an unnecessary provider request while keeping the
+#: function in a usable, explicitly low-confidence state. The OpenCode
+#: adapter intentionally does not do this: its agent can inspect Ghidra.
+_NO_DECOMPILED_CODE_SHORT = "Decompilation unavailable; no direct code summary generated."
+_NO_DECOMPILED_CODE_LONG = (
+    "No decompiled C was available for this function, so the direct LLM "
+    "adapter did not generate a code-based summary."
+)
+
 
 class _SummaryPayload(BaseModel):
     """The enforced response shape (§6.2: validate with Pydantic, never
@@ -262,9 +273,21 @@ class LiteLlmAdapter:
             raise mapped from exc
 
     async def summarize(self, req: SummaryRequest) -> SummaryResult:
+        # LiteLLM can only analyse the supplied decompiled C. Do not spend a
+        # provider request on imports/thunks/placeholders with no C corpus.
+        # This is deliberately local to this adapter: OpenCode must still run
+        # because its Ghidra-enabled agent can obtain the missing context.
+        if req.code_c is None:
+            return SummaryResult(
+                summary_short=_NO_DECOMPILED_CODE_SHORT,
+                summary_long=_NO_DECOMPILED_CODE_LONG,
+                model=self._settings.llm_model,
+                low_confidence=True,
+            )
+
         input_truncated = False
         code_c = req.code_c
-        if code_c is not None and len(code_c) > _CODE_C_MAX_CHARS:
+        if len(code_c) > _CODE_C_MAX_CHARS:
             code_c = code_c[:_CODE_C_MAX_CHARS]
             input_truncated = True
 

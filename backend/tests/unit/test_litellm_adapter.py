@@ -130,6 +130,22 @@ async def test_summarize_parses_valid_json(
 
 
 @pytest.mark.asyncio
+async def test_summarize_without_decompiled_c_skips_provider(
+    adapter: LiteLlmAdapter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The direct-completion adapter has nothing to analyse without C."""
+    calls = _install_completion_kwargs(
+        monkeypatch,
+        lambda **kw: pytest.fail("LiteLLM must not be called without decompiled C"),
+    )
+    result = await adapter.summarize(_req(code_c=None))
+    assert calls == []
+    assert result.summary_short == "Decompilation unavailable; no direct code summary generated."
+    assert result.low_confidence is True
+    assert result.input_truncated is False
+
+
+@pytest.mark.asyncio
 async def test_summarize_clamps_short_to_one_row(
     adapter: LiteLlmAdapter, monkeypatch: pytest.MonkeyPatch
 ) -> None:

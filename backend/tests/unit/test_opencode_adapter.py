@@ -168,6 +168,18 @@ async def test_summarize_parses_valid_json(adapter: OpenCodeAdapter) -> None:
 
 
 @pytest.mark.asyncio
+async def test_summarize_without_decompiled_c_still_runs_agent(adapter: OpenCodeAdapter) -> None:
+    """The Ghidra-enabled agent can retrieve code that was not imported."""
+    client = _install(adapter, _ok_client(_VALID_JSON))
+    result = await adapter.summarize(_req(code_c=None))
+    posts = [call for call in client.calls if call.method == "POST"]
+    prompt = posts[1].json["messages"][0]["content"]
+    assert result.summary_short == "Checks licence blob"
+    assert [post.url for post in posts] == ["/session", "/session/sess-1/message"]
+    assert "<untrusted label='code_c'>" not in prompt
+
+
+@pytest.mark.asyncio
 async def test_summarize_clamps_short_to_one_row(adapter: OpenCodeAdapter) -> None:
     long_short = "x" * 500
     payload = (
