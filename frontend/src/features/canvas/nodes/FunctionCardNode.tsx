@@ -46,6 +46,8 @@ export function FunctionCardNode({ data }: { data: FunctionCardNodeData }) {
   const config = useConfig();
   const { data: fn, isPending, isError } = useFunctionQuery(data.functionId);
   const selectFunction = useAppStore((s) => s.selectFunction);
+  const clearSelection = useAppStore((s) => s.clearSelection);
+  const isSelected = useAppStore((s) => s.selectedFunctionId === data.functionId);
   const actions = useViewNodeActions(data.viewId);
 
   // I9 §5.1: opening/placing a card demands its OWN summary at priority 0,
@@ -103,12 +105,7 @@ export function FunctionCardNode({ data }: { data: FunctionCardNodeData }) {
     >
       <NodeHandles />
       <div style={{ display: "flex", alignItems: "center" }}>
-        <div
-          style={{ flex: 1, cursor: "pointer" }}
-          onClick={() => {
-            selectFunction(data.functionId);
-          }}
-        >
+        <div style={{ flex: 1 }}>
           <CardHeader
             fn={fn}
             color={data.viewNode.color}
@@ -118,6 +115,29 @@ export function FunctionCardNode({ data }: { data: FunctionCardNodeData }) {
             }}
           />
         </div>
+        <button
+          type="button"
+          aria-label={isSelected ? `Hide details for ${fn.displayName}` : `Show details for ${fn.displayName}`}
+          aria-pressed={isSelected}
+          title={isSelected ? "Hide details" : "Show details"}
+          onClick={() => {
+            if (isSelected) {
+              clearSelection();
+            } else {
+              selectFunction(data.functionId);
+            }
+          }}
+          style={{
+            border: "none",
+            background: isSelected ? "#e5e7eb" : "none",
+            borderRadius: "0.25rem",
+            cursor: "pointer",
+            padding: "0.375rem 0.5rem",
+            color: isSelected ? "#111827" : "#6b7280",
+          }}
+        >
+          ℹ
+        </button>
         <button
           type="button"
           aria-label={`Hide ${fn.displayName}`}
