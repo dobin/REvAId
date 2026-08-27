@@ -84,7 +84,7 @@ class Settings(BaseSettings):
     #: Bound on one LiteLLM provider request so a hung provider cannot wedge
     #: a worker slot (§6.5). The worker retains its broader adapter-level
     #: guard for adapters that perform multiple provider attempts.
-    summary_request_timeout_seconds: float = Field(default=45.0, gt=0)
+    summary_request_timeout_seconds: float = Field(default=120.0, gt=0)
 
     #: I13 (§6.5): OpenCodeAdapter plumbing — `opencode serve` is the sidecar
     #: (plan decision 4: no custom bridge web service, no Node runtime dep in

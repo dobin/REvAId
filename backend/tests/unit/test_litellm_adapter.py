@@ -14,6 +14,7 @@ from typing import Any
 import litellm
 import pytest
 
+from graphrev.adapters.llm import litellm_adapter as litellm_adapter_module
 from graphrev.adapters.llm.base import (
     AuthError,
     ContextTooLargeError,
@@ -228,10 +229,22 @@ async def test_malformed_json_is_retried_then_succeeds(
     def _impl(**kw: Any) -> Any:
         return responses.pop(0)
 
+    events: list[dict[str, object]] = []
+
+    def _record_event(*args: object, **kwargs: object) -> None:
+        events.append(kwargs)
+
+    monkeypatch.setattr(litellm_adapter_module, "log_event", _record_event)
     calls = _install_completion_kwargs(monkeypatch, _impl)
     result = await adapter.summarize(_req())
     assert result.summary_short == "Checks licence blob"
     assert len(calls) == 2, "should have retried exactly once before succeeding"
+    retrying = next(event for event in events if event["outcome"] == "retrying")
+    assert retrying["json_attempt"] == 1
+    assert retrying["next_json_attempt"] == 2
+    assert retrying["max_json_attempts"] == 3
+    assert retrying["error_type"] == "PermanentProviderError"
+    assert "no JSON object" in str(retrying["reason"])
 
 
 @pytest.mark.asyncio

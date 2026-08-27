@@ -64,6 +64,9 @@ from graphrev.adapters.llm.base import (
     TransientProviderError,
 )
 from graphrev.core.config import Settings
+from graphrev.core.logging import get_logger, log_event
+
+logger = get_logger(__name__)
 
 #: litellm logs an INFO line per call ("LiteLLM completion() model=... provider=
 #: ...") plus a "Give Feedback / Get Help" banner on every error, straight to
@@ -304,9 +307,21 @@ class LiteLlmAdapter:
             content = response.choices[0].message.content or ""  # type: ignore[attr-defined]
             try:
                 payload = _extract_json(content)
-            except PermanentProviderError:
+            except PermanentProviderError as exc:
                 if attempt == attempts:
                     raise
+                log_event(
+                    logger,
+                    "summary_adapter.json_retrying",
+                    adapter=self.name,
+                    model=self._settings.llm_model,
+                    outcome="retrying",
+                    json_attempt=attempt,
+                    max_json_attempts=attempts,
+                    next_json_attempt=attempt + 1,
+                    error_type=type(exc).__name__,
+                    reason=str(exc),
+                )
                 continue
             return SummaryResult(
                 summary_short=payload.summary_short[:_SUMMARY_SHORT_MAX_CHARS],

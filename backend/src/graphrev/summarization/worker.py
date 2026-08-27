@@ -183,6 +183,32 @@ def _backoff_seconds(attempt: int) -> float:
     return float(base * (0.5 + random.random()))
 
 
+def _log_transient_retry(
+    *,
+    function_id: int,
+    adapter_name: str,
+    started_at: float,
+    attempt_count: int,
+    error: BaseException,
+    retry_delay_seconds: float,
+) -> None:
+    """Record a retry decision before the worker sleeps and tries again."""
+    log_event(
+        logger,
+        "summary_worker.retrying",
+        function_id=function_id,
+        adapter=adapter_name,
+        outcome="retrying",
+        duration_ms=(time.monotonic() - started_at) * 1000,
+        attempt_count=attempt_count,
+        max_attempts=_MAX_TRANSIENT_RETRIES,
+        next_attempt_count=attempt_count + 1,
+        retry_delay_seconds=retry_delay_seconds,
+        error_type=type(error).__name__,
+        reason=str(error) or f"adapter call exceeded {_SUMMARIZE_TIMEOUT_SECONDS}s",
+    )
+
+
 class SummaryWorkerPool:
     """Owns the N summarization worker tasks and their lifecycle.
 
@@ -337,7 +363,16 @@ async def run_one_item(
                     attempt_count=attempt,
                 )
                 return False
-            await asyncio.sleep(_backoff_seconds(attempt))
+            retry_delay_seconds = _backoff_seconds(attempt)
+            _log_transient_retry(
+                function_id=function_id,
+                adapter_name=adapter.name,
+                started_at=started_at,
+                attempt_count=attempt,
+                error=TimeoutError(),
+                retry_delay_seconds=retry_delay_seconds,
+            )
+            await asyncio.sleep(retry_delay_seconds)
             continue
         except RateLimitError as exc:
             queue.pause(exc.retry_after_seconds or _BASE_BACKOFF_SECONDS)
@@ -370,7 +405,16 @@ async def run_one_item(
                     attempt_count=attempt,
                 )
                 return False
-            await asyncio.sleep(_backoff_seconds(attempt))
+            retry_delay_seconds = _backoff_seconds(attempt)
+            _log_transient_retry(
+                function_id=function_id,
+                adapter_name=adapter.name,
+                started_at=started_at,
+                attempt_count=attempt,
+                error=exc,
+                retry_delay_seconds=retry_delay_seconds,
+            )
+            await asyncio.sleep(retry_delay_seconds)
             continue
         except (AuthError, ContextTooLargeError, PermanentProviderError) as exc:
             await _fail(

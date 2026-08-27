@@ -256,12 +256,20 @@ async def test_transient_failure_retries_then_fails(
 
 
 async def test_transient_failure_recovers_on_retry(
-    session: AsyncSession, session_factory: async_sessionmaker[AsyncSession]
+    session: AsyncSession,
+    session_factory: async_sessionmaker[AsyncSession],
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     fn = await _make_function(session)
     queue = SummaryQueue(max_depth=10)
     item = queue.enqueue(fn.id, priority=0)
     await queue.pop()
+    events: list[dict[str, object]] = []
+
+    def _record_event(*args: object, **kwargs: object) -> None:
+        events.append(kwargs)
+
+    monkeypatch.setattr(worker_module, "log_event", _record_event)
 
     adapter = _StubAdapter(
         [
@@ -277,6 +285,13 @@ async def test_transient_failure_recovers_on_retry(
     await session.refresh(fn)
     assert fn.summary_status == "ready"
     assert fn.summary_short == "ok"
+    retrying = next(event for event in events if event["outcome"] == "retrying")
+    assert retrying["attempt_count"] == 1
+    assert retrying["next_attempt_count"] == 2
+    assert retrying["max_attempts"] == 3
+    assert retrying["error_type"] == "TransientProviderError"
+    assert retrying["reason"] == "try again"
+    assert retrying["retry_delay_seconds"] == 0
 
 
 async def test_rate_limit_pauses_queue_and_requeues_without_erroring(
