@@ -6,25 +6,12 @@
  * stay I10).
  */
 import { useFunctionQuery } from "@/api/queries/functions";
-import { useSummaryDemand } from "@/hooks/useSummaryDemand";
 import { toHex } from "@/lib/hex";
 import { useAppStore } from "@/store";
 
 export function DetailPanel() {
   const selectedFunctionId = useAppStore((s) => s.selectedFunctionId);
   const { data: fn, isPending, isError } = useFunctionQuery(selectedFunctionId);
-
-  // I9: the detail panel is another priority-0 surface for the selected
-  // function's own summary — shares the same function id (and therefore
-  // refcount) as the corresponding FunctionCardNode's `card:<id>` demand,
-  // but is tracked under its own surface id so closing the panel alone
-  // doesn't release a still-visible card's demand.
-  useSummaryDemand({
-    surface: `detail:${String(selectedFunctionId ?? "none")}`,
-    functionIds: selectedFunctionId === null ? [] : [selectedFunctionId],
-    priority: 0,
-    enabled: selectedFunctionId !== null,
-  });
 
   if (selectedFunctionId === null) return null;
 

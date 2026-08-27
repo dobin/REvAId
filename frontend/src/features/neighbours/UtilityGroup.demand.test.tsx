@@ -1,9 +1,6 @@
 /**
- * I9 §5.4: "expanding the utility group enqueues exactly its N; collapsing
- * cancels the unstarted remainder." Collapse relies on `UtilityGroupRows`
- * (and its `VirtualRowList`) unmounting, which releases demand via
- * `useSummaryDemand`'s unmount cleanup — verified here by asserting a
- * `DELETE /summary` call per row after collapsing.
+ * Utility rows are passive: expanding and collapsing a group must not create
+ * or release summary demands.
  */
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -100,18 +97,18 @@ function releaseCallCount(): number {
   }).length;
 }
 
-describe("UtilityGroup demand acquisition (I9 cost bound)", () => {
+describe("UtilityGroup passive rendering", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("expanding demands exactly its 7 rows; collapsing releases them", async () => {
+  it("expanding and collapsing never requests summaries", async () => {
     mockFetch();
     const queryClient = new QueryClient();
     render(
       <QueryClientProvider client={queryClient}>
         <ConfigProvider fallback={null}>
-          <UtilityGroup functionId={1} viewId={1} direction="callees" totalUtility={7} priority={1} />
+          <UtilityGroup functionId={1} viewId={1} direction="callees" totalUtility={7} />
         </ConfigProvider>
       </QueryClientProvider>,
     );
@@ -121,14 +118,12 @@ describe("UtilityGroup demand acquisition (I9 cost bound)", () => {
     const expandButton = await screen.findByRole("button", { name: /utility calls/i });
     fireEvent.click(expandButton);
 
-    await waitFor(() => {
-      expect(demandCallCount()).toBe(7);
-    });
+    await screen.findByText("utility_0");
+    expect(demandCallCount()).toBe(0);
 
     fireEvent.click(expandButton);
 
-    await waitFor(() => {
-      expect(releaseCallCount()).toBe(7);
-    });
+    await waitFor(() => expect(screen.queryByText("utility_0")).not.toBeInTheDocument());
+    expect(releaseCallCount()).toBe(0);
   });
 });

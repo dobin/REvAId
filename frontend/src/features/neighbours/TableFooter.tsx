@@ -1,8 +1,18 @@
 /**
- * "showing N of total · Fan out all" footer. "Fan out all" is disabled — the
- * behavior it triggers (batch node placement) is I6 scope.
+ * Page-progress footer for a neighbour group. Rows stay virtualized; loading
+ * more only fetches the next bounded API page.
  */
-export function TableFooter({ shown, total }: { shown: number; total: number }) {
+export function TableFooter({
+  shown,
+  total,
+  onLoadMore,
+  isLoadingMore = false,
+}: {
+  shown: number;
+  total: number;
+  onLoadMore?: () => void;
+  isLoadingMore?: boolean;
+}) {
   return (
     <div
       style={{
@@ -16,9 +26,11 @@ export function TableFooter({ shown, total }: { shown: number; total: number }) 
       <span>
         showing {shown} of {total}
       </span>
-      <button type="button" disabled title="Coming soon (I6)">
-        Fan out all
-      </button>
+      {shown < total && onLoadMore && (
+        <button type="button" onClick={onLoadMore} disabled={isLoadingMore}>
+          {isLoadingMore ? "Loading…" : "Load more"}
+        </button>
+      )}
     </div>
   );
 }

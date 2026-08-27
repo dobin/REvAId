@@ -3,7 +3,7 @@
  * Side-effect free by construction (C2c) — this is a plain GET, no
  * summary-demand wiring in I5 (that arrives with I9).
  */
-import { queryOptions, useQuery } from "@tanstack/react-query";
+import { infiniteQueryOptions, queryOptions, useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { apiClient } from "@/api/client";
 import type { FunctionId, NeighbourPageDto, ViewId } from "@/api/types";
 
@@ -63,4 +63,33 @@ export function neighbourQueryOptions(params: NeighbourQueryParams) {
 
 export function useNeighboursQuery(params: NeighbourQueryParams) {
   return useQuery(neighbourQueryOptions(params));
+}
+
+/**
+ * Fetches successive pages for a neighbour group. Keeping page size bounded
+ * protects the API and summary-demand queue, while callers can still expose
+ * every row advertised by the response's `total`.
+ */
+export function useInfiniteNeighboursQuery(params: NeighbourQueryParams) {
+  return useInfiniteQuery(
+    infiniteQueryOptions({
+      queryKey: [
+        "neighbours-infinite",
+        params.functionId,
+        params.viewId,
+        params.direction,
+        params.group ?? "primary",
+        params.limit,
+        params.sort,
+        params.order,
+        params.filter,
+      ],
+      initialPageParam: 0,
+      queryFn: ({ pageParam }) => fetchNeighbours({ ...params, offset: pageParam }),
+      getNextPageParam: (lastPage) => {
+        const nextOffset = lastPage.offset + lastPage.rows.length;
+        return nextOffset < lastPage.total ? nextOffset : undefined;
+      },
+    }),
+  );
 }

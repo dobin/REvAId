@@ -32,6 +32,7 @@ async def _make_function(
     utility_override: str | None = None,
     fan_in: int = 0,
     summary_short: str | None = None,
+    name_llm: str | None = None,
 ) -> Function:
     fn = Function(
         binary_id=binary.id,
@@ -41,6 +42,7 @@ async def _make_function(
         utility_override=utility_override,
         fan_in=fan_in,
         summary_short=summary_short,
+        name_llm=name_llm,
         created_at=_now(),
         updated_at=_now(),
     )
@@ -275,6 +277,48 @@ async def test_filter_matches_name_and_summary_short(session: AsyncSession) -> N
     # Unfiltered group totals must not shift because of the filter text.
     assert page.total_primary == 3
     assert page.total == 2
+
+
+@pytest.mark.asyncio
+async def test_filter_matches_display_name_and_hex_address(session: AsyncSession) -> None:
+    binary = await _make_binary(session)
+    view = await _make_view(session, binary)
+    root = await _make_function(session, binary, 0x1000, "root")
+    llm_named = await _make_function(
+        session, binary, 0x401230, "FUN_00401230", name_llm="parse_packet"
+    )
+    await _add_edge(session, binary, root, llm_named)
+    await session.commit()
+
+    by_name = await fetch_neighbour_page(
+        session,
+        function_id=root.id,
+        view_id=view.id,
+        direction="callees",
+        group="primary",
+        limit=16,
+        offset=0,
+        sort="name",
+        order="asc",
+        filter_text="packet",
+        caller_suppress_threshold=32,
+    )
+    assert [row.function.id for row in by_name.rows] == [llm_named.id]
+
+    by_address = await fetch_neighbour_page(
+        session,
+        function_id=root.id,
+        view_id=view.id,
+        direction="callees",
+        group="primary",
+        limit=16,
+        offset=0,
+        sort="name",
+        order="asc",
+        filter_text="0x401230",
+        caller_suppress_threshold=32,
+    )
+    assert [row.function.id for row in by_address.rows] == [llm_named.id]
 
 
 @pytest.mark.asyncio

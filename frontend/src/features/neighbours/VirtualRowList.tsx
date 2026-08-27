@@ -1,16 +1,12 @@
 /**
- * Row virtualisation as a cost control (C2a) — only rendered rows may be
- * summarised (I9). `useVirtualizer`'s `overscan: 4` below IS the "+4-row
- * lookahead" the plan calls for (§5.2) — the demand hook acquires exactly
- * `virtualizer.getVirtualItems()`, nothing more, so fast-scrolling never
- * demands more than the momentarily-rendered window.
+ * Row virtualisation keeps large neighbour lists responsive. Rendering and
+ * scrolling are read-only: summary generation is triggered only by placing a
+ * FunctionCardNode on the canvas.
  */
-import { useMemo, useRef } from "react";
+import { useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import type { NeighbourRowDto, Priority } from "@/api/types";
+import type { NeighbourRowDto } from "@/api/types";
 import type { FanOutOrigin } from "@/features/canvas/CanvasActions";
-import { useSummaryDemand } from "@/hooks/useSummaryDemand";
-import type { SurfaceId } from "@/store/demandSlice";
 import { NeighbourRow } from "./NeighbourRow";
 
 const ROW_HEIGHT_PX = 32;
@@ -26,17 +22,11 @@ const SCROLLBAR_GUTTER_PX = 14;
 export function VirtualRowList({
   rows,
   origin,
-  demand,
 }: {
   rows: NeighbourRowDto[];
   /** Fan-out provenance for every row in this list (the card + which table).
    * Optional so isolated row rendering (e.g. in a test) still works. */
   origin?: FanOutOrigin | undefined;
-  /** I9 demand acquisition for this list's rendered rows. Omitted entirely
-   * in isolated/test rendering, or when a caller wants no auto-analysis
-   * (there is currently no such caller, but keeping it optional keeps this
-   * component usable without the store/hook wiring). */
-  demand?: { surface: SurfaceId; priority: Priority } | undefined;
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
@@ -45,13 +35,6 @@ export function VirtualRowList({
     estimateSize: () => ROW_HEIGHT_PX,
     overscan: 4,
   });
-
-  const virtualItems = virtualizer.getVirtualItems();
-  const visibleFunctionIds = useMemo(
-    () => virtualItems.map((v) => rows[v.index]?.id).filter((id): id is number => id !== undefined),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [virtualItems, rows],
-  );
 
   const height = Math.min(rows.length * ROW_HEIGHT_PX, MAX_LIST_HEIGHT_PX);
   const canScroll = rows.length * ROW_HEIGHT_PX > MAX_LIST_HEIGHT_PX;
@@ -82,7 +65,7 @@ export function VirtualRowList({
       role="rowgroup"
       aria-label="neighbour-rows"
     >
-      <div style={{ height: String(virtualizer.getTotalSize()), position: "relative" }}>
+      <div style={{ height: virtualizer.getTotalSize(), position: "relative" }}>
         {virtualizer.getVirtualItems().map((virtualRow) => {
           const row = rows[virtualRow.index];
           if (!row) return null;
@@ -103,28 +86,6 @@ export function VirtualRowList({
           );
         })}
       </div>
-      {demand && (
-        <RowDemand functionIds={visibleFunctionIds} surface={demand.surface} priority={demand.priority} />
-      )}
     </div>
   );
-}
-
-/**
- * Isolated so `useSummaryDemand` — which needs `ConfigProvider`/a
- * `QueryClient` — is only mounted when a caller actually opts in via the
- * `demand` prop. Keeps `VirtualRowList` usable in isolated/unit-test
- * rendering with zero providers when `demand` is omitted.
- */
-function RowDemand({
-  functionIds,
-  surface,
-  priority,
-}: {
-  functionIds: readonly number[];
-  surface: SurfaceId;
-  priority: Priority;
-}) {
-  useSummaryDemand({ surface, functionIds, priority, enabled: true });
-  return null;
 }

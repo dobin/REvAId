@@ -115,7 +115,7 @@ async def test_dispatch_large_callees_are_capped_at_table_row_cap(
     )
     assert response.status_code == 200
     body = response.json()
-    assert len(body["rows"]) == 16  # table_row_cap default
+    assert len(body["rows"]) == 64  # table_row_cap default
     assert body["total"] >= 300
 
 

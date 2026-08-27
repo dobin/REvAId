@@ -1,31 +1,27 @@
 /**
  * "▸ ▫ utility calls (N)" collapsed group (D34). Expanding fetches the
- * `group=utility` page for the first time — collapsed groups never acquire
- * summaries (C2b: deferred, not skipped) because `UtilityGroupRows` (and its
- * `VirtualRowList`) is simply not mounted while collapsed. Collapsing
- * unmounts it, which releases every demand it held via the hook's unmount
- * cleanup — "collapsing cancels the unstarted remainder" (§5.4) needs no
- * extra code here.
+ * `group=utility` page for the first time. Neighbour-table reads and
+ * scrolling are passive, so expanding and collapsing this group never
+ * creates or releases summary work.
  */
 import { useState } from "react";
 import { Glyph } from "@/components/Glyph";
-import { useNeighboursQuery } from "@/api/queries/neighbours";
-import type { FunctionId, Priority, ViewId } from "@/api/types";
+import { useInfiniteNeighboursQuery } from "@/api/queries/neighbours";
+import type { FunctionId, ViewId } from "@/api/types";
 import type { FanOutOrigin } from "@/features/canvas/CanvasActions";
 import { VirtualRowList } from "./VirtualRowList";
+import { TableFooter } from "./TableFooter";
 
 export function UtilityGroup({
   functionId,
   viewId,
   direction,
   totalUtility,
-  priority,
 }: {
   functionId: FunctionId;
   viewId: ViewId;
   direction: "callees" | "callers";
   totalUtility: number;
-  priority: Priority;
 }) {
   // Utility rows fan out exactly like primary rows: from this card, oriented
   // by direction (callees -> right, callers -> left). Resolved downstream.
@@ -62,7 +58,6 @@ export function UtilityGroup({
           viewId={viewId}
           direction={direction}
           origin={origin}
-          priority={priority}
         />
       )}
     </div>
@@ -74,15 +69,13 @@ function UtilityGroupRows({
   viewId,
   direction,
   origin,
-  priority,
 }: {
   functionId: FunctionId;
   viewId: ViewId;
   direction: "callees" | "callers";
   origin?: FanOutOrigin | undefined;
-  priority: Priority;
 }) {
-  const { data, isPending, isError } = useNeighboursQuery({
+  const { data, isPending, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteNeighboursQuery({
     functionId,
     viewId,
     direction,
@@ -91,11 +84,22 @@ function UtilityGroupRows({
 
   if (isPending) return <p style={{ fontSize: "0.75rem" }}>Loading…</p>;
   if (isError) return <p style={{ fontSize: "0.75rem" }}>Could not load utility calls.</p>;
+  if (!data) return null;
+  const firstPage = data.pages[0];
+  if (!firstPage) return null;
+  const rows = data.pages.flatMap((page) => page.rows);
   return (
-    <VirtualRowList
-      rows={data.rows}
-      origin={origin}
-      demand={{ surface: `table:${String(functionId)}:${direction}:utility`, priority }}
-    />
+    <>
+      <VirtualRowList
+        rows={rows}
+        origin={origin}
+      />
+      <TableFooter
+        shown={rows.length}
+        total={firstPage.total}
+        isLoadingMore={isFetchingNextPage}
+        {...(hasNextPage ? { onLoadMore: () => void fetchNextPage() } : {})}
+      />
+    </>
   );
 }

@@ -115,7 +115,7 @@ class Settings(BaseSettings):
     log_json: bool = Field(default=False, description="JSON logs in prod, console in dev (F2).")
 
     # -- F1a: the five PRD-named UI tuning constants -----------------------
-    table_row_cap: int = Field(default=16, gt=0, description="D6 / F1a / V1.")
+    table_row_cap: int = Field(default=64, gt=0, description="D6 / F1a / V1.")
     caller_suppress_threshold: int = Field(default=32, gt=0, description="D7 / F1a / V1.")
     utility_fanin_threshold: int = Field(default=50, gt=0, description="D34a / F1a / V2.")
     fan_out_all_hard_cap: int = Field(default=50, gt=0, description="D24 / F1a.")

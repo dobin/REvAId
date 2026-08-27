@@ -1,9 +1,6 @@
 /**
- * I9 §5.4: "placing one typical card demands <= 20 summaries (median)."
- * `FunctionCardNode` demands its own summary (priority 0) plus whatever its
- * two `NeighbourTable`s' `VirtualRowList`s acquire — capped at
- * `tableRowCap` rows per direction by the backend page size, so a typical
- * card (16 callees + a few callers) stays comfortably under 20.
+ * A FunctionCardNode is the sole automatic summary-demand surface: placing a
+ * card requests its own summary, while its neighbour rows remain passive.
  *
  * Note: React Flow marks its node subtree `aria-hidden`, so role queries
  * inside a `FunctionCardNode` need `{ hidden: true }` — see
@@ -172,12 +169,12 @@ function renderWithProviders() {
   );
 }
 
-describe("FunctionCardNode demand acquisition (I9 cost bound)", () => {
+describe("FunctionCardNode summary demand", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
 
-  it("placing one card (16 callees + 3 callers) demands <= 20 summaries", async () => {
+  it("demands only the placed card's summary, not summaries for its rows", async () => {
     mockFetch();
     renderWithProviders();
 
@@ -187,12 +184,14 @@ describe("FunctionCardNode demand acquisition (I9 cost bound)", () => {
 
     await waitFor(
       () => {
-        // own summary (1) + up to 16 callee rows + up to 3 caller rows.
-        expect(demandCallCount()).toBeGreaterThan(0);
+        expect(demandCallCount()).toBe(1);
       },
       { timeout: 2000 },
     );
 
-    expect(demandCallCount()).toBeLessThanOrEqual(20);
+    const summaryUrls = vi.mocked(global.fetch).mock.calls
+      .map(([input]) => (input instanceof Request ? input.url : String(input)))
+      .filter((url) => url.includes("/summary"));
+    expect(summaryUrls).toEqual([expect.stringContaining("/functions/1/summary")]);
   });
 });

@@ -3,24 +3,17 @@
  * tables (TAD §2.3/§4.3).
  *
  * `callersSuppressed` short-circuits to just `SuppressedNotice` (D7/E2a) —
- * filter/sort/utility-group (and therefore `VirtualRowList`'s demand
- * acquisition) never render for a suppressed caller table, matching the
- * backend's own "never fetch 291 rows" guarantee. A suppressed hub's own
- * card summary (priority 0, wired in `FunctionCardNode`) is still demanded —
- * only its caller *table* is inert.
- *
- * I9: row demand priority is 1 for the selected card's own tables, 2
- * otherwise (§5.1's priority ladder) — this is what makes "open a card,
- * analyse it first, then its neighbours" fall out of the existing queue
- * priorities rather than any client-side sequencing.
+ * filter/sort/utility-group never render for a suppressed caller table,
+ * matching the backend's own "never fetch 291 rows" guarantee. Neighbour
+ * tables are read-only and never trigger summary generation.
  */
 import { useState } from "react";
-import { useNeighboursQuery } from "@/api/queries/neighbours";
+import { useInfiniteNeighboursQuery } from "@/api/queries/neighbours";
 import type { FunctionId, ViewId } from "@/api/types";
-import { useAppStore } from "@/store";
 import { FilterInput } from "./FilterInput";
 import { SortControl, type SortKey, type SortOrder } from "./SortControl";
 import { SuppressedNotice } from "./SuppressedNotice";
+import { TableFooter } from "./TableFooter";
 
 import { UtilityGroup } from "./UtilityGroup";
 import { VirtualRowList } from "./VirtualRowList";
@@ -37,17 +30,15 @@ export function NeighbourTable({
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState<SortKey>("name");
   const [order, setOrder] = useState<SortOrder>("asc");
-  const isSelected = useAppStore((s) => s.selectedFunctionId === functionId);
-  const rowPriority = isSelected ? 1 : 2;
 
-  const { data, isPending, isError } = useNeighboursQuery({
+  const { data, isPending, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteNeighboursQuery({
     functionId,
     viewId,
     direction,
     group: "primary",
     sort,
     order,
-    filter: filter || undefined,
+    ...(filter ? { filter } : {}),
   });
 
   const label = direction === "callees" ? "Callees" : "Callers";
@@ -61,13 +52,18 @@ export function NeighbourTable({
   if (isError) {
     return <p style={{ fontSize: "0.8125rem" }}>Could not load {label.toLowerCase()}.</p>;
   }
+  if (!data) return null;
 
-  if (direction === "callers" && data.callersSuppressed) {
+  const firstPage = data.pages[0];
+  if (!firstPage) return null;
+  const rows = data.pages.flatMap((page) => page.rows);
+
+  if (direction === "callers" && firstPage.callersSuppressed) {
     return (
       <section>
         <hr style={{ border: "none", borderTop: "1px solid #e5e7eb", margin: "0.5rem 0" }} />
         <h3 style={{ fontSize: "0.8125rem", margin: "0.5rem 0 0.25rem" }}>{label}</h3>
-        <SuppressedNotice total={data.total} />
+        <SuppressedNotice total={firstPage.total} />
       </section>
     );
   }
@@ -89,18 +85,22 @@ export function NeighbourTable({
         </div>
       </div>
       <VirtualRowList
-        rows={data.rows}
+        rows={rows}
         origin={origin}
-        demand={{ surface: `table:${String(functionId)}:${direction}:primary`, priority: rowPriority }}
+      />
+      <TableFooter
+        shown={rows.length}
+        total={firstPage.total}
+        isLoadingMore={isFetchingNextPage}
+        {...(hasNextPage ? { onLoadMore: () => void fetchNextPage() } : {})}
       />
       <UtilityGroup
         functionId={functionId}
         viewId={viewId}
         direction={direction}
-        totalUtility={data.totalUtility}
-        priority={rowPriority}
+        totalUtility={firstPage.totalUtility}
       />
-      {data.mayBeIncomplete && (
+      {firstPage.mayBeIncomplete && (
         <p style={{ fontSize: "0.6875rem", color: "#9ca3af", margin: "0.25rem 0 0" }}>
           List may be incomplete (indirect calls).
         </p>

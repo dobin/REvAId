@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-from sqlalchemy import ColumnElement, and_, func, or_, select
+from sqlalchemy import ColumnElement, String, and_, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from graphrev.db.models import Edge, Function, ViewNode
@@ -41,10 +41,10 @@ class NeighbourRow:
 
 
 #: Sort-key -> the SQL expression it orders by (D23). "name" sorts by the
-#: analyst-visible display name (`name_analyst ?? name_ghidra`), matching
+#: visible display name (`name_analyst ?? name_llm ?? name_ghidra`), matching
 #: `function_dto_from_row`'s `display_name` derivation.
 _SORT_EXPRESSIONS: dict[SortKey, ColumnElement[object]] = {
-    "name": func.coalesce(Function.name_analyst, Function.name_ghidra),
+    "name": func.coalesce(Function.name_analyst, Function.name_llm, Function.name_ghidra),
     "address": Function.address,  # type: ignore[dict-item]
     "fanIn": Function.fan_in,  # type: ignore[dict-item]
 }
@@ -125,10 +125,16 @@ async def fetch_neighbour_page(
     filter_clause = None
     if filter_text:
         like = f"%{filter_text}%"
+        address_text = filter_text.strip()
+        if address_text.lower().startswith("0x"):
+            address_text = address_text[2:]
         filter_clause = or_(
             Function.name_ghidra.collate("NOCASE").like(like),
+            Function.name_llm.collate("NOCASE").like(like),
             Function.name_analyst.collate("NOCASE").like(like),
             Function.summary_short.collate("NOCASE").like(like),
+            cast(Function.address, String).like(like),
+            func.printf("%X", Function.address).like(f"%{address_text.upper()}%"),
         )
 
     async def _group_total(is_utility_group: bool) -> int:

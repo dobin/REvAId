@@ -60,7 +60,7 @@ function renderWithProviders() {
   const queryClient = new QueryClient();
   return render(
     <QueryClientProvider client={queryClient}>
-      <UtilityGroup functionId={1} viewId={1} direction="callees" totalUtility={7} priority={1} />
+      <UtilityGroup functionId={1} viewId={1} direction="callees" totalUtility={7} />
     </QueryClientProvider>,
   );
 }
@@ -70,7 +70,7 @@ function renderExpandableWithProviders() {
   return render(
     <QueryClientProvider client={queryClient}>
       <ConfigProvider fallback={null}>
-        <UtilityGroup functionId={1} viewId={1} direction="callees" totalUtility={7} priority={1} />
+        <UtilityGroup functionId={1} viewId={1} direction="callees" totalUtility={7} />
       </ConfigProvider>
     </QueryClientProvider>,
   );
@@ -121,7 +121,7 @@ describe("UtilityGroup", () => {
     const queryClient = new QueryClient();
     render(
       <QueryClientProvider client={queryClient}>
-        <UtilityGroup functionId={1} viewId={1} direction="callees" totalUtility={0} priority={1} />
+        <UtilityGroup functionId={1} viewId={1} direction="callees" totalUtility={0} />
       </QueryClientProvider>,
     );
     expect(screen.queryByText(/utility calls/i)).not.toBeInTheDocument();

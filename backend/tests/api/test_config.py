@@ -14,7 +14,7 @@ async def test_config_returns_camel_case_defaults(client: AsyncClient) -> None:
     assert response.status_code == 200
     body = response.json()
 
-    assert body["tableRowCap"] == 16
+    assert body["tableRowCap"] == 64
     assert body["callerSuppressThreshold"] == 32
     assert body["utilityFanInThreshold"] == 50
     assert body["fanOutAllHardCap"] == 50

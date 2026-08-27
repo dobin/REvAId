@@ -147,4 +147,53 @@ describe("NeighbourTable", () => {
     expect(screen.getByLabelText("Filter callees")).toBeInTheDocument();
     expect(screen.getByLabelText("Sort callees")).toBeInTheDocument();
   });
+
+  it("loads subsequent pages so callees beyond the row cap are reachable", async () => {
+    const firstPage: NeighbourPageDto = {
+      functionId: 1,
+      direction: "callees",
+      group: "primary",
+      rows: Array.from({ length: 16 }, (_, i) => makeRow(i)),
+      total: 17,
+      totalPrimary: 17,
+      totalUtility: 0,
+      limit: 16,
+      offset: 0,
+      callersSuppressed: false,
+      mayBeIncomplete: false,
+    };
+    const secondPage: NeighbourPageDto = {
+      ...firstPage,
+      rows: [makeRow(17, { displayName: "callee_beyond_first_page" })],
+      offset: 16,
+    };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: string | URL | Request) => {
+        const url = input instanceof Request ? input.url : String(input);
+        if (url.endsWith("/api/v1/config")) {
+          return Promise.resolve(new Response(JSON.stringify(config), { status: 200 }));
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify(url.includes("offset=16") ? secondPage : firstPage), {
+            status: 200,
+          }),
+        );
+      }),
+    );
+    renderWithProviders(1, 1, "callees");
+
+    const loadMore = await screen.findByRole("button", { name: "Load more" });
+    expect(screen.queryByText("callee_beyond_first_page")).not.toBeInTheDocument();
+    loadMore.click();
+
+    await waitFor(() => {
+      expect(vi.mocked(global.fetch).mock.calls.map((call) => String(call[0]))).toContainEqual(
+        expect.stringContaining("offset=16"),
+      );
+    });
+    // The list is virtualized, so jsdom intentionally does not guarantee
+    // that row 17 is mounted. The count proves it was appended for scrolling.
+    expect(screen.getByText("showing 17 of 17")).toBeInTheDocument();
+  });
 });
