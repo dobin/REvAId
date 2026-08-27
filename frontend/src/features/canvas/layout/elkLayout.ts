@@ -50,8 +50,8 @@ const NODE_SPACING_PX = 48;
 const elk = new ELK();
 
 /**
- * Shifts a freshly laid-out block of nodes right until it clears every
- * `obstacle` (D15's pinned nodes).
+ * Shifts a freshly laid-out block of nodes clear of every `obstacle` (D15's
+ * pinned nodes), toward `side` (right by default).
  *
  * ELK is only ever given the *unpinned* nodes, so it always lays them out
  * starting at its own origin — with no idea that a pinned card already
@@ -63,6 +63,12 @@ const elk = new ELK();
  * pinned nodes in as ordinary children would let ELK reposition them, which
  * D15 forbids.
  *
+ * `side` preserves the caller/callee reading direction that dropping a pinned
+ * node's edges from ELK would otherwise lose: fanning out a *caller* of a
+ * pinned card must land the block to that card's *left* (`side: "left"`), not
+ * blindly to its right. Plain callee fan-outs, and every case with no pinned
+ * card, keep the default `"right"`.
+ *
  * A single rigid horizontal translation of the whole block (rather than
  * per-node nudging) is deliberate: it preserves ELK's layering exactly, so
  * the call-direction reading order the layout exists to produce (a callee to
@@ -72,6 +78,7 @@ export function offsetPastObstacles(
   positions: LayoutPositions,
   sizes: Map<string, { width: number; height: number }>,
   obstacles: LayoutObstacle[],
+  side: "left" | "right" = "right",
 ): LayoutPositions {
   if (obstacles.length === 0) return positions;
 
@@ -83,6 +90,7 @@ export function offsetPastObstacles(
   // slide it into another, so keep pushing until a full pass is collision
   // free. Bounded by the obstacle count — each iteration clears at least one.
   for (let pass = 0; pass <= obstacles.length; pass += 1) {
+    // Largest *magnitude* nudge any node needs this pass, in `side`'s direction.
     let worst = 0;
     for (const [id, pos] of entries) {
       const size = sizes.get(id);
@@ -94,13 +102,19 @@ export function offsetPastObstacles(
         const overlapsY =
           pos.y < obstacle.y + obstacle.height && pos.y + size.height > obstacle.y;
         if (!overlapsX || !overlapsY) continue;
-        // Push this node's left edge past the obstacle's right edge, plus the
-        // normal inter-layer gap so the result reads like the rest of the layout.
-        worst = Math.max(worst, obstacle.x + obstacle.width + LAYER_SPACING_PX - left);
+        // Push clear of the obstacle plus the normal inter-layer gap so the
+        // result reads like the rest of the layout: leftwards, the node's
+        // right edge must sit left of the obstacle; rightwards, its left edge
+        // must sit right of the obstacle.
+        const need =
+          side === "left"
+            ? right - (obstacle.x - LAYER_SPACING_PX)
+            : obstacle.x + obstacle.width + LAYER_SPACING_PX - left;
+        worst = Math.max(worst, need);
       }
     }
     if (worst <= 0) break;
-    shift += worst;
+    shift += side === "left" ? -worst : worst;
   }
 
   if (shift === 0) return positions;
@@ -115,6 +129,7 @@ export async function computeElkLayout(
   nodes: LayoutInputNode[],
   edges: LayoutInputEdge[],
   obstacles: LayoutObstacle[] = [],
+  side: "left" | "right" = "right",
 ): Promise<LayoutPositions> {
   const graph = {
     id: "root",
@@ -152,7 +167,7 @@ export async function computeElkLayout(
       }
     }
     const sizes = new Map(nodes.map((n) => [n.id, { width: n.width, height: n.height }]));
-    return offsetPastObstacles(positions, sizes, obstacles);
+    return offsetPastObstacles(positions, sizes, obstacles, side);
   } catch {
     // A failed layout is a no-op for the caller (nodes keep their current
     // positions) — never throw over one bad request.

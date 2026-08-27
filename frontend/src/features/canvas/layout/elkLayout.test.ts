@@ -197,4 +197,25 @@ describe("offsetPastObstacles", () => {
       ]),
     ).toEqual(positions);
   });
+
+  it("shifts the block LEFT of the obstacle when side is 'left'", () => {
+    // A caller fanned out of a pinned card: the block must land left of it,
+    // not right (the default). ELK laid the block at the same x as the
+    // pinned obstacle here, so it has to move negative to clear.
+    const obstacle: LayoutObstacle = { x: 0, y: 0, width: 500, height: 400 };
+    const result = offsetPastObstacles(block, sizes, [obstacle], "left");
+
+    const deltaA = positionOf(result, "a").x - positionOf(block, "a").x;
+    const deltaB = positionOf(result, "b").x - positionOf(block, "b").x;
+    // Rigid translation, and it went left (negative), never touching y.
+    expect(deltaA).toBe(deltaB);
+    expect(deltaA).toBeLessThan(0);
+    expect(positionOf(result, "a").y).toBe(0);
+    // Every node's right edge now sits left of the obstacle's left edge.
+    for (const [id, pos] of Object.entries(result)) {
+      const size = sizes.get(id);
+      if (!size) throw new Error(`no size for ${id}`);
+      expect(pos.x + size.width).toBeLessThanOrEqual(obstacle.x);
+    }
+  });
 });

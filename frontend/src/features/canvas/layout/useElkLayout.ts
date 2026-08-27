@@ -50,6 +50,7 @@ export function useElkLayout(layoutFn: ElkLayoutFn = computeElkLayout) {
 
       const unpinned = nodes.filter((n) => !n.pinned);
       const unpinnedIds = new Set(unpinned.map((n) => n.id));
+      const pinnedIds = new Set(nodes.filter((n) => n.pinned).map((n) => n.id));
       // Only edges between two unpinned nodes are meaningful to ELK's layout
       // (a pinned node is a fixed obstacle, not a layout participant).
       const relevantEdges = edges.filter(
@@ -63,10 +64,22 @@ export function useElkLayout(layoutFn: ElkLayoutFn = computeElkLayout) {
         .filter((n) => n.pinned && n.x !== undefined && n.y !== undefined)
         .map((n) => ({ x: n.x ?? 0, y: n.y ?? 0, width: n.width, height: n.height }));
 
+      // Which side of the pinned obstacle(s) the laid-out block belongs on.
+      // A boundary edge whose *target* is pinned means the unpinned node is a
+      // caller of the pinned card (deriveCanvasEdges orients a fanin edge
+      // caller -> origin), so the block must land to the pinned card's LEFT.
+      // Everything else (callee fan-out, or no pinned neighbour) stays right.
+      const side: "left" | "right" = edges.some(
+        (e) => unpinnedIds.has(e.source) && pinnedIds.has(e.target),
+      )
+        ? "left"
+        : "right";
+
       void layoutFn(
         unpinned.map(({ id, width, height }) => ({ id, width, height })),
         relevantEdges,
         obstacles,
+        side,
       ).then((result) => {
         // Latest-wins: ignore a result for any request that isn't the most
         // recently issued one (a superseded, in-flight call resolving late).

@@ -16,11 +16,12 @@ function makeFakeLayoutFn() {
     nodes: LayoutInputNode[];
     edges: LayoutInputEdge[];
     obstacles: LayoutObstacle[] | undefined;
+    side: "left" | "right" | undefined;
   }[] = [];
   const resolvers: ((positions: LayoutPositions) => void)[] = [];
 
-  const fn: ElkLayoutFn = (nodes, edges, obstacles) => {
-    calls.push({ nodes, edges, obstacles });
+  const fn: ElkLayoutFn = (nodes, edges, obstacles, side) => {
+    calls.push({ nodes, edges, obstacles, side });
     return new Promise<LayoutPositions>((resolve) => {
       resolvers.push(resolve);
     });
@@ -75,6 +76,44 @@ describe("useElkLayout", () => {
     expect(fake.calls[0]?.obstacles).toEqual([
       { x: 16, y: 24, width: 380, height: 546 },
     ]);
+  });
+
+  it("asks for the left side when a caller is fanned out of a pinned card", () => {
+    const fake = makeFakeLayoutFn();
+    const { result } = renderHook(() => useElkLayout(fake.fn));
+
+    act(() => {
+      result.current.runLayout(
+        [
+          { id: "centre", width: 380, height: 200, pinned: true, x: 500, y: 0 },
+          { id: "caller", width: 380, height: 200, pinned: false },
+        ],
+        // deriveCanvasEdges orients a fanin (caller) edge caller -> origin,
+        // so the pinned origin is the edge *target*.
+        [{ id: "caller->centre", source: "caller", target: "centre" }],
+      );
+    });
+
+    expect(fake.calls[0]?.side).toBe("left");
+  });
+
+  it("keeps the right side when a callee is fanned out of a pinned card", () => {
+    const fake = makeFakeLayoutFn();
+    const { result } = renderHook(() => useElkLayout(fake.fn));
+
+    act(() => {
+      result.current.runLayout(
+        [
+          { id: "centre", width: 380, height: 200, pinned: true, x: 0, y: 0 },
+          { id: "callee", width: 380, height: 200, pinned: false },
+        ],
+        // A fanout (callee) edge is origin -> callee, so the pinned origin is
+        // the edge *source* — no left flip.
+        [{ id: "centre->callee", source: "centre", target: "callee" }],
+      );
+    });
+
+    expect(fake.calls[0]?.side).toBe("right");
   });
 
   it("skips a pinned node whose position is unknown", () => {
