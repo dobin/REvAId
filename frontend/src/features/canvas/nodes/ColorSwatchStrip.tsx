@@ -6,13 +6,13 @@
 import type { NodeColor } from "@/api/types";
 
 export const SWATCH_HEX: Record<NodeColor, string> = {
-  slate: "#64748b",
-  red: "#ef4444",
-  amber: "#f59e0b",
-  green: "#22c55e",
-  blue: "#3b82f6",
-  violet: "#8b5cf6",
-  pink: "#ec4899",
+  slate: "#f1f5f9",
+  red: "#fef2f2",
+  amber: "#fffbeb",
+  green: "#f0fdf4",
+  blue: "#eff6ff",
+  violet: "#f5f3ff",
+  pink: "#fdf2f8",
 };
 
 export function ColorSwatchStrip({

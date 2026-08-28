@@ -17,6 +17,7 @@ import { useSummaryDemand } from "@/hooks/useSummaryDemand";
 import { useAppStore } from "@/store";
 import { useViewNodeActions } from "../useViewNodeActions";
 import { CollapsedChip } from "./CollapsedChip";
+import { SWATCH_HEX } from "./ColorSwatchStrip";
 
 /**
  * A card connects to its provenance parent/children horizontally (layout
@@ -96,7 +97,7 @@ export function FunctionCardNode({ data }: { data: FunctionCardNodeData }) {
     <div
       style={{
         width: config.cardWidthPx,
-        background: "white",
+        background: data.viewNode.color ? SWATCH_HEX[data.viewNode.color] : "white",
         border: "1px solid #d1d5db",
         borderRadius: "0.375rem",
         boxShadow: "0 1px 2px rgba(0,0,0,0.06)",
