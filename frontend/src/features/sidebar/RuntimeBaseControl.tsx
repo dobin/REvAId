@@ -29,21 +29,29 @@ export function RuntimeBaseControl({
       <p style={{ fontSize: "0.75rem", color: "#6b7280", margin: "0 0 0.375rem" }}>
         Default image base: {analysisImageBase === null ? "not recorded" : toHex(analysisImageBase)}
       </p>
-      <input
-        type="text"
-        aria-label="Runtime load base"
-        placeholder="Your image base (optional)"
-        value={text}
-        onChange={(event) => {
-          const next = event.target.value;
-          setText(next);
-          const nextBase = parseAddressNumber(next);
-          if (next.trim().length === 0 || nextBase !== null) {
-            onRuntimeBaseChange(nextBase);
-          }
-        }}
-        style={{ ...inputStyle, borderColor: invalid ? "#dc2626" : "#d1d5db" }}
-      />
+      <label style={{ display: "flex", alignItems: "center", gap: "0.375rem", fontSize: "0.75rem", color: "#6b7280" }}>
+        Your image base:
+        <input
+          type="text"
+          aria-label="Runtime load base"
+          placeholder="(optional)"
+          value={text}
+          onChange={(event) => {
+            const next = event.target.value;
+            setText(next);
+            const nextBase = parseAddressNumber(next);
+            if (next.trim().length === 0 || nextBase !== null) {
+              onRuntimeBaseChange(nextBase);
+            }
+          }}
+          style={{
+            ...inputStyle,
+            flex: "1 1 0",
+            minWidth: 0,
+            borderColor: invalid ? "#dc2626" : "#d1d5db",
+          }}
+        />
+      </label>
       {invalid ? (
         <p role="alert" style={{ fontSize: "0.75rem", color: "#b91c1c", margin: "0.25rem 0 0" }}>
           Enter a decimal or 0x-prefixed hexadecimal load base.

@@ -1,19 +1,24 @@
 /**
- * Wipes every node from the view and clears local position state, leaving a
- * blank canvas. Sends `PATCH /views/{id}/nodes` with `remove: [all ids]` so
- * the server is also cleared, then calls `clearPositions` on the canvas slice
- * to drop any pinned/drag positions that would otherwise linger in Zustand.
+ * Wipes every node from the view, clears local position state, then replaces
+ * the binary's preferred entry point as the new root. It sends separate
+ * remove and upsert requests because the server applies an upsert before a
+ * remove in a combined request.
  *
  * Intentionally does NOT reset the camera — the user can pan/zoom themselves.
  */
+import { usePlaceEntryPoint } from "./PlaceEntryPointButton";
 import { useViewQuery } from "@/api/queries/views";
 import { usePatchViewNodesMutation } from "@/api/queries/viewNodes";
-import type { ViewId } from "@/api/types";
+import type { BinaryId, ViewId } from "@/api/types";
 import { useAppStore } from "@/store";
 
-export function ResetCanvasButton({ viewId }: { viewId: ViewId }) {
+export function ResetCanvasButton({ binaryId, viewId }: { binaryId: BinaryId; viewId: ViewId }) {
   const view = useViewQuery(viewId);
   const patchNodes = usePatchViewNodesMutation(viewId);
+  const { topEntryPoint, placeEntryPoint, isPending: isPlacingEntryPoint } = usePlaceEntryPoint(
+    binaryId,
+    viewId,
+  );
   const clearPositions = useAppStore((s) => s.clearPositions);
 
   const nodeIds = view.data?.nodes.map((n) => n.functionId) ?? [];
@@ -22,17 +27,13 @@ export function ResetCanvasButton({ viewId }: { viewId: ViewId }) {
   return (
     <button
       type="button"
-      disabled={!hasNodes || patchNodes.isPending}
+      disabled={!hasNodes || !topEntryPoint || patchNodes.isPending || isPlacingEntryPoint}
       onClick={() => {
-        if (nodeIds.length === 0) return;
-        patchNodes.mutate(
-          { remove: nodeIds },
-          {
-            onSuccess: () => {
-              clearPositions();
-            },
-          },
-        );
+        if (nodeIds.length === 0 || !topEntryPoint) return;
+        void patchNodes.mutateAsync({ remove: nodeIds }).then(async () => {
+          clearPositions();
+          await placeEntryPoint();
+        });
       }}
       style={{
         display: "block",
@@ -42,11 +43,17 @@ export function ResetCanvasButton({ viewId }: { viewId: ViewId }) {
         textAlign: "left",
         background: "none",
         border: "none",
-        cursor: hasNodes ? "pointer" : "not-allowed",
+        cursor: hasNodes && topEntryPoint ? "pointer" : "not-allowed",
       }}
-      title={hasNodes ? "Remove all nodes and reset the canvas" : "Canvas is already empty"}
+      title={
+        !hasNodes
+          ? "Canvas is already empty"
+          : !topEntryPoint
+            ? "No entry-point suggestions for this binary"
+            : "Remove all nodes and place the entry point"
+      }
     >
-      {patchNodes.isPending ? "Clearing…" : "✕ Reset canvas"}
+      {patchNodes.isPending ? "Clearing…" : isPlacingEntryPoint ? "Placing…" : "✕ Reset canvas"}
     </button>
   );
 }

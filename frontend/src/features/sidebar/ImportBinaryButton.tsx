@@ -151,7 +151,7 @@ export function ImportBinaryButton({
       title="Import binary from Ghidra export"
       trigger={
         <button type="button" style={buttonStyle} title="Import a Ghidra JSON export">
-          ⬆ Import binary…
+          ⬆ (Re) Import binary
         </button>
       }
     >

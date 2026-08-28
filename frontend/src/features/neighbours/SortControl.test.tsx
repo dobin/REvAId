@@ -74,7 +74,7 @@ describe("SortControl", () => {
         direction="callees"
       />,
     );
-    expect(screen.getByRole("option", { name: "Imported order" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Position" })).toBeInTheDocument();
 
     rerender(
       <SortControl
@@ -86,6 +86,6 @@ describe("SortControl", () => {
         direction="callers"
       />,
     );
-    expect(screen.queryByRole("option", { name: "Imported order" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Position" })).not.toBeInTheDocument();
   });
 });

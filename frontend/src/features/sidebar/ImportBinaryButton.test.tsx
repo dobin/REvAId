@@ -23,7 +23,7 @@ function jsonFile(name: string, content: string): File {
 }
 
 function openDialogAndUpload(file: File) {
-  fireEvent.click(screen.getByText("⬆ Import binary…"));
+  fireEvent.click(screen.getByRole("button", { name: /\(re\) import binary/i }));
   const input = document.querySelector('input[type="file"]') as HTMLInputElement;
   fireEvent.change(input, { target: { files: [file] } });
 }

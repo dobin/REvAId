@@ -13,7 +13,7 @@ async def test_health_reports_db_ok_and_revision(client: AsyncClient) -> None:
     body = response.json()
     assert body["status"] == "ok"
     assert body["dbOk"] is True
-    assert body["migrationRevision"] == "0007"
+    assert body["migrationRevision"] == "0008"
     assert body["ghidraAdapter"] == "mock"
     assert body["llmAdapter"] == "mock"
     # AM5: adapter reachability, not just the name — the mock adapter is

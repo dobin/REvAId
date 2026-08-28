@@ -73,11 +73,17 @@ export function Sidebar({
         flexDirection: "column",
       }}
     >
-      <SidebarSection title="Binary">
-        <ImportBinaryButton onImported={onImported} />
-      </SidebarSection>
       {binaryId !== null && (
-        <SidebarSection title="Runtime Address">
+        <SidebarSection title="Image">
+          <div
+            style={{
+              fontSize: "0.75rem",
+              color: "#6b7280",
+              marginBottom: "0.375rem",
+            }}
+          >
+            Binary: {binaryName}
+          </div>
           <RuntimeBaseControl
             key={binaryId}
             analysisImageBase={analysisImageBase}
@@ -98,16 +104,6 @@ export function Sidebar({
       )}
       {binaryId !== null && binaryName !== null && (
         <SidebarSection title="View">
-          <div
-            style={{
-              fontFamily: "var(--gr-font-mono, monospace)",
-              fontSize: "0.875rem",
-              color: "var(--gr-color-ground-truth, #111827)",
-              marginBottom: "0.5rem",
-            }}
-          >
-            {binaryName}
-          </div>
           <ViewPicker binaryId={binaryId} value={viewId} onChange={onSelectView} />
         </SidebarSection>
       )}
@@ -118,8 +114,10 @@ export function Sidebar({
             <PlaceEntryPointButton binaryId={binaryId} viewId={viewId} />
           )}
           <RebalanceButton viewId={viewId} />
-          <ResetCanvasButton viewId={viewId} />
+          {binaryId !== null && <ResetCanvasButton binaryId={binaryId} viewId={viewId} />}
           {binaryId !== null && <ResetSummariesButton binaryId={binaryId} />}
+          <ImportBinaryButton onImported={onImported} />
+
         </SidebarSection>
       ) : null}
 

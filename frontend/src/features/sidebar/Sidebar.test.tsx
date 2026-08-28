@@ -8,7 +8,7 @@ vi.mock("./LlmConnectionStatus", () => ({
 }));
 
 describe("Sidebar", () => {
-  it("renders the binary section", () => {
+  it("renders persistent sidebar sections without a selected binary", () => {
     const queryClient = new QueryClient();
     render(
       <QueryClientProvider client={queryClient}>
@@ -24,12 +24,11 @@ describe("Sidebar", () => {
         />
       </QueryClientProvider>,
     );
-    expect(screen.getByText("Binary")).toBeInTheDocument();
     expect(screen.getByText("LLM Connection")).toBeInTheDocument();
     expect(screen.getByText("LLM connector status")).toBeInTheDocument();
   });
 
-  it("renders the binary name and view controls in the View section", () => {
+  it("renders the binary name in Image and view controls in View", () => {
     const queryClient = new QueryClient();
     render(
       <QueryClientProvider client={queryClient}>
@@ -46,7 +45,8 @@ describe("Sidebar", () => {
       </QueryClientProvider>,
     );
 
+    expect(screen.getByText("Image")).toBeInTheDocument();
+    expect(screen.getByText("Binary: test.exe")).toBeInTheDocument();
     expect(screen.getByText("View")).toBeInTheDocument();
-    expect(screen.getByText("test.exe")).toBeInTheDocument();
   });
 });

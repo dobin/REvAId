@@ -6,6 +6,7 @@ import { useBinariesQuery } from "@/api/queries/binaries";
 import { useViewsQuery } from "@/api/queries/views";
 import { Toolbar } from "@/features/toolbar/Toolbar";
 import { Sidebar } from "@/features/sidebar/Sidebar";
+import { AutoPlaceEntryPoint } from "@/features/sidebar/PlaceEntryPointButton";
 import { CanvasView } from "@/features/canvas/CanvasView";
 import { DetailPanel } from "@/features/detail/DetailPanel";
 import { BinariesPage } from "@/features/binaries/BinariesPage";
@@ -92,6 +93,13 @@ function BinaryWorkspace({ binaryName }: { binaryName: string }) {
           <main style={{ flex: 1, minWidth: 0 }}>
             <CanvasView selectedBinaryId={selectedBinaryId} viewId={selectedViewId} actionsRegistry={actionsRegistry} />
           </main>
+          {selectedBinaryId !== null && selectedViewId !== null && (
+            <AutoPlaceEntryPoint
+              key={selectedViewId}
+              binaryId={selectedBinaryId as BinaryId}
+              viewId={selectedViewId as ViewId}
+            />
+          )}
           <DetailPanel />
         </div>
       </CanvasActionsRegistryProvider>
