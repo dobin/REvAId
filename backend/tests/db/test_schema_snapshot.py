@@ -55,6 +55,18 @@ async def test_functions_columns_match_model(engine: AsyncEngine, migrated_db: P
 
 
 @pytest.mark.asyncio
+async def test_edges_columns_match_model(engine: AsyncEngine, migrated_db: Path) -> None:
+    expected_columns = {c.name for c in Base.metadata.tables["edges"].columns}
+    async with engine.connect() as conn:
+
+        def _columns(sync_conn: object) -> list[str]:
+            return [c["name"] for c in inspect(sync_conn).get_columns("edges")]  # type: ignore[arg-type]
+
+        columns = await conn.run_sync(_columns)
+    assert set(columns) == expected_columns
+
+
+@pytest.mark.asyncio
 async def test_indexes_present(engine: AsyncEngine, migrated_db: Path) -> None:
     async with engine.connect() as conn:
 
@@ -75,6 +87,7 @@ async def test_indexes_present(engine: AsyncEngine, migrated_db: Path) -> None:
         "ix_functions_utility_eff",
         "ix_edges_caller",
         "ix_edges_callee",
+        "ix_edges_caller_callee_order",
         "ix_views_binary",
         "ix_view_nodes_view",
         "ix_view_nodes_origin",

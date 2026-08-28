@@ -30,7 +30,7 @@ from graphrev.db.uow import unit_of_work
 from graphrev.ingestion.placeholders import placeholder_name
 from graphrev.ingestion.report import BinaryIngestionReport
 from graphrev.repositories.binaries import get_or_create_binary
-from graphrev.repositories.edges import upsert_edge, upsert_edges_batch
+from graphrev.repositories.edges import EdgeUpsertValues, upsert_edge, upsert_edges_batch
 from graphrev.repositories.functions import (
     FunctionBatchValues,
     recompute_fan_in_fan_out_and_utility,
@@ -237,11 +237,17 @@ async def _ingest_edge_batch(
             # The ordinary edge fallback below preserves best-effort handling.
             pass
     try:
-        pairs = [
-            (address_to_id[edge.caller_address], address_to_id[edge.callee_address])
+        edge_values = [
+            EdgeUpsertValues(
+                caller_id=address_to_id[edge.caller_address],
+                callee_id=address_to_id[edge.callee_address],
+                callee_order=edge.callee_order,
+            )
             for edge in edges
         ]
-        inserted, skipped = await upsert_edges_batch(session, binary_id=binary_id, edges=pairs)
+        inserted, skipped = await upsert_edges_batch(
+            session, binary_id=binary_id, edges=edge_values
+        )
         report.edges_inserted += inserted
         report.edges_skipped_duplicate += skipped
     except Exception:
@@ -251,7 +257,11 @@ async def _ingest_edge_batch(
                 callee_id = address_to_id[edge.callee_address]
                 async with session.begin_nested():
                     inserted = await upsert_edge(
-                        session, binary_id=binary_id, caller_id=caller_id, callee_id=callee_id
+                        session,
+                        binary_id=binary_id,
+                        caller_id=caller_id,
+                        callee_id=callee_id,
+                        callee_order=edge.callee_order,
                     )
                 if inserted:
                     report.edges_inserted += 1

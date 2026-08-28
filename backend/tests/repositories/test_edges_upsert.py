@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import pytest
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from graphrev.core.clock import utc_now_iso
-from graphrev.db.models import Binary, Function
-from graphrev.repositories.edges import upsert_edge, upsert_edges_batch
+from graphrev.db.models import Binary, Edge, Function
+from graphrev.repositories.edges import EdgeUpsertValues, upsert_edge, upsert_edges_batch
 from graphrev.repositories.functions import (
     recompute_fan_in_fan_out_and_utility,
     upsert_function,
@@ -23,19 +24,47 @@ async def _make_binary(session: AsyncSession, name: str = "acme.exe") -> Binary:
 
 
 @pytest.mark.asyncio
-async def test_upsert_edge_duplicate_pair_is_noop(session: AsyncSession) -> None:
+async def test_upsert_edge_duplicate_pair_refreshes_non_null_order(session: AsyncSession) -> None:
     binary = await _make_binary(session)
     a_id, _ = await upsert_function(session, binary_id=binary.id, address=0x1, name_ghidra="a")
     b_id, _ = await upsert_function(session, binary_id=binary.id, address=0x2, name_ghidra="b")
     await session.commit()
 
-    inserted1 = await upsert_edge(session, binary_id=binary.id, caller_id=a_id, callee_id=b_id)
+    inserted1 = await upsert_edge(
+        session, binary_id=binary.id, caller_id=a_id, callee_id=b_id, callee_order=0
+    )
     await session.commit()
-    inserted2 = await upsert_edge(session, binary_id=binary.id, caller_id=a_id, callee_id=b_id)
+    inserted2 = await upsert_edge(
+        session, binary_id=binary.id, caller_id=a_id, callee_id=b_id, callee_order=4
+    )
     await session.commit()
 
     assert inserted1 is True
     assert inserted2 is False
+    edge = (
+        await session.execute(select(Edge).where(Edge.caller_id == a_id, Edge.callee_id == b_id))
+    ).scalar_one()
+    assert edge.callee_order == 4
+
+
+@pytest.mark.asyncio
+async def test_upsert_edge_legacy_order_does_not_clear_known_order(session: AsyncSession) -> None:
+    binary = await _make_binary(session)
+    a_id, _ = await upsert_function(session, binary_id=binary.id, address=0x1, name_ghidra="a")
+    b_id, _ = await upsert_function(session, binary_id=binary.id, address=0x2, name_ghidra="b")
+    await upsert_edge(
+        session, binary_id=binary.id, caller_id=a_id, callee_id=b_id, callee_order=3
+    )
+    await session.commit()
+
+    inserted = await upsert_edge(session, binary_id=binary.id, caller_id=a_id, callee_id=b_id)
+    await session.commit()
+
+    assert inserted is False
+    edge = (
+        await session.execute(select(Edge).where(Edge.caller_id == a_id, Edge.callee_id == b_id))
+    ).scalar_one()
+    assert edge.callee_order == 3
 
 
 @pytest.mark.asyncio
@@ -63,17 +92,26 @@ async def test_batch_upsert_edges_deduplicates_input_and_existing_rows(
     inserted, skipped = await upsert_edges_batch(
         session,
         binary_id=binary.id,
-        edges=[(a_id, b_id), (a_id, b_id), (b_id, c_id)],
+        edges=[
+            EdgeUpsertValues(a_id, b_id, 0),
+            EdgeUpsertValues(a_id, b_id, 0),
+            EdgeUpsertValues(b_id, c_id, 0),
+        ],
     )
     await session.commit()
     assert inserted == 2
     assert skipped == 1
 
     inserted, skipped = await upsert_edges_batch(
-        session, binary_id=binary.id, edges=[(a_id, b_id), (b_id, c_id)]
+        session,
+        binary_id=binary.id,
+        edges=[EdgeUpsertValues(a_id, b_id, 2), EdgeUpsertValues(b_id, c_id)],
     )
     assert inserted == 0
     assert skipped == 2
+    assert (
+        await session.execute(select(Edge.callee_order).where(Edge.caller_id == a_id))
+    ).scalar_one() == 2
 
 
 @pytest.mark.asyncio

@@ -11,6 +11,7 @@ import type { FunctionId, Priority, ViewId } from "@/api/types";
 import type { FanOutOrigin } from "@/features/canvas/CanvasActions";
 import { VirtualRowList } from "./VirtualRowList";
 import { TableFooter } from "./TableFooter";
+import type { SortKey, SortOrder } from "./SortControl";
 
 export function UtilityGroup({
   functionId,
@@ -18,12 +19,16 @@ export function UtilityGroup({
   direction,
   totalUtility,
   priority,
+  sort,
+  order,
 }: {
   functionId: FunctionId;
   viewId: ViewId;
   direction: "callees" | "callers";
   totalUtility: number;
   priority: Priority;
+  sort?: SortKey;
+  order?: SortOrder;
 }) {
   // Utility rows fan out exactly like primary rows: from this card, oriented
   // by direction (callees -> right, callers -> left). Resolved downstream.
@@ -61,6 +66,8 @@ export function UtilityGroup({
           direction={direction}
           origin={origin}
           priority={priority}
+          sort={sort ?? (direction === "callees" ? "callOrder" : "name")}
+          order={order ?? "asc"}
         />
       )}
     </div>
@@ -73,12 +80,16 @@ function UtilityGroupRows({
   direction,
   origin,
   priority,
+  sort,
+  order,
 }: {
   functionId: FunctionId;
   viewId: ViewId;
   direction: "callees" | "callers";
   origin?: FanOutOrigin | undefined;
   priority: Priority;
+  sort: SortKey;
+  order: SortOrder;
 }) {
   const config = useConfig();
   const { data, isPending, isError, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteNeighboursQuery({
@@ -87,6 +98,8 @@ function UtilityGroupRows({
     direction,
     group: "utility",
     limit: direction === "callers" ? 5 : config.tableRowCap,
+    sort,
+    order,
   });
 
   if (isPending) return <p style={{ fontSize: "0.75rem" }}>Loading…</p>;

@@ -59,6 +59,12 @@ async def get_neighbour_page(
     order: SortOrder,
     filter_text: str | None,
 ) -> NeighbourPageDto:
+    if sort == "callOrder" and direction != "callees":
+        raise AppError(
+            ErrorCode.VALIDATION_ERROR,
+            "callOrder sorting is only available for callees.",
+            details={"direction": direction, "sort": sort},
+        )
     fn = await get_function_by_id(session, function_id)
     if fn is None:
         raise AppError(

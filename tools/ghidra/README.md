@@ -69,11 +69,11 @@ Script arguments (both optional, positional):
 The exporter appends `.json` when the selected or supplied output path does
 not already have that extension.
 
-## Output schema (v1)
+## Output schema (v2)
 
 ```jsonc
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "binary": {
     "name": "acme.exe",
     "version": "",              // free text; overridable via arg 2
@@ -102,7 +102,8 @@ not already have that extension.
     {
       "callerAddress": 4198400,
       "calleeAddress": 4198688,
-      "calleeModule": null       // library name for an external callee; used if no target row exists
+      "calleeModule": null,      // library name for an external callee; used if no target row exists
+      "calleeOrder": 0           // zero-based order among this caller's distinct callees
     }
   ]
 }
@@ -131,6 +132,14 @@ not already have that extension.
 - **Edges are de-duplicated** to one row per unique `(callerAddress,
   calleeAddress)` pair (multiple call sites collapse to one edge, per `D30`).
   Self-edges are kept for recursion.
+- **`calleeOrder`** is a zero-based, contiguous ordinal per caller. The
+  exporter first discovers direct call references (and outgoing jump
+  tail-call candidates) by walking the caller's instructions in ascending
+  address order; a callee called more than once keeps its first location.
+  It then supplements that result with any callee reported only by Ghidra's
+  `getCalledFunctions()` API. Those location-unknown fallback callees appear
+  at the end, ordered by entry address. This is deterministic static memory
+  order, **not** dynamic runtime execution order across branches or loops.
 - **`calleeModule`** is set when the callee is external or a thunk to an
   external. The exporter normally includes that resolved external function,
   so its edge resolves to the real `kind='external'` row. If a target is absent
@@ -148,6 +157,7 @@ jq '.functions | length' acme.json                        # function count
 jq '.binary.functionCount' acme.json                      # should match
 jq '.functions[] | select(.kind=="normal") | .codeC' acme.json | head   # spot-check C
 jq '[.edges[] | {c:.callerAddress, e:.calleeAddress}] | unique | length' acme.json  # no dupes
+jq '[.edges | sort_by(.callerAddress) | group_by(.callerAddress)[] | sort_by(.calleeOrder) | [.[] | .calleeOrder] == [range(0; length)]] | all' acme.json  # contiguous per-caller order
 ```
 
 ## Limitations / notes
@@ -163,3 +173,6 @@ jq '[.edges[] | {c:.callerAddress, e:.calleeAddress}] | unique | length' acme.js
   this field.
 - Loading the exported file into GraphRev is Increment **I12** and is not part
   of this tool — the exporter only produces the file.
+- GraphRev accepts schema-v1 and schema-v2 exports. Schema v1 has no imported
+  callee order; schema v2 preserves `edges[].calleeOrder` for ordered callee
+  tables.

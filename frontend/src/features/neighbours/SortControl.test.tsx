@@ -12,6 +12,7 @@ describe("SortControl", () => {
         onSortChange={onSortChange}
         onOrderChange={vi.fn()}
         label="Sort callees"
+        direction="callees"
       />,
     );
     fireEvent.change(screen.getByLabelText("Sort callees"), { target: { value: "fanIn" } });
@@ -27,6 +28,7 @@ describe("SortControl", () => {
         onSortChange={vi.fn()}
         onOrderChange={onOrderChange}
         label="Sort callees"
+        direction="callees"
       />,
     );
     fireEvent.click(screen.getByLabelText("Sort callees direction"));
@@ -41,6 +43,7 @@ describe("SortControl", () => {
         onSortChange={vi.fn()}
         onOrderChange={vi.fn()}
         label="Sort callees"
+        direction="callees"
       />,
     );
     expect(screen.getByLabelText("Sort ascending")).toBeInTheDocument();
@@ -53,9 +56,36 @@ describe("SortControl", () => {
         onSortChange={vi.fn()}
         onOrderChange={vi.fn()}
         label="Sort callees"
+        direction="callees"
       />,
     );
     expect(screen.getByLabelText("Sort descending")).toBeInTheDocument();
     expect(screen.queryByText("desc")).not.toBeInTheDocument();
+  });
+
+  it("offers imported order only for callees", () => {
+    const { rerender } = render(
+      <SortControl
+        sort="callOrder"
+        order="asc"
+        onSortChange={vi.fn()}
+        onOrderChange={vi.fn()}
+        label="Sort callees"
+        direction="callees"
+      />,
+    );
+    expect(screen.getByRole("option", { name: "Imported order" })).toBeInTheDocument();
+
+    rerender(
+      <SortControl
+        sort="name"
+        order="asc"
+        onSortChange={vi.fn()}
+        onOrderChange={vi.fn()}
+        label="Sort callers"
+        direction="callers"
+      />,
+    );
+    expect(screen.queryByRole("option", { name: "Imported order" })).not.toBeInTheDocument();
   });
 });

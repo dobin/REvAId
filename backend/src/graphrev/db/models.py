@@ -205,6 +205,9 @@ class Edge(Base):
     binary_id: Mapped[int] = mapped_column(ForeignKey("binaries.id", ondelete="CASCADE"))
     caller_id: Mapped[int] = mapped_column(ForeignKey("functions.id", ondelete="CASCADE"))
     callee_id: Mapped[int] = mapped_column(ForeignKey("functions.id", ondelete="CASCADE"))
+    # Static first-call-site order from a schema-v2 Ghidra export. NULL means
+    # the source did not report an order (for example, a legacy v1 export).
+    callee_order: Mapped[int | None] = mapped_column(default=None)
     kind: Mapped[str] = mapped_column(default="call")
 
     binary: Mapped[Binary] = relationship(back_populates="edges", foreign_keys=[binary_id])
@@ -212,8 +215,12 @@ class Edge(Base):
     __table_args__ = (
         UniqueConstraint("caller_id", "callee_id", name="ux_edges_pair"),  # B3; self-edges allowed
         CheckConstraint(f"kind IN {_sql_in_list(EDGE_KIND_VALUES)}", name="kind_valid"),
+        CheckConstraint(
+            "callee_order IS NULL OR callee_order >= 0", name="callee_order_nonnegative"
+        ),
         Index("ix_edges_caller", "caller_id"),
         Index("ix_edges_callee", "callee_id"),
+        Index("ix_edges_caller_callee_order", "caller_id", "callee_order"),
     )
 
 

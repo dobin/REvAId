@@ -3,7 +3,7 @@
  */
 import { Glyph } from "@/components/Glyph";
 
-export type SortKey = "name" | "address" | "fanIn";
+export type SortKey = "callOrder" | "name" | "address" | "fanIn";
 export type SortOrder = "asc" | "desc";
 
 export function SortControl({
@@ -12,12 +12,14 @@ export function SortControl({
   onSortChange,
   onOrderChange,
   label,
+  direction,
 }: {
   sort: SortKey;
   order: SortOrder;
   onSortChange: (sort: SortKey) => void;
   onOrderChange: (order: SortOrder) => void;
   label: string;
+  direction: "callees" | "callers";
 }) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: "0.25rem" }}>
@@ -29,6 +31,7 @@ export function SortControl({
         }}
         style={{ fontSize: "0.75rem" }}
       >
+        {direction === "callees" && <option value="callOrder">Position</option>}
         <option value="name">Name</option>
         <option value="address">Address</option>
         <option value="fanIn">Fan-in</option>

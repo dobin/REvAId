@@ -14,7 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from graphrev.core.config import Settings
 from graphrev.core.errors import AppError, ErrorCode
-from graphrev.db.models import Binary, Function
+from graphrev.db.models import Binary, Edge, Function
 from graphrev.schemas.ingest import (
     GhidraExportBinary,
     GhidraExportDocument,
@@ -27,7 +27,7 @@ from graphrev.services import binary_service
 
 def _document() -> GhidraExportDocument:
     return GhidraExportDocument(
-        schema_version=1,
+        schema_version=2,
         binary=GhidraExportBinary(
             name="sample.exe",
             version="1.0",
@@ -65,10 +65,15 @@ def _document() -> GhidraExportDocument:
             ),
         ],
         edges=[
-            GhidraExportEdge(caller_address=0x401000, callee_address=0x401100),
+            GhidraExportEdge(
+                caller_address=0x401000, callee_address=0x401100, callee_order=0
+            ),
             # A cross-module edge whose target is not in `functions` -> B17 placeholder.
             GhidraExportEdge(
-                caller_address=0x401000, callee_address=0x7FF00000, callee_module="ntdll.dll"
+                caller_address=0x401000,
+                callee_address=0x7FF00000,
+                callee_module="ntdll.dll",
+                callee_order=1,
             ),
         ],
     )
@@ -102,6 +107,12 @@ async def test_import_creates_binary_with_functions_and_placeholder(
     binary = await session.get(Binary, result.binary_id)
     assert binary is not None
     assert binary.analysis_image_base == 0x400000
+    edge_orders = (
+        await session.execute(
+            select(Edge.callee_order).where(Edge.binary_id == result.binary_id).order_by(Edge.callee_order)
+        )
+    ).scalars().all()
+    assert edge_orders == [0, 1]
 
 
 @pytest.mark.asyncio
@@ -116,6 +127,23 @@ async def test_import_legacy_document_leaves_analysis_image_base_null(
         binary = await session.get(Binary, result.binary_id)
     assert binary is not None
     assert binary.analysis_image_base is None
+
+
+@pytest.mark.asyncio
+async def test_import_schema_v1_document_leaves_callee_order_unknown(
+    session_factory: async_sessionmaker[AsyncSession], settings: Settings
+) -> None:
+    doc = _document()
+    doc.schema_version = 1
+    for edge in doc.edges:
+        edge.callee_order = None
+    result = await binary_service.import_ghidra_export(session_factory, settings, doc)
+
+    async with session_factory() as session:
+        orders = (
+            await session.execute(select(Edge.callee_order).where(Edge.binary_id == result.binary_id))
+        ).scalars().all()
+    assert orders == [None, None]
 
 
 @pytest.mark.asyncio

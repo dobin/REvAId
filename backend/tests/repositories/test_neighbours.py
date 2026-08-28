@@ -59,9 +59,21 @@ async def _make_view(session: AsyncSession, binary: Binary) -> View:
 
 
 async def _add_edge(
-    session: AsyncSession, binary: Binary, caller: Function, callee: Function
+    session: AsyncSession,
+    binary: Binary,
+    caller: Function,
+    callee: Function,
+    *,
+    callee_order: int | None = None,
 ) -> None:
-    session.add(Edge(binary_id=binary.id, caller_id=caller.id, callee_id=callee.id))
+    session.add(
+        Edge(
+            binary_id=binary.id,
+            caller_id=caller.id,
+            callee_id=callee.id,
+            callee_order=callee_order,
+        )
+    )
     await session.flush()
 
 
@@ -346,6 +358,64 @@ async def test_sort_by_fan_in_descending(session: AsyncSession) -> None:
         caller_suppress_threshold=32,
     )
     assert [r.function.name_ghidra for r in page.rows] == ["high_fanin", "low_fanin"]
+
+
+@pytest.mark.asyncio
+async def test_callee_call_order_sorts_known_orders_before_legacy_rows(session: AsyncSession) -> None:
+    binary = await _make_binary(session)
+    view = await _make_view(session, binary)
+    root = await _make_function(session, binary, 0x1000, "root")
+    first = await _make_function(session, binary, 0x1010, "first")
+    second = await _make_function(session, binary, 0x1020, "second")
+    legacy = await _make_function(session, binary, 0x1030, "legacy")
+    await _add_edge(session, binary, root, second, callee_order=1)
+    await _add_edge(session, binary, root, legacy)
+    await _add_edge(session, binary, root, first, callee_order=0)
+    await session.commit()
+
+    page = await fetch_neighbour_page(
+        session,
+        function_id=root.id,
+        view_id=view.id,
+        direction="callees",
+        group="primary",
+        limit=16,
+        offset=0,
+        sort="callOrder",
+        order="asc",
+        filter_text=None,
+        caller_suppress_threshold=32,
+    )
+    assert [r.function.name_ghidra for r in page.rows] == ["first", "second", "legacy"]
+
+
+@pytest.mark.asyncio
+async def test_callee_call_order_preserves_relative_order_after_filter(session: AsyncSession) -> None:
+    binary = await _make_binary(session)
+    view = await _make_view(session, binary)
+    root = await _make_function(session, binary, 0x1000, "root")
+    early = await _make_function(session, binary, 0x1010, "parse_early")
+    ignored = await _make_function(session, binary, 0x1020, "ignored")
+    late = await _make_function(session, binary, 0x1030, "parse_late")
+    await _add_edge(session, binary, root, late, callee_order=2)
+    await _add_edge(session, binary, root, ignored, callee_order=1)
+    await _add_edge(session, binary, root, early, callee_order=0)
+    await session.commit()
+
+    page = await fetch_neighbour_page(
+        session,
+        function_id=root.id,
+        view_id=view.id,
+        direction="callees",
+        group="primary",
+        limit=16,
+        offset=0,
+        sort="callOrder",
+        order="asc",
+        filter_text="parse",
+        caller_suppress_threshold=32,
+    )
+    assert [r.function.name_ghidra for r in page.rows] == ["parse_early", "parse_late"]
 
 
 @pytest.mark.asyncio

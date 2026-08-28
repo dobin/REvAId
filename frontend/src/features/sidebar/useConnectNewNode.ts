@@ -56,7 +56,6 @@ export function useConnectNewNode(viewId: ViewId | null) {
         functionId,
         viewId,
         group: "primary",
-        sort: "name",
         order: "asc",
       } as const;
 
@@ -65,10 +64,10 @@ export function useConnectNewNode(viewId: ViewId | null) {
       // case its `rows` is empty and we simply consider the callees instead.
       const [callers, callees] = await Promise.all([
         queryClient
-          .fetchQuery(neighbourQueryOptions({ ...baseParams, direction: "callers" }))
+          .fetchQuery(neighbourQueryOptions({ ...baseParams, direction: "callers", sort: "name" }))
           .catch(() => null),
         queryClient
-          .fetchQuery(neighbourQueryOptions({ ...baseParams, direction: "callees" }))
+          .fetchQuery(neighbourQueryOptions({ ...baseParams, direction: "callees", sort: "callOrder" }))
           .catch(() => null),
       ]);
 

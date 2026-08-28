@@ -31,7 +31,7 @@ export function NeighbourTable({
 }) {
   const config = useConfig();
   const [filter, setFilter] = useState("");
-  const [sort, setSort] = useState<SortKey>("name");
+  const [sort, setSort] = useState<SortKey>(direction === "callees" ? "callOrder" : "name");
   const [order, setOrder] = useState<SortOrder>("asc");
   const isSelected = useAppStore((s) => s.selectedFunctionId === functionId);
   const rowPriority = isSelected ? 1 : 2;
@@ -87,6 +87,7 @@ export function NeighbourTable({
             order={order}
             onSortChange={setSort}
             onOrderChange={setOrder}
+            direction={direction}
           />
         </div>
       </div>
@@ -107,6 +108,8 @@ export function NeighbourTable({
         direction={direction}
         totalUtility={firstPage.totalUtility}
         priority={rowPriority}
+        sort={sort}
+        order={order}
       />
       {firstPage.mayBeIncomplete && (
         <p style={{ fontSize: "0.6875rem", color: "#9ca3af", margin: "0.25rem 0 0" }}>

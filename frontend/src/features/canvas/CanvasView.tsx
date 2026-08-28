@@ -404,7 +404,7 @@ function CanvasViewInner({
             viewId,
             direction,
             group: "primary",
-            sort: "name",
+            sort: direction === "callees" ? "callOrder" : "name",
             order: "asc",
           }),
         ),

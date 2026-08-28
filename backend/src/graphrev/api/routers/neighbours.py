@@ -25,7 +25,7 @@ async def get_neighbours(
     group: Literal["primary", "utility"] = Query(default="primary"),
     limit: int = Query(default=0, ge=0),
     offset: int = Query(default=0, ge=0),
-    sort: Literal["name", "address", "fanIn"] = Query(default="name"),
+    sort: Literal["callOrder", "name", "address", "fanIn"] | None = Query(default=None),
     order: Literal["asc", "desc"] = Query(default="asc"),
     filter: str | None = Query(
         default=None, description="Substring over name + summaryShort (D22)."
@@ -41,7 +41,7 @@ async def get_neighbours(
         group=group,
         limit=effective_limit,
         offset=offset,
-        sort=sort,
+        sort=sort or ("callOrder" if direction == "callees" else "name"),
         order=order,
         filter_text=filter,
     )

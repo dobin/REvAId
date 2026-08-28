@@ -41,7 +41,7 @@ export interface BinarySummaryDto {
 
 /**
  * A Ghidra JSON export document — the `POST /binaries/import` request body
- * (I12). Produced by `tools/ghidra/GraphRevExport.java` (schema v1). Typed
+ * (I12). Produced by `tools/ghidra/GraphRevExport.java` (schemas v1/v2). Typed
  * loosely here (functions/edges as `unknown[]`) since the file is parsed and
  * validated server-side; the client only needs to POST the parsed JSON.
  */

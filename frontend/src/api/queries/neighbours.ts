@@ -14,7 +14,7 @@ export interface NeighbourQueryParams {
   group?: "primary" | "utility";
   limit?: number;
   offset?: number;
-  sort?: "name" | "address" | "fanIn";
+  sort?: "callOrder" | "name" | "address" | "fanIn";
   order?: "asc" | "desc";
   filter?: string;
 }

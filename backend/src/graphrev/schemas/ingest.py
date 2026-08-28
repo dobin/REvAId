@@ -1,7 +1,7 @@
 """Ghidra JSON-export import DTOs (I12 — file-based ingestion).
 
 The wire shape mirrors the JSON produced by ``tools/ghidra/GraphRevExport.java``
-(schema v1). These DTOs are the *only* validation boundary for an uploaded
+(schemas v1 and v2). These DTOs are the *only* validation boundary for an uploaded
 export — everything past :class:`GhidraExportDocument` is trusted, already-typed
 data fed into the ingestion pipeline via
 :class:`graphrev.adapters.ghidra.file.FileGhidraAdapter`.
@@ -14,15 +14,14 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from graphrev.db.enums import FunctionKind
 from graphrev.schemas.common import ApiModel
 
-#: The only export schema version this build understands. The exporter writes
-#: ``schemaVersion: 1``; a future bump gates here rather than silently
-#: mis-parsing (see ``tools/ghidra/README.md``).
-SUPPORTED_EXPORT_SCHEMA_VERSION = 1
+#: Versions accepted by this build. Schema v2 adds per-caller ``calleeOrder``;
+#: v1 remains accepted so existing exports can still be imported as unordered.
+SUPPORTED_EXPORT_SCHEMA_VERSIONS = frozenset({1, 2})
 
 
 class GhidraExportParam(ApiModel):
@@ -63,6 +62,9 @@ class GhidraExportEdge(ApiModel):
     caller_address: int
     callee_address: int
     callee_module: str | None = None
+    #: Schema-v2 static first-call-site ordinal. ``None`` represents a legacy
+    #: schema-v1 export, which has no trustworthy imported order.
+    callee_order: int | None = Field(default=None, ge=0)
 
 
 class GhidraExportBinary(ApiModel):
@@ -91,6 +93,33 @@ class GhidraExportDocument(ApiModel):
     binary: GhidraExportBinary
     functions: list[GhidraExportFunction] = Field(default_factory=list)
     edges: list[GhidraExportEdge] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _validate_callee_order(self) -> GhidraExportDocument:
+        """Enforce schema-v2's distinct, contiguous per-caller order contract."""
+        if self.schema_version != 2:
+            return self
+
+        orders_by_caller: dict[int, list[int]] = {}
+        seen_pairs: set[tuple[int, int]] = set()
+        for edge in self.edges:
+            if edge.callee_order is None:
+                raise ValueError("schemaVersion 2 requires calleeOrder on every edge")
+            pair = (edge.caller_address, edge.callee_address)
+            if pair in seen_pairs:
+                raise ValueError(
+                    "schemaVersion 2 must not contain duplicate callerAddress/calleeAddress pairs"
+                )
+            seen_pairs.add(pair)
+            orders_by_caller.setdefault(edge.caller_address, []).append(edge.callee_order)
+
+        for caller_address, orders in orders_by_caller.items():
+            if sorted(orders) != list(range(len(orders))):
+                raise ValueError(
+                    f"schemaVersion 2 calleeOrder values for callerAddress {caller_address} "
+                    "must be contiguous from 0"
+                )
+        return self
 
 
 class ImportResultDto(ApiModel):

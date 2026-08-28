@@ -23,7 +23,7 @@ from graphrev.repositories.binaries import (
 from graphrev.repositories.functions import list_entry_points
 from graphrev.schemas.binary import BinarySummaryDto, binary_summary_from_row
 from graphrev.schemas.ingest import (
-    SUPPORTED_EXPORT_SCHEMA_VERSION,
+    SUPPORTED_EXPORT_SCHEMA_VERSIONS,
     GhidraExportDocument,
     ImportResultDto,
 )
@@ -121,14 +121,14 @@ async def import_ghidra_export(
     Takes the session *factory* rather than a request session because
     `run_ingestion` owns its own `unit_of_work` transactions (one per binary).
     """
-    if document.schema_version != SUPPORTED_EXPORT_SCHEMA_VERSION:
+    if document.schema_version not in SUPPORTED_EXPORT_SCHEMA_VERSIONS:
         raise AppError(
             ErrorCode.VALIDATION_ERROR,
             f"Unsupported export schemaVersion {document.schema_version}; "
-            f"this build supports {SUPPORTED_EXPORT_SCHEMA_VERSION}.",
+            f"this build supports {sorted(SUPPORTED_EXPORT_SCHEMA_VERSIONS)}.",
             details={
                 "schemaVersion": document.schema_version,
-                "supported": SUPPORTED_EXPORT_SCHEMA_VERSION,
+                "supported": sorted(SUPPORTED_EXPORT_SCHEMA_VERSIONS),
             },
         )
 

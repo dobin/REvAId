@@ -85,6 +85,21 @@ async def test_edge_kind_rejects_non_call_value(session: AsyncSession) -> None:
 
 
 @pytest.mark.asyncio
+async def test_edge_callee_order_is_nullable_and_nonnegative(session: AsyncSession) -> None:
+    binary = await _make_binary(session)
+    fn_a = await _make_function(session, binary, 0x1000, "a")
+    fn_b = await _make_function(session, binary, 0x2000, "b")
+    fn_c = await _make_function(session, binary, 0x3000, "c")
+    session.add(Edge(binary_id=binary.id, caller_id=fn_a.id, callee_id=fn_b.id, callee_order=None))
+    session.add(Edge(binary_id=binary.id, caller_id=fn_a.id, callee_id=fn_c.id, callee_order=0))
+    await session.flush()
+
+    session.add(Edge(binary_id=binary.id, caller_id=fn_b.id, callee_id=fn_c.id, callee_order=-1))
+    with pytest.raises(IntegrityError):
+        await session.flush()
+
+
+@pytest.mark.asyncio
 async def test_summary_status_accepts_stale(session: AsyncSession) -> None:
     """D-4: summary_status keeps all five values including 'stale'."""
     binary = await _make_binary(session)

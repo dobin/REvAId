@@ -18,7 +18,7 @@ from graphrev.db.models import Edge, Function, ViewNode
 
 Direction = Literal["callees", "callers"]
 Group = Literal["primary", "utility"]
-SortKey = Literal["name", "address", "fanIn"]
+SortKey = Literal["callOrder", "name", "address", "fanIn"]
 SortOrder = Literal["asc", "desc"]
 
 
@@ -43,7 +43,7 @@ class NeighbourRow:
 #: Sort-key -> the SQL expression it orders by (D23). "name" sorts by the
 #: visible display name (`name_analyst ?? name_llm ?? name_ghidra`), matching
 #: `function_dto_from_row`'s `display_name` derivation.
-_SORT_EXPRESSIONS: dict[SortKey, ColumnElement[object]] = {
+_SORT_EXPRESSIONS: dict[Literal["name", "address", "fanIn"], ColumnElement[object]] = {
     "name": func.coalesce(Function.name_analyst, Function.name_llm, Function.name_ghidra),
     "address": Function.address,  # type: ignore[dict-item]
     "fanIn": Function.fan_in,  # type: ignore[dict-item]
@@ -153,10 +153,21 @@ async def fetch_neighbour_page(
         await session.execute(select(func.count()).select_from(group_stmt.subquery()))
     ).scalar_one()
 
-    sort_expr = _SORT_EXPRESSIONS[sort]
-    order_expr = sort_expr.desc() if order == "desc" else sort_expr.asc()
+    if sort == "callOrder":
+        if direction != "callees":
+            raise ValueError("callOrder sorting is only defined for callees")
+        # Legacy/schema-v1 edges have no static call-site order. Keep them
+        # after known orders in both directions, then make pagination stable.
+        order_by = [
+            Edge.callee_order.is_(None).asc(),
+            Edge.callee_order.desc() if order == "desc" else Edge.callee_order.asc(),
+            Function.id.asc(),
+        ]
+    else:
+        sort_expr = _SORT_EXPRESSIONS[sort]
+        order_by = [sort_expr.desc() if order == "desc" else sort_expr.asc(), Function.id.asc()]
     page_stmt = (
-        group_stmt.order_by(Function.is_utility_effective.asc(), order_expr, Function.id.asc())
+        group_stmt.order_by(Function.is_utility_effective.asc(), *order_by)
         .limit(limit)
         .offset(offset)
     )

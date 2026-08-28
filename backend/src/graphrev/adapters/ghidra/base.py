@@ -95,6 +95,9 @@ class RawEdge:
     caller_address: int
     callee_address: int
     callee_module: str | None = None
+    #: Static first-call-site ordinal from schema-v2 exports; ``None`` when an
+    #: adapter or legacy source cannot report a trustworthy order.
+    callee_order: int | None = None
 
 
 class GhidraAdapter(Protocol):

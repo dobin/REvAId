@@ -145,7 +145,7 @@ describe("NeighbourTable", () => {
       expect(screen.getByText("entry_child_00")).toBeInTheDocument();
     });
     expect(screen.getByLabelText("Filter callees")).toBeInTheDocument();
-    expect(screen.getByLabelText("Sort callees")).toBeInTheDocument();
+    expect(screen.getByLabelText<HTMLSelectElement>("Sort callees").value).toBe("callOrder");
   });
 
   it("loads subsequent pages so callees beyond the row cap are reachable", async () => {

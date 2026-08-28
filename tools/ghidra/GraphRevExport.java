@@ -29,6 +29,9 @@ import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -55,7 +58,7 @@ import ghidra.program.model.symbol.RefType;
 public class GraphRevExport extends GhidraScript {
 
     /** Bump when the emitted schema changes shape. */
-    private static final int SCHEMA_VERSION = 1;
+    private static final int SCHEMA_VERSION = 2;
 
     /** Per-function decompiler timeout, in seconds. */
     private static final int DECOMPILE_TIMEOUT_SECONDS = 60;
@@ -411,12 +414,13 @@ public class GraphRevExport extends GhidraScript {
     private int appendEdgesForFunction(
             StringBuilder sb, Set<String> emitted, int alreadyWritten, Function caller) {
         int written = 0;
-        for (Function called : caller.getCalledFunctions(monitor)) {
+        List<Function> callees = orderedCalledFunctions(caller);
+        for (int calleeOrder = 0; calleeOrder < callees.size(); calleeOrder++) {
+            Function callee = callees.get(calleeOrder);
             // PE/ELF imports are frequently represented as a local thunk. The
             // resolved external function is the useful graph target; exporting
             // the thunk address would leave ADVAPI32.DLL::EventRegister (etc.)
             // disconnected despite Ghidra having resolved it.
-            Function callee = resolveEdgeCallee(called);
             long callerAddr = caller.getEntryPoint().getOffset();
             long calleeAddr = callee.getEntryPoint().getOffset();
             String dedupeKey = callerAddr + "->" + calleeAddr;
@@ -433,10 +437,76 @@ public class GraphRevExport extends GhidraScript {
             w.field("callerAddress", callerAddr);
             w.field("calleeAddress", calleeAddr);
             w.fieldOrNull("calleeModule", calleeModule);
+            w.field("calleeOrder", calleeOrder);
             w.endObject();
             written++;
         }
         return written;
+    }
+
+    /**
+     * Distinct callees in deterministic static-address order, augmented by
+     * Ghidra's call graph as a completeness fallback.
+     *
+     * <p>The first pass walks the caller's instructions in ascending address
+     * order. This assigns each directly resolved callee to the address of its
+     * first call site (or outgoing tail-jump candidate). The second pass keeps
+     * {@link Function#getCalledFunctions(ghidra.util.task.TaskMonitor)} as the
+     * authoritative completeness source: any callee it reports but the
+     * instruction scan could not locate is appended afterward, sorted by entry
+     * address. This makes a missing source location visible as a trailing
+     * callee without depending on the iteration order of Ghidra's Set.
+     *
+     * <p>This is static memory order, not runtime execution order. Calls in
+     * separate branches or loops have no single dynamic ordering.
+     */
+    private List<Function> orderedCalledFunctions(Function caller) {
+        List<Function> ordered = new ArrayList<>();
+        Set<Address> seenCallees = new HashSet<>();
+
+        if (caller.getBody() != null && !caller.getBody().isEmpty()) {
+            Listing listing = caller.getProgram().getListing();
+            InstructionIterator instructions = listing.getInstructions(caller.getBody(), true);
+
+            while (instructions.hasNext()) {
+                Instruction instruction = instructions.next();
+                for (Reference reference : instruction.getReferencesFrom()) {
+                    RefType refType = reference.getReferenceType();
+                    Address target = reference.getToAddress();
+                    boolean isTailCallCandidate =
+                            refType.isJump() && !caller.getBody().contains(target);
+                    if (!refType.isCall() && !isTailCallCandidate) {
+                        continue;
+                    }
+
+                    Function callee = caller.getProgram().getFunctionManager().getFunctionAt(target);
+                    if (callee == null) {
+                        callee = caller.getProgram().getFunctionManager().getFunctionContaining(target);
+                    }
+                    if (callee == null) {
+                        continue;
+                    }
+
+                    callee = resolveEdgeCallee(callee);
+                    if (seenCallees.add(callee.getEntryPoint())) {
+                        ordered.add(callee);
+                    }
+                }
+            }
+        }
+
+        List<Function> unorderedFallback = new ArrayList<>();
+        for (Function called : caller.getCalledFunctions(monitor)) {
+            Function callee = resolveEdgeCallee(called);
+            if (seenCallees.add(callee.getEntryPoint())) {
+                unorderedFallback.add(callee);
+            }
+        }
+        Collections.sort(
+                unorderedFallback,
+                Comparator.comparingLong(callee -> callee.getEntryPoint().getOffset()));
+        ordered.addAll(unorderedFallback);
+        return ordered;
     }
 
     /** Return the final external target of an import thunk, otherwise {@code callee}. */

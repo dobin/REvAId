@@ -54,6 +54,7 @@ def _to_raw_edge(edge: GhidraExportEdge) -> RawEdge:
         caller_address=edge.caller_address,
         callee_address=edge.callee_address,
         callee_module=edge.callee_module,
+        callee_order=edge.callee_order,
     )
 
 
