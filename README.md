@@ -2,6 +2,8 @@
 
 **I cant code but i must reverse**
 
+> Cant read asm? dont understand C pointers? Dont know what a basic block is? Tired of having FUN_*? Or just being sick of it? Fear not, REvAId is here!
+
 REvAId is a semantic function graph explorer for binary reverse
 engineering: it renders a binary's call graph as interactive cards, lazily
 summarizes functions with an LLM, and lets an analyst annotate what they
