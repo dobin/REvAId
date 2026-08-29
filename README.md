@@ -15,6 +15,12 @@ Purpose:
 
 This is 100% vibe coded. See `IDEA.md`, `PRD.md`, `TAD.md`.
 
+## Screenshots
+
+![Function graph explorer](docs/img/REvAId-1.png)
+
+![Function summary view](docs/img/REvAId-2.png)
+
 
 ## Usage
 
