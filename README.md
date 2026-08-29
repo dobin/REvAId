@@ -17,7 +17,12 @@ This is 100% vibe coded. See `IDEA.md`, `PRD.md`, `TAD.md`.
 
 ## Screenshots
 
+Reversing MS Defender: 
+
 ![Function graph explorer](docs/img/REvAId-1.png)
+
+
+AI Summaries for each function:
 
 ![Function summary view](docs/img/REvAId-2.png)
 
