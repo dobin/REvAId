@@ -17,12 +17,16 @@ This is 100% vibe coded. See `IDEA.md`, `PRD.md`, `TAD.md`.
 
 ## Screenshots
 
-Reversing MS Defender: 
+All function names are AI generated. The quick summary & function name is generated based on decompiled C. 
+
+Callees and callers can be fan-out to explore the binary (without reading any code). 
+
+### Reversing MS Defender process injection detection
 
 ![Function graph explorer](docs/img/REvAId-1.png)
 
 
-AI Summaries for each function:
+### Detailed AI Summary
 
 ![Function summary view](docs/img/REvAId-2.png)
 
@@ -32,7 +36,7 @@ AI Summaries for each function:
 1) Let Ghidra analyze your binary
 2) Export Ghidra data with the included script to JSON
 3) Import JSON into REvAId
-4) Explore the code base
+4) Explore the code base (find functions to add them to the canvas, like by their address)
 
 There are two AI providers available: 
 * LLM based: Simple. Queries the LLM with the disassembled function code
