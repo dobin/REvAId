@@ -37,7 +37,15 @@ async def count_views_by_binary(session: AsyncSession, *, binary_id: int) -> int
     return result.scalar_one()
 
 
-async def create_view(session: AsyncSession, *, binary_id: int, name: str) -> View:
+async def create_view(
+    session: AsyncSession, *, binary_id: int, name: str, view_id: int | None = None
+) -> View:
+    """Create a `View` row.
+
+    `view_id` is normally left ``None`` so SQLite assigns the next
+    autoincrement id; public mode passes an explicit random id (ADR 0006)
+    so view ids are unguessable capabilities, not enumerable ints.
+    """
     now = utc_now_iso()
     view = View(
         binary_id=binary_id,
@@ -49,6 +57,8 @@ async def create_view(session: AsyncSession, *, binary_id: int, name: str) -> Vi
         created_at=now,
         updated_at=now,
     )
+    if view_id is not None:
+        view.id = view_id
     session.add(view)
     await session.flush()
     return view
@@ -105,10 +115,13 @@ async def delete_view(session: AsyncSession, view: View) -> None:
     await session.flush()
 
 
-async def duplicate_view(session: AsyncSession, view: View) -> View:
+async def duplicate_view(
+    session: AsyncSession, view: View, *, view_id: int | None = None
+) -> View:
     """Copy layout only (B8): a new `View` row plus a verbatim copy of every
     `ViewNode` row (new ids, same positions/colors/provenance). No summaries
-    or functions are touched."""
+    or functions are touched. `view_id` is an explicit random id in public
+    mode (ADR 0006), else autoincrement."""
     now = utc_now_iso()
     new_view = View(
         binary_id=view.binary_id,
@@ -120,6 +133,8 @@ async def duplicate_view(session: AsyncSession, view: View) -> View:
         created_at=now,
         updated_at=now,
     )
+    if view_id is not None:
+        new_view.id = view_id
     session.add(new_view)
     await session.flush()
 

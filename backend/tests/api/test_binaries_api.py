@@ -10,7 +10,7 @@ import json
 import pytest
 from httpx import AsyncClient
 
-from graphrev.core.config import Settings
+from graphrev.core.config import Settings, get_settings
 
 
 @pytest.mark.asyncio
@@ -35,6 +35,30 @@ async def test_list_binaries_empty_when_nothing_ingested(client: AsyncClient) ->
     response = await client.get("/api/v1/binaries")
     assert response.status_code == 200
     assert response.json() == []
+
+
+@pytest.mark.asyncio
+async def test_list_binaries_redacts_last_view_id_in_public_mode(
+    client: AsyncClient, ingested: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    binaries = (await client.get("/api/v1/binaries")).json()
+    acme_id = next(b["id"] for b in binaries if b["name"] == "acme.exe")
+    views = (await client.get(f"/api/v1/binaries/{acme_id}/views")).json()
+    view_id = views[0]["id"]
+
+    # Persist a last-view pointer in private mode first.
+    await client.post(f"/api/v1/binaries/{acme_id}/last-view", json={"viewId": view_id})
+    body = (await client.get("/api/v1/binaries")).json()
+    assert next(b for b in body if b["name"] == "acme.exe")["lastViewId"] == view_id
+
+    # ADR 0006: in public mode the pointer is redacted so it cannot leak.
+    monkeypatch.setenv("GRAPHREV_PUBLIC_MODE", "true")
+    get_settings.cache_clear()
+    try:
+        body = (await client.get("/api/v1/binaries")).json()
+        assert all(b["lastViewId"] is None for b in body)
+    finally:
+        get_settings.cache_clear()
 
 
 @pytest.mark.asyncio

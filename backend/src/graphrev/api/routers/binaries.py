@@ -30,8 +30,11 @@ def _parse_address(raw: str) -> int:
 
 
 @router.get("/binaries", response_model=list[BinarySummaryDto])
-async def list_binaries(session: SessionDep) -> list[BinarySummaryDto]:
-    return await binary_service.list_binaries_dto(session)
+async def list_binaries(session: SessionDep, settings: SettingsDep) -> list[BinarySummaryDto]:
+    # ADR 0006: `last_view_id` is a shared pointer across anonymous browsers;
+    # redact it in public mode so the binary listing cannot leak which view
+    # the owner last used.
+    return await binary_service.list_binaries_dto(session, redact_last_view=settings.public_mode)
 
 
 @router.post(

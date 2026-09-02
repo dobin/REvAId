@@ -33,6 +33,11 @@ class ErrorCode(StrEnum):
     IMPORT_TOO_LARGE = "IMPORT_TOO_LARGE"
     IMPORT_JOB_NOT_FOUND = "IMPORT_JOB_NOT_FOUND"
     LAST_VIEW_DELETE_FORBIDDEN = "LAST_VIEW_DELETE_FORBIDDEN"
+    #: ADR 0006: in public mode the shared view-listing and last-view-pointer
+    #: endpoints are closed — anonymous browsers track their own views
+    #: client-side, and the listing would enumerate every visitor's (and the
+    #: owner's) view ids, defeating the capability model.
+    PUBLIC_MODE_FORBIDDEN = "PUBLIC_MODE_FORBIDDEN"
     #: I13 (§6.3, decision 5): the opencode agent's loaded Ghidra program does
     #: not match the requested binary. Unrecoverable via re-ingestion (A3:
     #: `summary_*` is ingestion-immutable), so it must fail loudly.
@@ -55,6 +60,7 @@ _DEFAULT_STATUS: dict[ErrorCode, int] = {
     ErrorCode.IMPORT_TOO_LARGE: status.HTTP_413_CONTENT_TOO_LARGE,
     ErrorCode.IMPORT_JOB_NOT_FOUND: status.HTTP_404_NOT_FOUND,
     ErrorCode.LAST_VIEW_DELETE_FORBIDDEN: status.HTTP_400_BAD_REQUEST,
+    ErrorCode.PUBLIC_MODE_FORBIDDEN: status.HTTP_403_FORBIDDEN,
     ErrorCode.GHIDRA_PROGRAM_MISMATCH: status.HTTP_502_BAD_GATEWAY,
     ErrorCode.INTERNAL_ERROR: status.HTTP_500_INTERNAL_SERVER_ERROR,
 }

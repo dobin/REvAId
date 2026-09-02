@@ -17,8 +17,15 @@ class BinarySummaryDto(ApiModel):
     created_at: str
 
 
-def binary_summary_from_row(row: BinaryWithCounts) -> BinarySummaryDto:
-    """The single mapping function from a repository row to the wire DTO."""
+def binary_summary_from_row(
+    row: BinaryWithCounts, *, redact_last_view: bool = False
+) -> BinarySummaryDto:
+    """The single mapping function from a repository row to the wire DTO.
+
+    `redact_last_view` (ADR 0006) nulls `last_view_id` in public mode, where
+    it would otherwise leak the owner's last-used view id to anonymous
+    browsers.
+    """
     return BinarySummaryDto(
         id=row.binary.id,
         name=row.binary.name,
@@ -26,6 +33,6 @@ def binary_summary_from_row(row: BinaryWithCounts) -> BinarySummaryDto:
         analysis_image_base=row.binary.analysis_image_base,
         function_count=row.function_count,
         edge_count=row.edge_count,
-        last_view_id=row.binary.last_view_id,
+        last_view_id=None if redact_last_view else row.binary.last_view_id,
         created_at=row.binary.created_at,
     )

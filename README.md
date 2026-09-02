@@ -107,6 +107,29 @@ pending/shimmer/queue-depth UI under realistic timing. A small
 off, so the summary error+retry state is reachable in a normal demo; set it
 to `0` to disable.
 
+### Public demo mode
+
+Set `GRAPHREV_PUBLIC_MODE=true` when exposing an instance to anonymous
+visitors (see `docs/adr/0006-public-mode-anonymous-views.md`). Every browser
+then gets its own private views — tracked client-side in `localStorage` —
+instead of everyone landing on the binary's shared default view, so
+anonymous visitors cannot clobber each other's canvas (or yours).
+
+In public mode the shared view-listing endpoint is closed and view ids are
+cryptographically random, so a visitor cannot enumerate other people's
+views. The view picker lists only that browser's own views, and the shared
+`last-view` pointer (B16) is not written.
+
+Off by default: a private instance keeps the single-user behaviour where
+every browser shares the binary's views. Note that public mode is "secure
+enough for a demo", not authorization — the view id is the credential, so
+someone who learns it (a shared link, a screenshot) can still read/modify
+that view. Hardening against hostile clients needs real auth.
+
+Caveat: enable public mode on a fresh DB (or re-ingest), since random ids
+are only assigned at view-creation time — flipping it on a DB that already
+has sequential view ids leaves those old ids guessable.
+
 ### Real LLM summaries (litellm)
 
 Set `GRAPHREV_LLM_ADAPTER=litellm` to summarise with a real model instead of

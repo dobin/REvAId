@@ -2,9 +2,17 @@
  * Minimal view picker (I6, pulled forward from I10's full `ViewMenu`). A
  * compact native select + new-view action — no rename/delete/duplicate chrome
  * yet (that UI polish is deferred; the plain CRUD endpoints already exist).
- * Switching views calls `useSetLastViewMutation` (B16).
+ *
+ * Mode split (ADR 0006): private instances list all of the binary's views
+ * via `useViewsQuery` and persist switches via `useSetLastViewMutation`
+ * (B16). Public mode lists only this browser's owned views from
+ * `lib/myViews` (the listing endpoint is closed) and skips the shared
+ * `last-view` write — a server-side pointer is meaningless across anonymous
+ * browsers and they would fight over it.
  */
+import { useConfig } from "@/config/ConfigProvider";
 import { useCreateViewMutation, useSetLastViewMutation, useViewsQuery } from "@/api/queries/views";
+import { getMyViews, recordMyView } from "@/lib/myViews";
 import type { BinaryId, ViewId } from "@/api/types";
 
 const selectStyle: React.CSSProperties = {
@@ -41,16 +49,31 @@ export function ViewPicker({
   value: ViewId | null;
   onChange: (viewId: ViewId) => void;
 }) {
-  const { data: views, isPending, isError } = useViewsQuery(binaryId);
+  const config = useConfig();
+  // ADR 0006: disabled in public mode (the listing endpoint is closed); owned
+  // views come from `lib/myViews` below. `views` is only meaningful when
+  // `!config.publicMode`, so it is typed/narrowed accordingly.
+  const views = useViewsQuery(binaryId, { enabled: !config.publicMode });
   const createView = useCreateViewMutation(binaryId);
   const setLastView = useSetLastViewMutation(binaryId);
 
-  if (isPending) return <span>Loading views…</span>;
-  if (isError) return <span>Could not load views.</span>;
+  if (!config.publicMode && views.isPending) return <span>Loading views…</span>;
+  if (!config.publicMode && views.isError) return <span>Could not load views.</span>;
 
-  const selectView = (viewId: ViewId) => {
+  // Public mode: only this browser's own views are listed/selectable —
+  // other visitors' (and the owner's) views stay invisible, which is the
+  // isolation ADR 0006 is about. `getMyViews` reads localStorage, so the
+  // list is per-browser by construction and needs no network call.
+  const ownedViews = config.publicMode ? getMyViews(binaryId) : null;
+  const options = ownedViews ?? (views.data ?? []);
+
+  const selectView = (viewId: ViewId, name: string) => {
     onChange(viewId);
-    setLastView.mutate({ viewId });
+    if (config.publicMode) {
+      recordMyView(binaryId, viewId, name);
+    } else {
+      setLastView.mutate({ viewId });
+    }
   };
 
   return (
@@ -58,15 +81,17 @@ export function ViewPicker({
       <select
         aria-label="View"
         style={selectStyle}
-        value={value !== null ? String(value) : ""}
+        value={value !== null && options.some((v) => v.id === value) ? String(value) : ""}
         onChange={(event) => {
-          selectView(Number(event.target.value));
+          const viewId = Number(event.target.value);
+          const name = options.find((v) => v.id === viewId)?.name ?? String(viewId);
+          selectView(viewId, name);
         }}
       >
         <option value="" disabled>
           Select a view…
         </option>
-        {views.map((view) => (
+        {options.map((view) => (
           <option key={view.id} value={String(view.id)}>
             {view.name}
           </option>
@@ -84,7 +109,10 @@ export function ViewPicker({
             { name },
             {
               onSuccess: (created) => {
-                selectView(created.id);
+                if (config.publicMode) {
+                  recordMyView(binaryId, created.id, created.name);
+                }
+                selectView(created.id, created.name);
               },
             },
           );

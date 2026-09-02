@@ -114,6 +114,18 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO")
     log_json: bool = Field(default=False, description="JSON logs in prod, console in dev (F2).")
 
+    #: Public-demo mode (docs/adr/0006-public-mode-anonymous-views.md). When
+    #: enabled, the frontend gives every browser its own private anonymous
+    #: views (tracked client-side in localStorage) instead of everyone
+    #: landing on the binary's shared default view — anonymous visitors
+    #: cannot clobber each other's canvas. Private instances leave this off
+    #: and keep the single-user behaviour (AS1/B18) unchanged. Exposed on
+    #: ``GET /config`` as ``publicMode`` (E1d's single-payload contract).
+    public_mode: bool = Field(
+        default=False,
+        description="Demo-safe anonymous browsing: one private view set per browser.",
+    )
+
     # -- F1a: the five PRD-named UI tuning constants -----------------------
     table_row_cap: int = Field(default=64, gt=0, description="D6 / F1a / V1.")
     caller_suppress_threshold: int = Field(default=32, gt=0, description="D7 / F1a / V1.")

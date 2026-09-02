@@ -4,6 +4,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Toolbar } from "./Toolbar";
 
+// Toolbar renders ModeIndicator, which reads `publicMode` from useConfig().
+vi.mock("@/config/ConfigProvider", () => ({
+  useConfig: () => ({ publicMode: false }),
+}));
+
 describe("Toolbar", () => {
   beforeEach(() => {
     vi.stubGlobal(

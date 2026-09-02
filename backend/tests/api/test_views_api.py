@@ -7,6 +7,8 @@ import asyncio
 import pytest
 from httpx import AsyncClient
 
+from graphrev.core.config import get_settings
+
 
 async def _get_binary_id(client: AsyncClient, name: str) -> int:
     binaries = (await client.get("/api/v1/binaries")).json()
@@ -360,3 +362,89 @@ async def test_patch_view_nodes_is_idempotent(client: AsyncClient, ingested: Non
     first = await client.patch(f"/api/v1/views/{view_id}/nodes", json=payload)
     second = await client.patch(f"/api/v1/views/{view_id}/nodes", json=payload)
     assert first.json() == second.json()
+
+
+# ---------------------------------------------------------------------------
+# ADR 0006 — public mode closes enumeration and randomizes view ids.
+# ---------------------------------------------------------------------------
+
+
+def _enable_public_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Flip the process-wide Settings into public mode for one test, restoring
+    the cached settings on exit (same idiom as `test_config.py`)."""
+    monkeypatch.setenv("GRAPHREV_PUBLIC_MODE", "true")
+    get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_list_views_forbidden_in_public_mode(
+    client: AsyncClient, ingested: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    binary_id = await _get_binary_id(client, "acme.exe")
+
+    _enable_public_mode(monkeypatch)
+    try:
+        response = await client.get(f"/api/v1/binaries/{binary_id}/views")
+    finally:
+        get_settings.cache_clear()
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "PUBLIC_MODE_FORBIDDEN"
+
+
+@pytest.mark.asyncio
+async def test_set_last_view_forbidden_in_public_mode(
+    client: AsyncClient, ingested: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    binary_id = await _get_binary_id(client, "acme.exe")
+    view_id = await _get_default_view_id(client, binary_id)
+
+    _enable_public_mode(monkeypatch)
+    try:
+        response = await client.post(
+            f"/api/v1/binaries/{binary_id}/last-view", json={"viewId": view_id}
+        )
+    finally:
+        get_settings.cache_clear()
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "PUBLIC_MODE_FORBIDDEN"
+
+
+@pytest.mark.asyncio
+async def test_create_view_randomizes_id_in_public_mode(
+    client: AsyncClient, ingested: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    binary_id = await _get_binary_id(client, "acme.exe")
+
+    _enable_public_mode(monkeypatch)
+    try:
+        response = await client.post(f"/api/v1/binaries/{binary_id}/views", json={"name": "mine"})
+    finally:
+        get_settings.cache_clear()
+
+    assert response.status_code == 201
+    view_id = response.json()["id"]
+    # An unguessable capability, not the next sequential id (2). The threshold
+    # 1000 is astronomically unlikely to collide with a random id in [1, 2^53].
+    assert isinstance(view_id, int)
+    assert view_id > 1000
+
+
+@pytest.mark.asyncio
+async def test_create_view_is_fetchable_by_its_random_id_in_public_mode(
+    client: AsyncClient, ingested: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    binary_id = await _get_binary_id(client, "acme.exe")
+
+    _enable_public_mode(monkeypatch)
+    try:
+        created = await client.post(f"/api/v1/binaries/{binary_id}/views", json={"name": "mine"})
+        view_id = created.json()["id"]
+        fetched = await client.get(f"/api/v1/views/{view_id}")
+    finally:
+        get_settings.cache_clear()
+
+    assert fetched.status_code == 200
+    assert fetched.json()["id"] == view_id
+    assert fetched.json()["name"] == "mine"

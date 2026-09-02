@@ -323,6 +323,10 @@ export interface AppConfigDto {
   // I9: fast-scroll debounce guard for row-summary demand acquisition —
   // `hooks/useSummaryDemand.ts` reads this rather than hard-coding a value.
   summaryDemandDebounceMs: number;
+  // ADR 0006 (public mode): an operational flag, not a threshold, but it
+  // rides the same single-payload contract (E1d) so the client never
+  // branches on anything but `GET /config`.
+  publicMode: boolean;
   nodeColorPalette: NodeColor[];
   adapters: AdapterIdentityDto;
 }
@@ -356,6 +360,7 @@ export type ErrorCode =
   | "SUMMARY_RATE_LIMITED"
   | "QUEUE_FULL"
   | "LAST_VIEW_DELETE_FORBIDDEN"
+  | "PUBLIC_MODE_FORBIDDEN"
   | "GHIDRA_PROGRAM_MISMATCH"
   | "INTERNAL_ERROR";
 

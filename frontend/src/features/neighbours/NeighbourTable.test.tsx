@@ -19,6 +19,7 @@ const config: AppConfigDto = {
   layoutHeightChangeThresholdPx: 8,
   layoutAnimationMs: 400,
   summaryDemandDebounceMs: 250,
+  publicMode: false,
   nodeColorPalette: ["slate"],
   adapters: { ghidra: "mock", llm: "mock", llmModel: "mock-llm-v1" },
 };

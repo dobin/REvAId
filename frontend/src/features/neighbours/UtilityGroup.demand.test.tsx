@@ -18,8 +18,7 @@ const config: AppConfigDto = {
   summaryConcurrency: 4,
   layoutHeightChangeThresholdPx: 8,
   layoutAnimationMs: 400,
-  summaryDemandDebounceMs: 10,
-  nodeColorPalette: ["slate"],
+  summaryDemandDebounceMs: 10,  publicMode: false,  nodeColorPalette: ["slate"],
   adapters: { ghidra: "mock", llm: "mock", llmModel: "mock-llm-v1" },
 };
 

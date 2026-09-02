@@ -3,7 +3,7 @@ import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-r
 import { ConfigProvider } from "@/config/ConfigProvider";
 import type { BinaryId, ViewId } from "@/api/types";
 import { useBinariesQuery } from "@/api/queries/binaries";
-import { useViewsQuery } from "@/api/queries/views";
+import { useWorkspaceView } from "@/hooks/useWorkspaceView";
 import { Toolbar } from "@/features/toolbar/Toolbar";
 import { Sidebar } from "@/features/sidebar/Sidebar";
 import { AutoPlaceEntryPoint } from "@/features/sidebar/PlaceEntryPointButton";
@@ -24,24 +24,17 @@ function BinaryWorkspace({ binaryName }: { binaryName: string }) {
   const actionsRegistry = useCreateCanvasActionsRegistry();
   const navigate = useNavigate();
   const { data: binaries, isPending, isError } = useBinariesQuery();
-  const [selectedViewId, setSelectedViewId] = useState<ViewId | null>(null);
   const [runtimeBase, setRuntimeBase] = useState<number | null>(null);
 
   const binary = binaries?.find((candidate) => candidate.name === binaryName) ?? null;
   const selectedBinaryId: BinaryId | null = binary?.id ?? null;
-  const views = useViewsQuery(selectedBinaryId);
+  // ADR 0006: the single view-resolution point. Private mode defaults to
+  // the binary's first view; public mode resolves/creates this browser's
+  // own anonymous view and never falls back to a shared one.
+  const { viewId: selectedViewId, isResolving, selectView } = useWorkspaceView(selectedBinaryId);
 
-  // Default to the binary's first view whenever the binary changes (or on
-  // first load) and no view has been explicitly picked yet.
+  // Reset the runtime base when navigating to a different binary.
   useEffect(() => {
-    if (selectedViewId !== null) return;
-    const firstView = views.data?.[0];
-    if (firstView) setSelectedViewId(firstView.id);
-  }, [views.data, selectedViewId]);
-
-  // Reset the view selection when navigating to a different binary.
-  useEffect(() => {
-    setSelectedViewId(null);
     setRuntimeBase(null);
   }, [binaryName]);
 
@@ -63,6 +56,12 @@ function BinaryWorkspace({ binaryName }: { binaryName: string }) {
         }
       />
     );
+  }
+
+  // Public mode may still be creating this browser's first view — hold the
+  // canvas rather than flashing it against a view id that is about to land.
+  if (isResolving) {
+    return <EmptyState title="Preparing view…" />;
   }
 
   const handleImported = (binaryId: BinaryId) => {
@@ -87,7 +86,7 @@ function BinaryWorkspace({ binaryName }: { binaryName: string }) {
             runtimeBase={runtimeBase}
             onRuntimeBaseChange={setRuntimeBase}
             viewId={selectedViewId}
-            onSelectView={setSelectedViewId}
+            onSelectView={selectView}
             onImported={handleImported}
           />
           <main style={{ flex: 1, minWidth: 0 }}>

@@ -18,11 +18,16 @@ async function fetchViews(binaryId: BinaryId): Promise<ViewSummaryDto[]> {
   return apiClient.get<ViewSummaryDto[]>(`/binaries/${String(binaryId)}/views`);
 }
 
-export function useViewsQuery(binaryId: BinaryId | null) {
+export function useViewsQuery(
+  binaryId: BinaryId | null,
+  opts?: { enabled?: boolean },
+) {
   return useQuery({
     queryKey: ["views", binaryId],
     queryFn: () => fetchViews(binaryId as BinaryId),
-    enabled: binaryId !== null,
+    // ADR 0006: in public mode the listing endpoint is closed (403), so
+    // callers disable this query rather than fetch a forbidden listing.
+    enabled: binaryId !== null && (opts?.enabled ?? true),
   });
 }
 

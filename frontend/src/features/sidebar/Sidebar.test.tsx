@@ -3,6 +3,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, expect, it, vi } from "vitest";
 import { Sidebar } from "./Sidebar";
 
+// ViewPicker reads `publicMode` from useConfig() (ADR 0006) — mock the
+// provider rather than fetching a real config for this layout test.
+vi.mock("@/config/ConfigProvider", () => ({
+  useConfig: () => ({ publicMode: false }),
+}));
+
 vi.mock("./LlmConnectionStatus", () => ({
   LlmConnectionStatus: () => <div>LLM connector status</div>,
 }));

@@ -30,6 +30,10 @@ class AppConfigDto(ApiModel):
     # I9 (F1a): fast-scroll debounce guard for row-summary demand acquisition —
     # `hooks/useSummaryDemand.ts` must read this rather than hard-coding 250ms.
     summary_demand_debounce_ms: int
+    # ADR 0006 (public mode): an operational flag, not a threshold, but it
+    # rides the same single-payload contract (E1d) so the client never
+    # branches on anything but `GET /config`.
+    public_mode: bool
     node_color_palette: list[str]
     adapters: AdapterIdentityDto
 
@@ -52,6 +56,7 @@ def app_config_from_settings(settings: Settings) -> AppConfigDto:
         layout_height_change_threshold_px=settings.layout_height_change_threshold_px,
         layout_animation_ms=settings.layout_animation_ms,
         summary_demand_debounce_ms=settings.summary_demand_debounce_ms,
+        public_mode=settings.public_mode,
         node_color_palette=list(NODE_COLOR_PALETTE),
         adapters=AdapterIdentityDto(
             ghidra=settings.ghidra_adapter,

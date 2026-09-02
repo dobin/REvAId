@@ -24,6 +24,9 @@ async def test_config_returns_camel_case_defaults(client: AsyncClient) -> None:
     assert body["summaryDemandDebounceMs"] == 250
     assert "red" in body["nodeColorPalette"]
     assert body["adapters"] == {"ghidra": "mock", "llm": "mock", "llmModel": "mock-llm-v1"}
+    # ADR 0006: off by default — private instances keep the single-user
+    # behaviour where every browser shares the binary's views.
+    assert body["publicMode"] is False
 
 
 @pytest.mark.asyncio
@@ -35,5 +38,18 @@ async def test_config_reflects_env_override(
     try:
         response = await client.get("/api/v1/config")
         assert response.json()["tableRowCap"] == 8
+    finally:
+        get_settings.cache_clear()
+
+
+@pytest.mark.asyncio
+async def test_config_reflects_public_mode_override(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("GRAPHREV_PUBLIC_MODE", "true")
+    get_settings.cache_clear()
+    try:
+        response = await client.get("/api/v1/config")
+        assert response.json()["publicMode"] is True
     finally:
         get_settings.cache_clear()

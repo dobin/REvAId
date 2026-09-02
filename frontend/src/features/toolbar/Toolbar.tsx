@@ -1,8 +1,10 @@
 /**
- * Toolbar (TAD §2.3) — home link and `QueueChip` (I8). Binary and view
- * selection controls live in the sidebar. Binary selection is on `/`.
+ * Toolbar (TAD §2.3) — home link, `ModeIndicator` (ADR 0006) and
+ * `QueueChip` (I8). Binary and view selection controls live in the sidebar.
+ * Binary selection is on `/`.
  */
 import { Link } from "react-router";
+import { ModeIndicator } from "./ModeIndicator";
 import { QueueChip } from "./QueueChip";
 
 const homeLinkStyle: React.CSSProperties = {
@@ -26,6 +28,7 @@ export function Toolbar() {
           GraphRev
         </Link>
       </strong>
+      <ModeIndicator />
       <div style={{ marginLeft: "auto" }}>
         <QueueChip />
       </div>
