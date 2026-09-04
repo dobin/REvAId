@@ -33,6 +33,63 @@ afterEach(() => {
 });
 
 describe("ImportBinaryButton", () => {
+  it("asks how to handle an existing binary and imports a new name when selected", async () => {
+    vi.spyOn(apiClient, "get").mockImplementation(async (path) => {
+      if (path === "/binaries") {
+        return [{
+          id: 7,
+          name: "sample.exe",
+          version: "1.0",
+          analysisImageBase: null,
+          functionCount: 1,
+          edgeCount: 0,
+          lastViewId: null,
+          createdAt: "2026-01-01T00:00:00Z",
+        }];
+      }
+      return {
+        jobId: "job-new",
+        phase: "completed",
+        bytesReceived: 1,
+        result: {
+          binaryId: 8,
+          name: "sample-copy.exe",
+          version: "1.0",
+          functionsInserted: 1,
+          functionsUpdated: 0,
+          edgesInserted: 0,
+          placeholdersCreated: 0,
+          failures: [],
+        },
+        errorMessage: null,
+        failureSamples: [],
+      } satisfies ImportJobStatusDto;
+    });
+    const post = vi.spyOn(apiClient, "post").mockResolvedValue({
+      jobId: "job-new",
+      phase: "queued",
+      bytesReceived: 1,
+    });
+    const { onImported } = renderButton();
+    openDialogAndUpload(jsonFile("sample.json", JSON.stringify({
+      schemaVersion: 1,
+      binary: { name: "sample.exe", version: "1.0" },
+      functions: [],
+      edges: [],
+    })));
+
+    expect(await screen.findByText(/already exists/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /open as new binary/i }));
+    fireEvent.change(screen.getByLabelText("New name"), { target: { value: "sample-copy.exe" } });
+    fireEvent.click(screen.getByText("Import"));
+
+    await waitFor(() => expect(onImported).toHaveBeenCalledWith(8));
+    expect(post).toHaveBeenCalledWith(
+      "/binaries/import",
+      expect.objectContaining({ binary: expect.objectContaining({ name: "sample-copy.exe" }) }),
+    );
+  });
+
   it("shows an inline error for a non-JSON file", async () => {
     renderButton();
     openDialogAndUpload(jsonFile("bad.json", "not json{"));

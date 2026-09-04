@@ -25,7 +25,7 @@ export function RuntimeBaseControl({
   const invalid = text.trim().length > 0 && parsed === null;
 
   return (
-    <div>
+    <div style={{ marginTop: "0.75rem" }}>
       <p style={{ fontSize: "0.75rem", color: "#6b7280", margin: "0 0 0.375rem" }}>
         Default image base: {analysisImageBase === null ? "not recorded" : toHex(analysisImageBase)}
       </p>

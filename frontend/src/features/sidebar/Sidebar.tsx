@@ -84,12 +84,6 @@ export function Sidebar({
           >
             Binary: {binaryName}
           </div>
-          <RuntimeBaseControl
-            key={binaryId}
-            analysisImageBase={analysisImageBase}
-            runtimeBase={runtimeBase}
-            onRuntimeBaseChange={onRuntimeBaseChange}
-          />
         </SidebarSection>
       )}
       {binaryId !== null && (
@@ -99,6 +93,13 @@ export function Sidebar({
             viewId={viewId}
             analysisImageBase={analysisImageBase}
             runtimeBase={runtimeBase}
+          />
+
+          <RuntimeBaseControl
+            key={binaryId}
+            analysisImageBase={analysisImageBase}
+            runtimeBase={runtimeBase}
+            onRuntimeBaseChange={onRuntimeBaseChange}
           />
         </SidebarSection>
       )}
