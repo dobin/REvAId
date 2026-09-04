@@ -141,7 +141,11 @@ async def test_summarize_without_decompiled_c_skips_provider(
     )
     result = await adapter.summarize(_req(code_c=None))
     assert calls == []
-    assert result.summary_short == "Decompilation unavailable; no direct code summary generated."
+    assert result.summary_short == "No LLM analysis: decompiled C source is unavailable."
+    assert result.summary_long == (
+        "No decompiled C source was available for this function, so the direct "
+        "LLM adapter did not perform an analysis."
+    )
     assert result.low_confidence is True
     assert result.input_truncated is False
 

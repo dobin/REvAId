@@ -104,14 +104,14 @@ _SYSTEM_PROMPT = (
 _NAME_LLM_MAX_CHARS = 64
 
 #: A missing decompilation is expected for imports, thunks, and external
-#: placeholders. There is no source material for the direct-completion path
-#: to analyse, so avoid an unnecessary provider request while keeping the
-#: function in a usable, explicitly low-confidence state. The OpenCode
-#: adapter intentionally does not do this: its agent can inspect Ghidra.
-_NO_DECOMPILED_CODE_SHORT = "Decompilation unavailable; no direct code summary generated."
+#: placeholders. There is no C source material for the direct-completion
+#: path, so it performs no LLM analysis and keeps the function in an
+#: explicitly low-confidence state. The OpenCode adapter intentionally does
+#: not do this: its agent can inspect Ghidra.
+_NO_DECOMPILED_CODE_SHORT = "No LLM analysis: decompiled C source is unavailable."
 _NO_DECOMPILED_CODE_LONG = (
-    "No decompiled C was available for this function, so the direct LLM "
-    "adapter did not generate a code-based summary."
+    "No decompiled C source was available for this function, so the direct "
+    "LLM adapter did not perform an analysis."
 )
 
 
@@ -276,8 +276,9 @@ class LiteLlmAdapter:
             raise mapped from exc
 
     async def summarize(self, req: SummaryRequest) -> SummaryResult:
-        # LiteLLM can only analyse the supplied decompiled C. Do not spend a
-        # provider request on imports/thunks/placeholders with no C corpus.
+        # LiteLLM can only analyse the supplied decompiled C. Do not perform
+        # LLM analysis or spend a provider request on imports, thunks, or
+        # placeholders with no C corpus.
         # This is deliberately local to this adapter: OpenCode must still run
         # because its Ghidra-enabled agent can obtain the missing context.
         if req.code_c is None:
