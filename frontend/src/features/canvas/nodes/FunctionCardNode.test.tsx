@@ -46,6 +46,8 @@ const mainFn: FunctionDto = {
   isRenamed: false,
   parameters: [],
   signature: null,
+  assembly: "; disassembly of main",
+  codeC: "int main(int arg0) { return arg0; }",
   kind: "normal",
   placeholderModule: null,
   fanIn: 0,

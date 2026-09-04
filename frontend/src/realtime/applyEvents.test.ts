@@ -44,6 +44,8 @@ function makeFunction(overrides: Partial<FunctionDto> = {}): FunctionDto {
     isRenamed: false,
     parameters: [],
     signature: null,
+    assembly: null,
+    codeC: null,
     kind: "normal",
     placeholderModule: null,
     fanIn: 0,

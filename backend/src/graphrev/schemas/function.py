@@ -44,6 +44,8 @@ class FunctionDto(ApiModel):
     is_renamed: bool
     parameters: list[FunctionParamDto]
     signature: str | None
+    assembly: str | None
+    code_c: str | None
     kind: str
     placeholder_module: str | None
     fan_in: int
@@ -77,6 +79,8 @@ def function_dto_from_row(fn: Function) -> FunctionDto:
         is_renamed=fn.name_analyst is not None,
         parameters=parameters,
         signature=fn.signature,
+        assembly=fn.assembly,
+        code_c=fn.code_c,
         kind=fn.kind,
         placeholder_module=fn.placeholder_module,
         fan_in=fn.fan_in,

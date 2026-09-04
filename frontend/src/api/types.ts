@@ -112,6 +112,10 @@ export interface FunctionDto {
   isRenamed: boolean;
   parameters: FunctionParam[];
   signature: string | null;
+  /** Ground-truth Ghidra disassembly; unavailable for import/thunk placeholders. */
+  assembly: string | null;
+  /** Ground-truth Ghidra decompiled C; unavailable when decompilation failed. */
+  codeC: string | null;
   kind: FunctionKind;
   placeholderModule: string | null;
   fanIn: number;

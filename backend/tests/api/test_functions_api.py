@@ -30,6 +30,8 @@ async def test_get_function_returns_full_dto_shape(client: AsyncClient, ingested
     assert body["nameAnalyst"] is None
     assert body["isRenamed"] is False
     assert isinstance(body["parameters"], list)
+    assert body["assembly"] == "; disassembly of main"
+    assert body["codeC"] == "int main(int arg0) { return arg0; }"
     assert body["kind"] == "normal"
     assert body["isEntryPoint"] is True
     assert body["utilitySource"] == "computed"

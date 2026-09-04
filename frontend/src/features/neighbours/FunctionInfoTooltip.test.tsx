@@ -16,6 +16,8 @@ function makeFunction(overrides: Partial<FunctionDto["summary"]> = {}): Function
     isRenamed: true,
     parameters: [],
     signature: null,
+    assembly: null,
+    codeC: null,
     kind: "normal",
     placeholderModule: null,
     fanIn: 2,
