@@ -9,11 +9,13 @@
 import { Handle, Position } from "@xyflow/react";
 import { useConfig } from "@/config/ConfigProvider";
 import { useFunctionQuery } from "@/api/queries/functions";
+import { useRegenerateSummaryMutation } from "@/api/queries/summaries";
 import type { FunctionId, ViewId, ViewNodeDto } from "@/api/types";
 import { CardHeader } from "@/features/card/CardHeader";
 import { CardSummary } from "@/features/card/CardSummary";
 import { NeighbourTable } from "@/features/neighbours/NeighbourTable";
 import { useSummaryDemand } from "@/hooks/useSummaryDemand";
+import { Glyph } from "@/components/Glyph";
 import { useAppStore } from "@/store";
 import { useViewNodeActions } from "../useViewNodeActions";
 import { CollapsedChip } from "./CollapsedChip";
@@ -50,6 +52,7 @@ export function FunctionCardNode({ data }: { data: FunctionCardNodeData }) {
   const clearSelection = useAppStore((s) => s.clearSelection);
   const isSelected = useAppStore((s) => s.selectedFunctionId === data.functionId);
   const actions = useViewNodeActions(data.viewId);
+  const regenerateSummary = useRegenerateSummaryMutation();
 
   // I9 §5.1: opening/placing a card demands its OWN summary at priority 0,
   // ahead of anything in its tables (priority 1/2) — "analyse the function
@@ -116,6 +119,25 @@ export function FunctionCardNode({ data }: { data: FunctionCardNodeData }) {
             }}
           />
         </div>
+        <button
+          type="button"
+          aria-label={`Refresh summary for ${fn.displayName}`}
+          title="Refresh summary"
+          onClick={() => {
+            regenerateSummary.mutate(data.functionId);
+          }}
+          disabled={regenerateSummary.isPending}
+          style={{
+            border: "none",
+            background: "none",
+            borderRadius: "0.25rem",
+            cursor: regenerateSummary.isPending ? "default" : "pointer",
+            padding: "0.375rem 0.5rem",
+            color: "#6b7280",
+          }}
+        >
+          <Glyph name="retry" />
+        </button>
         <button
           type="button"
           aria-label={isSelected ? `Hide details for ${fn.displayName}` : `Show details for ${fn.displayName}`}

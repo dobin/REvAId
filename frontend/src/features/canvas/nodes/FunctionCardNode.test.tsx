@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactFlowProvider } from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -119,6 +119,14 @@ describe("FunctionCardNode", () => {
         if (url.endsWith("/api/v1/functions/1")) {
           return Promise.resolve(new Response(JSON.stringify(mainFn), { status: 200 }));
         }
+        if (url.endsWith("/api/v1/functions/1/summary/regenerate")) {
+          return Promise.resolve(
+            new Response(
+              JSON.stringify({ functionId: 1, summaryStatus: "pending", queuePosition: 0, summaryShort: null }),
+              { status: 202 },
+            ),
+          );
+        }
         return Promise.reject(new Error(`Unexpected fetch: ${url}`));
       }),
     );
@@ -138,5 +146,18 @@ describe("FunctionCardNode", () => {
       expect(screen.getByText("Callees")).toBeInTheDocument();
     });
     expect(screen.getByText("Callers")).toBeInTheDocument();
+  });
+
+  it("refreshes the function summary on request", async () => {
+    renderWithProviders();
+
+    fireEvent.click(await screen.findByRole("button", { name: /refresh summary for main/i }));
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/v1/functions/1/summary/regenerate",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
   });
 });
