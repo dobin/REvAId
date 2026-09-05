@@ -19,6 +19,30 @@ dev:
     just web &
     wait
 
+# Build the SPA and serve it alongside the API without development reloads.
+# Pass Caddy's public hostname so Vite accepts its forwarded Host header.
+prod domain="":
+    #!/usr/bin/env bash
+    set -euo pipefail
+    trap 'kill 0' EXIT
+    export GRAPHREV_WEB_DOMAIN="{{ domain }}"
+    cd frontend && npm run build
+    just api-prod &
+    just web-prod &
+    wait
+
+api-prod:
+    cd backend && uv run uvicorn graphrev.main:app \
+        --host "${GRAPHREV_HOST:-127.0.0.1}" \
+        --port "${GRAPHREV_PORT:-8000}" \
+        --proxy-headers \
+        --forwarded-allow-ips "${GRAPHREV_FORWARDED_ALLOW_IPS:-127.0.0.1}"
+
+web-prod:
+    cd frontend && npm run preview -- \
+        --host "${GRAPHREV_WEB_HOST:-127.0.0.1}" \
+        --port "${GRAPHREV_WEB_PORT:-4173}"
+
 api:
     cd backend && uv run uvicorn graphrev.main:app --reload --host 127.0.0.1 --port 8000
 

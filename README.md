@@ -57,11 +57,30 @@ There are two AI providers available:
 just setup    # uv sync (backend) + npm install (frontend)
 just migrate  # alembic upgrade head — the ONLY way the DB schema is created
 just dev      # runs the API (uvicorn, :8000) and the SPA (Vite, :5173) together
+just prod     # production build on loopback (:8000 API, :4173 SPA) for a reverse proxy
 ```
 
 Then open http://127.0.0.1:5173 — you should see a small panel showing live
 `/health` and `/config` data, proving the frontend, backend, and database are
 wired together end to end.
+
+### Caddy / production
+
+The recommended deployment uses one public origin and lets Caddy route API
+requests separately. `just prod` binds both services to loopback by default:
+
+```caddyfile
+graphrev.example.com {
+	reverse_proxy /api/* 127.0.0.1:8000
+	reverse_proxy 127.0.0.1:4173
+}
+```
+
+Pass the public hostname so Vite accepts Caddy's forwarded `Host` header:
+
+```sh
+just prod domain=graphrev.example.com
+```
 
 
 ## Ghidra Export
