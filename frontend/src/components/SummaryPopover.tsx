@@ -19,6 +19,7 @@ import * as RadixTooltip from "@radix-ui/react-tooltip";
 import type { ReactNode } from "react";
 
 const POPOVER_WIDTH_PX = 416; // 26rem @ 16px base — matches FunctionInfoTooltip.
+const HOVER_OPEN_DELAY_MS = 400;
 
 const contentStyle: React.CSSProperties = {
   zIndex: 9999,
@@ -54,7 +55,7 @@ export function SummaryPopover({
   children: ReactNode;
 }) {
   return (
-    <RadixTooltip.Provider delayDuration={0} skipDelayDuration={0}>
+    <RadixTooltip.Provider delayDuration={HOVER_OPEN_DELAY_MS} skipDelayDuration={0}>
       <RadixTooltip.Root open={open} onOpenChange={onOpenChange}>
         <RadixTooltip.Trigger asChild>{trigger}</RadixTooltip.Trigger>
         <RadixTooltip.Portal>
