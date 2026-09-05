@@ -2,16 +2,17 @@
 
 **I cant code but i must reverse**
 
-> Cant read asm? dont understand C pointers? Dont know what a basic block is? Tired of having FUN_*? Or just being sick of it? Fear not, REvAId is here!
+> Cant read asm? dont understand C pointers? Dont know what a basic block is? Tired of having FUN_*? Have no PDBs? Or just being sick of it? Fear not, REvAId is here!
 
 REvAId is a semantic function graph explorer for binary reverse
 engineering: it renders a binary's call graph as interactive cards, lazily
 summarizes functions with an LLM, and lets an analyst annotate what they
-find. 
+find.
 
 Purpose: 
 * Reverse engineer binaries without reading C/ASM code, only LLM summaries in a function call graph (ai-assited reversing)
 * Manually verify the results of your super duper next generation AI reversing analysis (ai-reversing verification)
+* Dont be dependent on PDB
 
 This is 100% vibe coded. See `IDEA.md`, `PRD.md`, `TAD.md`.
 
