@@ -114,11 +114,11 @@ export function NeighbourRow({
         }}
         onMouseEnter={(e) => {
           if (!disabled) {
-            (e.currentTarget as HTMLButtonElement).style.background = "#f3f4f6";
+            (e.currentTarget).style.background = "#f3f4f6";
           }
         }}
         onMouseLeave={(e) => {
-          (e.currentTarget as HTMLButtonElement).style.background = "none";
+          (e.currentTarget).style.background = "none";
         }}
       >
         <Glyph name={row.onCanvas ? "onCanvas" : "fanOut"} />

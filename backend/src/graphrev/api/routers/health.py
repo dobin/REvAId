@@ -18,12 +18,18 @@ router = APIRouter(tags=["health"])
 async def _decompiler_health(executable: str | None) -> DecompilerHealthDto:
     """Verify configured Kuna path and version without analyzing a binary."""
     if not executable:
-        return DecompilerHealthDto(reachable=False, detail="No decompiler executable is configured.")
+        return DecompilerHealthDto(
+            reachable=False, detail="No decompiler executable is configured."
+        )
     path = Path(executable)
     if not path.is_file():
-        return DecompilerHealthDto(reachable=False, detail="Configured decompiler path is not a file.")
+        return DecompilerHealthDto(
+            reachable=False, detail="Configured decompiler path is not a file."
+        )
     if not path.stat().st_mode & 0o111:
-        return DecompilerHealthDto(reachable=False, detail="Configured decompiler is not executable.")
+        return DecompilerHealthDto(
+            reachable=False, detail="Configured decompiler is not executable."
+        )
     try:
         process = await asyncio.create_subprocess_exec(
             str(path),
@@ -36,7 +42,9 @@ async def _decompiler_health(executable: str | None) -> DecompilerHealthDto:
         return DecompilerHealthDto(reachable=False, detail="Could not run configured decompiler.")
     version = output.decode("utf-8", errors="replace").strip()
     if process.returncode != 0:
-        return DecompilerHealthDto(reachable=False, detail="Configured decompiler version check failed.")
+        return DecompilerHealthDto(
+            reachable=False, detail="Configured decompiler version check failed."
+        )
     if "kuna" not in version.lower():
         return DecompilerHealthDto(reachable=False, detail="Configured executable is not Kuna.")
     return DecompilerHealthDto(reachable=True, detail=version[:200] or "Kuna is available.")

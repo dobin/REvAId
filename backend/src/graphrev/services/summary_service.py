@@ -161,7 +161,7 @@ async def clear_binary_summaries(
             details={"binaryId": binary_id},
         )
 
-    result = await session.execute(
+    await session.execute(
         text(
             """
             UPDATE functions SET

@@ -25,9 +25,9 @@ export function QueueChip() {
     <div style={{ position: "relative" }}>
       <button
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={() => { setOpen((prev) => !prev); }}
         aria-expanded={open}
-        aria-label={`Summary queue: ${inFlight} in flight of ${total} total`}
+        aria-label={`Summary queue: ${String(inFlight)} in flight of ${String(total)} total`}
         style={{
           display: "flex",
           alignItems: "center",
@@ -71,7 +71,7 @@ export function QueueChip() {
           </p>
           <button
             type="button"
-            onClick={() => cancelPending.mutate()}
+            onClick={() => { cancelPending.mutate(); }}
             disabled={queued === 0 || cancelPending.isPending}
             style={{
               fontSize: "0.75rem",

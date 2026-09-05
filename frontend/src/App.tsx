@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
 import { ConfigProvider } from "@/config/ConfigProvider";
-import type { BinaryId, ViewId } from "@/api/types";
+import type { BinaryId } from "@/api/types";
 import { useBinariesQuery } from "@/api/queries/binaries";
 import { useWorkspaceView } from "@/hooks/useWorkspaceView";
 import { Toolbar } from "@/features/toolbar/Toolbar";
@@ -26,7 +26,7 @@ function BinaryWorkspace({ binaryName }: { binaryName: string }) {
   const { data: binaries, isPending, isError } = useBinariesQuery();
   const [runtimeBase, setRuntimeBase] = useState<number | null>(null);
 
-  const binary = binaries?.find((candidate) => candidate.name === binaryName) ?? null;
+  const binary = binaries?.find((candidate) => candidate.name === binaryName);
   const selectedBinaryId: BinaryId | null = binary?.id ?? null;
   // ADR 0006: the single view-resolution point. Private mode defaults to
   // the binary's first view; public mode resolves/creates this browser's
@@ -44,7 +44,7 @@ function BinaryWorkspace({ binaryName }: { binaryName: string }) {
   if (isError) {
     return <EmptyState title="Could not load binaries." />;
   }
-  if (binary === null) {
+  if (!binary) {
     return (
       <EmptyState
         title={`Binary “${binaryName}” not found.`}
@@ -65,11 +65,11 @@ function BinaryWorkspace({ binaryName }: { binaryName: string }) {
   }
 
   const handleImported = (binaryId: BinaryId) => {
-    const imported = (binaries ?? []).find((candidate) => candidate.id === binaryId);
+    const imported = binaries.find((candidate) => candidate.id === binaryId);
     if (imported) {
-      navigate(`/${encodeURIComponent(imported.name)}/`, { replace: true });
+      void navigate(`/${encodeURIComponent(imported.name)}/`, { replace: true });
     } else {
-      navigate("/", { replace: true });
+      void navigate("/", { replace: true });
     }
   };
 
@@ -95,8 +95,8 @@ function BinaryWorkspace({ binaryName }: { binaryName: string }) {
           {selectedBinaryId !== null && selectedViewId !== null && (
             <AutoPlaceEntryPoint
               key={selectedViewId}
-              binaryId={selectedBinaryId as BinaryId}
-              viewId={selectedViewId as ViewId}
+              binaryId={selectedBinaryId}
+              viewId={selectedViewId}
             />
           )}
           <DetailPanel />
@@ -119,7 +119,7 @@ function BinaryWorkspaceRoute() {
 
   useEffect(() => {
     if (!location.pathname.endsWith("/")) {
-      navigate(`${location.pathname}/`, { replace: true });
+      void navigate(`${location.pathname}/`, { replace: true });
     }
   }, [location.pathname, navigate]);
 

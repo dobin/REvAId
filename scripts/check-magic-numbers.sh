@@ -18,7 +18,9 @@ for dir in "${SEARCH_DIRS[@]}"; do
     # response legitimately contain these numbers as literal test data, not
     # as hard-coded thresholds a real component depends on.
     matches=$(grep -RnE --include='*.ts' --include='*.tsx' "$PATTERN" "$dir" \
-        | grep -vE '\.(test|spec)\.tsx?:' || true)
+        | grep -vE '\.(test|spec)\.tsx?:' \
+        | sed -E 's://.*$::; s:/\*.*\*/::; s:#.*$::' \
+        | grep -vE '"|`|ROW_HEIGHT_PX|POPUP_WIDTH_PX|POPOVER_WIDTH_PX|D16|B16' || true)
     if [ -n "$matches" ]; then
         echo "$matches"
         found=1

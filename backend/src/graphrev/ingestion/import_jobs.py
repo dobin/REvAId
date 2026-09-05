@@ -217,7 +217,9 @@ class ImportJobManager:
     async def _run_decompiler(self, job: _ImportJob) -> None:
         executable = self._settings.decompiler_executable
         if executable is None or not Path(executable).is_file():
-            raise AppError(ErrorCode.DECOMPILER_UNAVAILABLE, "The configured decompiler is unavailable.")
+            raise AppError(
+                ErrorCode.DECOMPILER_UNAVAILABLE, "The configured decompiler is unavailable."
+            )
         assert job.output_path is not None
         job.process = await asyncio.create_subprocess_exec(
             executable,
@@ -252,4 +254,7 @@ class ImportJobManager:
         if not job.output_path.is_file() or job.output_path.stat().st_size == 0:
             raise AppError(ErrorCode.DECOMPILER_FAILED, "Decompiler did not produce an export.")
         if job.output_path.stat().st_size > self._settings.decompiler_max_output_bytes:
-            raise AppError(ErrorCode.DECOMPILER_OUTPUT_TOO_LARGE, "Decompiler output exceeds the configured limit.")
+            raise AppError(
+                ErrorCode.DECOMPILER_OUTPUT_TOO_LARGE,
+                "Decompiler output exceeds the configured limit.",
+            )

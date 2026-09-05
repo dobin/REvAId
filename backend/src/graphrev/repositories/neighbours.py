@@ -167,7 +167,7 @@ async def fetch_neighbour_page(
         sort_expr = _SORT_EXPRESSIONS[sort]
         order_by = [sort_expr.desc() if order == "desc" else sort_expr.asc(), Function.id.asc()]
     page_stmt = (
-        group_stmt.order_by(Function.is_utility_effective.asc(), *order_by)
+        group_stmt.order_by(Function.is_utility_effective.asc(), *order_by)  # type: ignore[arg-type]
         .limit(limit)
         .offset(offset)
     )

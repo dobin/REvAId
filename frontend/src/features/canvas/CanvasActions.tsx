@@ -5,7 +5,7 @@
  * tables. Provided by `CanvasView`; consumed by anything that needs to
  * promote a function onto the canvas or pan to an existing node.
  */
-import { createContext, useContext, useRef, type MutableRefObject } from "react";
+import { createContext, useContext, useRef, type RefObject } from "react";
 import type { FunctionId } from "@/api/types";
 
 /** Where a fanned-out row came from: the card whose table it sits in, plus
@@ -46,7 +46,7 @@ export function useCanvasActions(): CanvasActions | null {
  * tree (e.g. the sidebar) can still call canvas actions. `CanvasViewInner`
  * writes its actions into this ref; consumers call through it.
  */
-const CanvasActionsRegistryContext = createContext<MutableRefObject<CanvasActions | null> | null>(null);
+const CanvasActionsRegistryContext = createContext<RefObject<CanvasActions | null> | null>(null);
 
 export const CanvasActionsRegistryProvider = CanvasActionsRegistryContext.Provider;
 

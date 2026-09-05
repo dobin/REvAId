@@ -74,7 +74,7 @@ function StatsDialog({
     ["Version", binary.version],
     ["Functions", String(binary.functionCount)],
     ["Call edges", String(binary.edgeCount)],
-    ["Last view", binary.lastViewId === null ? "—" : `#${binary.lastViewId}`],
+    ["Last view", binary.lastViewId === null ? "—" : `#${String(binary.lastViewId)}`],
     ["Ingested", formatCreatedAt(binary.createdAt)],
   ];
   return (
@@ -163,21 +163,21 @@ export function BinariesPage() {
                     <button
                       type="button"
                       style={actionButtonStyle}
-                      onClick={() => navigate(`/${encodeURIComponent(binary.name)}/`)}
+                      onClick={() => { void navigate(`/${encodeURIComponent(binary.name)}/`); }}
                     >
                       Open
                     </button>
                     <button
                       type="button"
                       style={actionButtonStyle}
-                      onClick={() => setStatsBinary(binary)}
+                      onClick={() => { setStatsBinary(binary); }}
                     >
                       Stats
                     </button>
                     <button
                       type="button"
                       style={dangerButtonStyle}
-                      onClick={() => setDeleteBinary(binary)}
+                      onClick={() => { setDeleteBinary(binary); }}
                     >
                       Delete
                     </button>
@@ -190,13 +190,13 @@ export function BinariesPage() {
       )}
 
       {statsBinary !== null && (
-        <StatsDialog binary={statsBinary} open onOpenChange={() => setStatsBinary(null)} />
+        <StatsDialog binary={statsBinary} open onOpenChange={() => { setStatsBinary(null); }} />
       )}
       {deleteBinary !== null && (
         <DeleteBinaryDialog
           binary={deleteBinary}
           open
-          onOpenChange={() => setDeleteBinary(null)}
+          onOpenChange={() => { setDeleteBinary(null); }}
         />
       )}
     </div>

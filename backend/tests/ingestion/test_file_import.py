@@ -65,9 +65,7 @@ def _document() -> GhidraExportDocument:
             ),
         ],
         edges=[
-            GhidraExportEdge(
-                caller_address=0x401000, callee_address=0x401100, callee_order=0
-            ),
+            GhidraExportEdge(caller_address=0x401000, callee_address=0x401100, callee_order=0),
             # A cross-module edge whose target is not in `functions` -> B17 placeholder.
             GhidraExportEdge(
                 caller_address=0x401000,
@@ -108,10 +106,16 @@ async def test_import_creates_binary_with_functions_and_placeholder(
     assert binary is not None
     assert binary.analysis_image_base == 0x400000
     edge_orders = (
-        await session.execute(
-            select(Edge.callee_order).where(Edge.binary_id == result.binary_id).order_by(Edge.callee_order)
+        (
+            await session.execute(
+                select(Edge.callee_order)
+                .where(Edge.binary_id == result.binary_id)
+                .order_by(Edge.callee_order)
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert edge_orders == [0, 1]
 
 
@@ -141,8 +145,14 @@ async def test_import_schema_v1_document_leaves_callee_order_unknown(
 
     async with session_factory() as session:
         orders = (
-            await session.execute(select(Edge.callee_order).where(Edge.binary_id == result.binary_id))
-        ).scalars().all()
+            (
+                await session.execute(
+                    select(Edge.callee_order).where(Edge.binary_id == result.binary_id)
+                )
+            )
+            .scalars()
+            .all()
+        )
     assert orders == [None, None]
 
 

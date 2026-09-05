@@ -46,7 +46,7 @@ export function CanvasView({
 }: {
   selectedBinaryId: BinaryId | null;
   viewId: ViewId | null;
-  actionsRegistry: React.MutableRefObject<import("./CanvasActions").CanvasActions | null>;
+  actionsRegistry: React.RefObject<import("./CanvasActions").CanvasActions | null>;
 }) {
   if (selectedBinaryId === null || viewId === null) {
     return <CanvasEmptyState message="Pick a binary from the toolbar to get started." />;
@@ -63,7 +63,7 @@ function CanvasViewInner({
   actionsRegistry,
 }: {
   viewId: ViewId;
-  actionsRegistry: React.MutableRefObject<import("./CanvasActions").CanvasActions | null>;
+  actionsRegistry: React.RefObject<import("./CanvasActions").CanvasActions | null>;
 }) {
   const config = useConfig();
   const queryClient = useQueryClient();

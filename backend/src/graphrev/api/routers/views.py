@@ -83,7 +83,5 @@ async def delete_view(view_id: int, session: WriteSessionDep) -> None:
 @router.post(
     "/views/{view_id}/duplicate", response_model=ViewDto, status_code=status.HTTP_201_CREATED
 )
-async def duplicate_view(
-    view_id: int, session: WriteSessionDep, settings: SettingsDep
-) -> ViewDto:
+async def duplicate_view(view_id: int, session: WriteSessionDep, settings: SettingsDep) -> ViewDto:
     return await view_service.duplicate_view_dto(session, view_id, random_id=settings.public_mode)

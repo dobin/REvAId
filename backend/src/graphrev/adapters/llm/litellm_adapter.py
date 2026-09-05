@@ -329,9 +329,7 @@ class LiteLlmAdapter:
                 summary_long=payload.summary_long,
                 model=getattr(response, "model", None) or self._settings.llm_model,
                 name_llm=(
-                    payload.name_llm[:_NAME_LLM_MAX_CHARS]
-                    if payload.name_llm is not None
-                    else None
+                    payload.name_llm[:_NAME_LLM_MAX_CHARS] if payload.name_llm is not None else None
                 ),
                 low_confidence=payload.low_confidence,
                 input_truncated=input_truncated,

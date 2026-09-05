@@ -13,7 +13,6 @@ import { FunctionSearchInput } from "./FunctionSearchInput";
 
 function neighbourRow(overrides: Partial<NeighbourRowDto> & { id: number }): NeighbourRowDto {
   return {
-    id: overrides.id,
     address: 0x402000,
     displayName: `fn_${String(overrides.id)}`,
     nameLlm: null,
@@ -28,6 +27,7 @@ function neighbourRow(overrides: Partial<NeighbourRowDto> & { id: number }): Nei
     fanIn: 1,
     isSelf: false,
     hasNotes: false,
+    ...overrides,
     ...overrides,
   };
 }

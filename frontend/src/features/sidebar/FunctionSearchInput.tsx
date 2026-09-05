@@ -161,7 +161,7 @@ export function FunctionSearchInput({
                   role="option"
                   aria-selected={false}
                   disabled={patchNodes.isPending || view.isPending}
-                  onClick={() => selectFunction(resolvedFunction!.id)}
+                  onClick={() => { selectFunction(resolvedFunction!.id); }}
                   style={rowButtonStyle}
                   title={onCanvasIds.has(resolvedFunction!.id)
                     ? `Jump to ${resolvedFunction!.displayName}`

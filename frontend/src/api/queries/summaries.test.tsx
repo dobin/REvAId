@@ -83,7 +83,7 @@ describe("summary demand queue synchronization", () => {
       { wrapper },
     );
 
-    await waitFor(() => expect(queue.result.current.isSuccess).toBe(true));
+    await waitFor(() => { expect(queue.result.current.isSuccess).toBe(true); });
     expect(queueRequestCount()).toBe(1);
 
     await Promise.all(

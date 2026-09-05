@@ -50,7 +50,6 @@ from graphrev.adapters.ghidra.base import (
     RawFunction,
     RawParam,
 )
-from graphrev.adapters.mock_summaries import MOCK_LLM_NAMES, MOCK_SUMMARIES
 
 #: A7: at least two distinct synthetic binaries.
 ACME_EXE = RawBinary(name="acme.exe", version="1.0")
@@ -311,53 +310,3 @@ class MockGhidraAdapter:
 #: type-check time (Protocol, so this is a static assertion, never instantiated).
 def _typecheck_conforms(adapter: MockGhidraAdapter) -> GhidraAdapter:
     return adapter
-
-
-# ---------------------------------------------------------------------------
-# Fake LLM summaries for UI development
-# ---------------------------------------------------------------------------
-# The corpus itself now lives in `adapters/mock_summaries.py` (shared with
-# `adapters/llm/mock.py::MockLlmAdapter` so both mocks agree on the same
-# fake content) — see that module's docstring for why importing it here does
-# not violate the "only adapters/*/base outside the package" import-linter
-# contract.
-
-
-async def seed_mock_summaries(session_factory: "async_sessionmaker") -> int:  # type: ignore[type-arg]
-    """Inject fake LLM summaries into the DB for UI development.
-
-    Only updates rows where *summary_status* is still ``'none'`` so a real
-    summarisation run is not overwritten.  Returns the number of rows updated.
-    """
-    from sqlalchemy import select, update
-    from sqlalchemy.ext.asyncio import async_sessionmaker  # noqa: F401 (type hint only)
-
-    from graphrev.db.models import Function
-
-    updated = 0
-    async with session_factory() as session:
-        async with session.begin():
-            for name, (short, long_) in MOCK_SUMMARIES.items():
-                result = await session.execute(
-                    select(Function.id).where(
-                        Function.name_ghidra == name,
-                        Function.summary_status == "none",
-                    )
-                )
-                ids = [row[0] for row in result.all()]
-                if not ids:
-                    continue
-                await session.execute(
-                    update(Function)
-                    .where(Function.id.in_(ids))
-                    .values(
-                        summary_short=short,
-                        summary_long=long_,
-                        name_llm=MOCK_LLM_NAMES.get(name),
-                        summary_status="ready",
-                        summary_model="mock-llm-v1",
-                        summary_generated_at="2026-08-22T00:00:00Z",
-                    )
-                )
-                updated += len(ids)
-    return updated

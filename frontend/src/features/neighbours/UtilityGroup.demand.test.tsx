@@ -116,10 +116,10 @@ describe("UtilityGroup demand acquisition", () => {
     const expandButton = await screen.findByRole("button", { name: /utility calls/i });
     fireEvent.click(expandButton);
 
-    await waitFor(() => expect(demandCallCount()).toBe(7));
+    await waitFor(() => { expect(demandCallCount()).toBe(7); });
 
     fireEvent.click(expandButton);
 
-    await waitFor(() => expect(releaseCallCount()).toBe(7));
+    await waitFor(() => { expect(releaseCallCount()).toBe(7); });
   });
 });

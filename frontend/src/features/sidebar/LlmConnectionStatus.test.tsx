@@ -18,6 +18,7 @@ const healthy: HealthDto = {
   ghidraAdapter: "mock",
   llmAdapter: "litellm",
   llmHealth: { reachable: true, detail: null },
+  decompilerHealth: { reachable: true, detail: null },
 };
 
 function renderWithHealth(health: HealthDto | undefined) {

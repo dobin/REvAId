@@ -148,9 +148,7 @@ async def test_successful_summarize_persists_name_llm(
             )
         ]
     )
-    await run_one_item(
-        item, queue=queue, adapter=adapter, session_factory=session_factory
-    )
+    await run_one_item(item, queue=queue, adapter=adapter, session_factory=session_factory)
 
     await session.refresh(fn)
     assert fn.name_llm == "parse_header"
@@ -173,9 +171,7 @@ async def test_successful_summarize_without_name_llm_leaves_column_null(
     adapter = _StubAdapter(
         [SummaryResult(summary_short="short", summary_long="long", model="stub-v1")]
     )
-    await run_one_item(
-        item, queue=queue, adapter=adapter, session_factory=session_factory
-    )
+    await run_one_item(item, queue=queue, adapter=adapter, session_factory=session_factory)
 
     await session.refresh(fn)
     assert fn.summary_status == "ready"

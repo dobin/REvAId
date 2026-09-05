@@ -33,7 +33,9 @@ async def recover_pending_summaries(session: AsyncSession, queue: SummaryQueue) 
     an evicted item cannot truthfully remain ``pending``. Reset only those
     un-restorable rows to ``none`` so they can be requested again.
     """
-    result = await session.execute(text("SELECT id FROM functions WHERE summary_status = 'pending'"))
+    result = await session.execute(
+        text("SELECT id FROM functions WHERE summary_status = 'pending'")
+    )
     function_ids = [cast(int, function_id) for function_id in result.scalars()]
     for function_id in function_ids:
         queue.enqueue(function_id, MAX_PRIORITY)

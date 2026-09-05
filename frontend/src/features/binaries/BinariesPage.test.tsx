@@ -126,10 +126,12 @@ describe("BinariesPage", () => {
     await user.click(firstDelete);
 
     const confirmInput = await screen.findByLabelText(/binary name confirmation/i);
-    const dialogDelete = () =>
-      screen
-        .getAllByRole("button", { name: "Delete", hidden: true })
-        .at(-1)!;
+    const dialogDelete = () => {
+      const buttons = screen.getAllByRole("button", { name: "Delete", hidden: true });
+      const button = buttons.at(-1);
+      if (!button) throw new Error("No dialog Delete button found");
+      return button;
+    };
     expect(dialogDelete()).toBeDisabled();
 
     await user.type(confirmInput, "wrong-name");

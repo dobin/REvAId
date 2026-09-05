@@ -17,7 +17,7 @@ interface GlobalWithResizeObserver {
   ResizeObserver?: typeof MockResizeObserver;
 }
 
-(globalThis as GlobalWithResizeObserver).ResizeObserver ??= MockResizeObserver;
+(globalThis as unknown as GlobalWithResizeObserver).ResizeObserver ??= MockResizeObserver;
 
 Object.defineProperty(HTMLElement.prototype, "clientHeight", {
   configurable: true,

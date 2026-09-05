@@ -63,9 +63,7 @@ async def list_binaries_dto(
     session: AsyncSession, *, redact_last_view: bool = False
 ) -> list[BinarySummaryDto]:
     rows = await list_binaries(session)
-    return [
-        binary_summary_from_row(row, redact_last_view=redact_last_view) for row in rows
-    ]
+    return [binary_summary_from_row(row, redact_last_view=redact_last_view) for row in rows]
 
 
 async def delete_binary_with_confirmation(

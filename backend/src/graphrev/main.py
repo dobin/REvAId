@@ -110,7 +110,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     async def _publish_summary_event(
         *,
         function_id: int,
-        binary_id: int,  # noqa: ARG001 - not part of the E5a payload; kept for future use
+        binary_id: int,
         summary_status: str,
         summary_short: str | None,
         summary_model: str | None,

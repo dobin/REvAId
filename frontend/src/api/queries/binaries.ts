@@ -88,7 +88,7 @@ export function useDeleteBinaryMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, name }: { id: BinaryId; name: string }) =>
-      apiClient.delete<void>(`/binaries/${String(id)}`, { confirm: name }),
+      apiClient.delete<undefined>(`/binaries/${String(id)}`, { confirm: name }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["binaries"] });
     },

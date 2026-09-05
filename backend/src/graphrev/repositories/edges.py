@@ -43,24 +43,20 @@ async def upsert_edge(
         select(Edge.id).where(Edge.caller_id == caller_id, Edge.callee_id == callee_id)
     )
     insert_stmt = sqlite_insert(Edge)
-    stmt = (
-        insert_stmt
-        .values(
-            binary_id=binary_id,
-            caller_id=caller_id,
-            callee_id=callee_id,
-            callee_order=callee_order,
-            kind=kind,
-        )
-        .on_conflict_do_update(
-            index_elements=[Edge.caller_id, Edge.callee_id],
-            set_={
-                "callee_order": case(
-                    (insert_stmt.excluded.callee_order.is_not(None), insert_stmt.excluded.callee_order),
-                    else_=Edge.callee_order,
-                )
-            },
-        )
+    stmt = insert_stmt.values(
+        binary_id=binary_id,
+        caller_id=caller_id,
+        callee_id=callee_id,
+        callee_order=callee_order,
+        kind=kind,
+    ).on_conflict_do_update(
+        index_elements=[Edge.caller_id, Edge.callee_id],
+        set_={
+            "callee_order": case(
+                (insert_stmt.excluded.callee_order.is_not(None), insert_stmt.excluded.callee_order),
+                else_=Edge.callee_order,
+            )
+        },
     )
     await session.execute(stmt)
     await session.flush()
@@ -100,29 +96,25 @@ async def upsert_edges_batch(
         ).all()
     )
     insert_stmt = sqlite_insert(Edge)
-    stmt = (
-        insert_stmt
-        .values(
-            [
-                {
-                    "binary_id": binary_id,
-                    "caller_id": edge.caller_id,
-                    "callee_id": edge.callee_id,
-                    "callee_order": edge.callee_order,
-                    "kind": kind,
-                }
-                for edge in values
-            ]
-        )
-        .on_conflict_do_update(
-            index_elements=[Edge.caller_id, Edge.callee_id],
-            set_={
-                "callee_order": case(
-                    (insert_stmt.excluded.callee_order.is_not(None), insert_stmt.excluded.callee_order),
-                    else_=Edge.callee_order,
-                )
-            },
-        )
+    stmt = insert_stmt.values(
+        [
+            {
+                "binary_id": binary_id,
+                "caller_id": edge.caller_id,
+                "callee_id": edge.callee_id,
+                "callee_order": edge.callee_order,
+                "kind": kind,
+            }
+            for edge in values
+        ]
+    ).on_conflict_do_update(
+        index_elements=[Edge.caller_id, Edge.callee_id],
+        set_={
+            "callee_order": case(
+                (insert_stmt.excluded.callee_order.is_not(None), insert_stmt.excluded.callee_order),
+                else_=Edge.callee_order,
+            )
+        },
     )
     await session.execute(stmt)
     inserted = len(pairs) - len(existing_pairs)

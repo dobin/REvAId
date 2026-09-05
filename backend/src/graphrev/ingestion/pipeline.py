@@ -268,9 +268,7 @@ async def _ingest_edge_batch(
                 else:
                     report.edges_skipped_duplicate += 1
             except Exception as exc:
-                message = (
-                    f"edge 0x{edge.caller_address:x} -> 0x{edge.callee_address:x}: {exc}"
-                )
+                message = f"edge 0x{edge.caller_address:x} -> 0x{edge.callee_address:x}: {exc}"
                 report.failures.append(message)
                 log_event(
                     logger,

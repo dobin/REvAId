@@ -13,11 +13,11 @@ import asyncio
 import typer
 
 from graphrev.adapters.ghidra import GhidraAdapterNotImplementedError, create_adapter
-from graphrev.adapters.ghidra.mock import seed_mock_summaries
 from graphrev.core.config import GhidraAdapterName, get_settings
 from graphrev.db.engine import create_engine, create_session_factory, dispose_engine
 from graphrev.ingestion.pipeline import run_ingestion
 from graphrev.ingestion.report import print_report
+from graphrev.ingestion.seed_summaries import seed_mock_summaries
 
 _VALID_ADAPTER_NAMES: tuple[GhidraAdapterName, ...] = ("mock", "rest")
 

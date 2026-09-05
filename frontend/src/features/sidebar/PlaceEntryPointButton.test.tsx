@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiClient } from "@/api/client";
-import type { EntryPointsDto, ViewDto, ViewNodesPatchResponse } from "@/api/types";
+import type { EntryPointsDto, ViewDto } from "@/api/types";
 import { AutoPlaceEntryPoint, PlaceEntryPointButton } from "./PlaceEntryPointButton";
 
 const entryPoints: EntryPointsDto = {
@@ -30,7 +30,7 @@ afterEach(() => {
 
 describe("entry-point placement", () => {
   it("automatically adds the entry point to an initially empty view", async () => {
-    const patchSpy = vi.spyOn(apiClient, "patch").mockResolvedValue({ nodes: [] } as ViewNodesPatchResponse);
+    const patchSpy = vi.spyOn(apiClient, "patch").mockResolvedValue({ nodes: [] });
     vi.spyOn(apiClient, "get").mockImplementation((url: string) => {
       if (url === "/views/5") return Promise.resolve(emptyView);
       if (url === "/binaries/1/entry-points") return Promise.resolve(entryPoints);
@@ -51,7 +51,7 @@ describe("entry-point placement", () => {
   });
 
   it("places the entry point when requested manually", async () => {
-    const patchSpy = vi.spyOn(apiClient, "patch").mockResolvedValue({ nodes: [] } as ViewNodesPatchResponse);
+    const patchSpy = vi.spyOn(apiClient, "patch").mockResolvedValue({ nodes: [] });
     vi.spyOn(apiClient, "get").mockResolvedValue(entryPoints);
 
     renderWithClient(<PlaceEntryPointButton binaryId={1} viewId={5} />);

@@ -76,8 +76,8 @@ export function QueuePanel() {
   return (
     <div>
       <p style={{ margin: "0 0 0.25rem", fontSize: "0.75rem", color: "#6b7280" }}>
-        <Spinner label="Summary generating" /> {inFlight.length} analysing
-        {queued.length > 0 ? `, ${queued.length} queued` : ""}
+        <Spinner label="Summary generating" /> {String(inFlight.length)} analysing
+        {queued.length > 0 ? `, ${String(queued.length)} queued` : ""}
         {data?.pausedUntil && (
           <span style={{ color: "#b45309" }}> — rate-limited, paused</span>
         )}
@@ -93,7 +93,7 @@ export function QueuePanel() {
       ))}
       {inFlight.length > MAX_IN_FLIGHT_SHOWN && (
         <p style={{ margin: 0, fontSize: "0.75rem", color: "#9ca3af" }}>
-          +{inFlight.length - MAX_IN_FLIGHT_SHOWN} more…
+          +{String(inFlight.length - MAX_IN_FLIGHT_SHOWN)} more…
         </p>
       )}
     </div>

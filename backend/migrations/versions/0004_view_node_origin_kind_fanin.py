@@ -77,9 +77,7 @@ def _view_nodes_table(check: str) -> sa.Table:
             ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_view_nodes")),
-        sa.UniqueConstraint(
-            "view_id", "function_id", name="ux_view_nodes_view_id_function_id"
-        ),
+        sa.UniqueConstraint("view_id", "function_id", name="ux_view_nodes_view_id_function_id"),
     )
 
 

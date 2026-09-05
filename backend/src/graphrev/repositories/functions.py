@@ -45,6 +45,7 @@ class FunctionBatchValues(TypedDict, total=False):
     has_indirect_calls: bool
     is_entry_point: bool
 
+
 #: Columns present in the INSERT's VALUES that are NOT part of
 #: ``INGESTION_OWNED_COLUMNS`` and must therefore be supplied only on first
 #: insert, never touched again on conflict (the primary key, the creation

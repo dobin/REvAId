@@ -39,7 +39,7 @@ export function useDemandSummaryMutation() {
 export function useReleaseSummaryDemandMutation() {
   return useMutation({
     mutationFn: (functionId: FunctionId) =>
-      apiClient.delete<void>(`/functions/${String(functionId)}/summary`),
+      apiClient.delete<undefined>(`/functions/${String(functionId)}/summary`),
   });
 }
 

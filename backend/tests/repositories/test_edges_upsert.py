@@ -52,9 +52,7 @@ async def test_upsert_edge_legacy_order_does_not_clear_known_order(session: Asyn
     binary = await _make_binary(session)
     a_id, _ = await upsert_function(session, binary_id=binary.id, address=0x1, name_ghidra="a")
     b_id, _ = await upsert_function(session, binary_id=binary.id, address=0x2, name_ghidra="b")
-    await upsert_edge(
-        session, binary_id=binary.id, caller_id=a_id, callee_id=b_id, callee_order=3
-    )
+    await upsert_edge(session, binary_id=binary.id, caller_id=a_id, callee_id=b_id, callee_order=3)
     await session.commit()
 
     inserted = await upsert_edge(session, binary_id=binary.id, caller_id=a_id, callee_id=b_id)

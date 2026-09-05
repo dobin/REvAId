@@ -84,7 +84,7 @@ describe("ImportBinaryButton", () => {
     fireEvent.change(screen.getByLabelText("New name"), { target: { value: "sample-copy.exe" } });
     fireEvent.click(screen.getByText("Import"));
 
-    await waitFor(() => expect(onImported).toHaveBeenCalledWith(8));
+    await waitFor(() => { expect(onImported).toHaveBeenCalledWith(8); });
     expect(post).toHaveBeenCalledWith(
       "/binaries/import",
       expect.objectContaining({ binary: expect.objectContaining({ name: "sample-copy.exe" }) }),

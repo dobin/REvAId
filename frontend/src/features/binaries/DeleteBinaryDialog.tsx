@@ -82,7 +82,7 @@ export function DeleteBinaryDialog({
         aria-label="Binary name confirmation"
         style={inputStyle}
         value={typedName}
-        onChange={(e) => setTypedName(e.target.value)}
+        onChange={(e) => { setTypedName(e.target.value); }}
         placeholder={binary.name}
         autoComplete="off"
       />
@@ -92,7 +92,7 @@ export function DeleteBinaryDialog({
         </p>
       )}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem", marginTop: "1rem" }}>
-        <button type="button" style={primaryButtonStyle} onClick={() => onOpenChange(false)}>
+        <button type="button" style={primaryButtonStyle} onClick={() => { onOpenChange(false); }}>
           Cancel
         </button>
         <button

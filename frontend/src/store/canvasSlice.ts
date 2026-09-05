@@ -90,13 +90,13 @@ export const createCanvasSlice: StateCreator<CanvasSlice, [], [], CanvasSlice> =
       },
     }));
   },
-  clearPositions: () => set({ positions: {} }),
+  clearPositions: () => { set({ positions: {} }); },
   unpinAll: () =>
-    set((state) => {
+    { set((state) => {
       const updated: Record<FunctionId, CanvasNodePosition> = {};
       for (const [id, pos] of Object.entries(state.positions)) {
-        updated[id as FunctionId] = { ...pos, pinned: false, dragging: false };
+        updated[id as unknown as FunctionId] = { ...pos, pinned: false, dragging: false };
       }
       return { positions: updated };
-    }),
+    }); },
 });

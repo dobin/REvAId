@@ -245,7 +245,7 @@ export function ImportBinaryButton({
           aria-selected={sourceKind === "binary"}
           aria-controls="binary-import-source"
           style={sourceKind === "binary" ? selectedSourceTabStyle : primaryButtonStyle}
-          onClick={() => setSourceKind("binary")}
+          onClick={() => { setSourceKind("binary"); }}
         >
           Raw binary
         </button>
@@ -256,7 +256,7 @@ export function ImportBinaryButton({
           aria-selected={sourceKind === "json"}
           aria-controls="binary-import-source"
           style={sourceKind === "json" ? selectedSourceTabStyle : primaryButtonStyle}
-          onClick={() => setSourceKind("json")}
+          onClick={() => { setSourceKind("json"); }}
         >
           .json Export
         </button>
@@ -317,7 +317,7 @@ export function ImportBinaryButton({
               type="button"
               style={primaryButtonStyle}
               aria-pressed={duplicateChoice === "overwrite"}
-              onClick={() => setDuplicateChoice("overwrite")}
+              onClick={() => { setDuplicateChoice("overwrite"); }}
             >
               Overwrite / refresh
             </button>
@@ -325,7 +325,7 @@ export function ImportBinaryButton({
               type="button"
               style={primaryButtonStyle}
               aria-pressed={duplicateChoice === "new"}
-              onClick={() => setDuplicateChoice("new")}
+              onClick={() => { setDuplicateChoice("new"); }}
             >
               Open as new binary
             </button>
@@ -336,7 +336,7 @@ export function ImportBinaryButton({
               <input
                 type="text"
                 value={newBinaryName}
-                onChange={(event) => setNewBinaryName(event.target.value)}
+                onChange={(event) => { setNewBinaryName(event.target.value); }}
                 placeholder={`${selectedBinaryName} (copy)`}
                 style={{ display: "block", width: "100%", boxSizing: "border-box", marginTop: "0.25rem" }}
               />

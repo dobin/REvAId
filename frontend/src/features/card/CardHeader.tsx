@@ -78,7 +78,7 @@ export function CardHeader({
       {fn.hasNotes && <Glyph name="hasNotes" />}
       {canColor && paletteOpen && (
         <div
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); }}
           style={{
             position: "absolute",
             top: "100%",

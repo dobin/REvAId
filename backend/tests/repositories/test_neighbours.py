@@ -361,7 +361,9 @@ async def test_sort_by_fan_in_descending(session: AsyncSession) -> None:
 
 
 @pytest.mark.asyncio
-async def test_callee_call_order_sorts_known_orders_before_legacy_rows(session: AsyncSession) -> None:
+async def test_callee_call_order_sorts_known_orders_before_legacy_rows(
+    session: AsyncSession,
+) -> None:
     binary = await _make_binary(session)
     view = await _make_view(session, binary)
     root = await _make_function(session, binary, 0x1000, "root")
@@ -390,7 +392,9 @@ async def test_callee_call_order_sorts_known_orders_before_legacy_rows(session: 
 
 
 @pytest.mark.asyncio
-async def test_callee_call_order_preserves_relative_order_after_filter(session: AsyncSession) -> None:
+async def test_callee_call_order_preserves_relative_order_after_filter(
+    session: AsyncSession,
+) -> None:
     binary = await _make_binary(session)
     view = await _make_view(session, binary)
     root = await _make_function(session, binary, 0x1000, "root")

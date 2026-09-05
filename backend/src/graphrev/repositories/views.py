@@ -115,9 +115,7 @@ async def delete_view(session: AsyncSession, view: View) -> None:
     await session.flush()
 
 
-async def duplicate_view(
-    session: AsyncSession, view: View, *, view_id: int | None = None
-) -> View:
+async def duplicate_view(session: AsyncSession, view: View, *, view_id: int | None = None) -> View:
     """Copy layout only (B8): a new `View` row plus a verbatim copy of every
     `ViewNode` row (new ids, same positions/colors/provenance). No summaries
     or functions are touched. `view_id` is an explicit random id in public

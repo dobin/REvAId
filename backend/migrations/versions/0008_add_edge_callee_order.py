@@ -41,13 +41,22 @@ def _edges_table(*, with_callee_order: bool) -> sa.Table:
     constraints: list[sa.SchemaItem] = [
         sa.CheckConstraint("kind IN ('call')", name=op.f("ck_edges_kind_valid")),
         sa.ForeignKeyConstraint(
-            ["binary_id"], ["binaries.id"], name=op.f("fk_edges_binary_id_binaries"), ondelete="CASCADE"
+            ["binary_id"],
+            ["binaries.id"],
+            name=op.f("fk_edges_binary_id_binaries"),
+            ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
-            ["callee_id"], ["functions.id"], name=op.f("fk_edges_callee_id_functions"), ondelete="CASCADE"
+            ["callee_id"],
+            ["functions.id"],
+            name=op.f("fk_edges_callee_id_functions"),
+            ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
-            ["caller_id"], ["functions.id"], name=op.f("fk_edges_caller_id_functions"), ondelete="CASCADE"
+            ["caller_id"],
+            ["functions.id"],
+            name=op.f("fk_edges_caller_id_functions"),
+            ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_edges")),
         sa.UniqueConstraint("caller_id", "callee_id", name="ux_edges_pair"),
@@ -64,7 +73,10 @@ def _edges_table(*, with_callee_order: bool) -> sa.Table:
 
 def _rebuild_edges(*, with_callee_order: bool) -> None:
     with op.batch_alter_table(
-        "edges", schema=None, copy_from=_edges_table(with_callee_order=with_callee_order), recreate="always"
+        "edges",
+        schema=None,
+        copy_from=_edges_table(with_callee_order=with_callee_order),
+        recreate="always",
     ):
         pass
     with op.batch_alter_table("edges", schema=None) as batch_op:

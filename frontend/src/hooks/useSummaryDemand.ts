@@ -31,7 +31,6 @@ import {
   useDemandSummaryMutation,
   useReleaseSummaryDemandMutation,
 } from "@/api/queries/summaries";
-
 /** True if this function id's summary is already settled/in-flight enough
  * that re-demanding it would be pointless. Checks the function detail cache
  * first (authoritative), then falls back to any cached neighbours page's row
@@ -132,6 +131,6 @@ export function useSummaryDemand({
         releaseRef.current(functionId);
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [surface, releaseSurface]);
 }
