@@ -77,6 +77,9 @@ class SummaryResult:
     name_llm: str | None = None
     low_confidence: bool = False
     input_truncated: bool = False
+    #: False only when an adapter produced a local fallback without contacting
+    #: its provider; such a result is not connectivity evidence.
+    provider_attempted: bool = True
 
 
 @dataclass(frozen=True, slots=True)

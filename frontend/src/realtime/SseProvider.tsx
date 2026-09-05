@@ -18,6 +18,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type {
   BinaryEvent,
   InFlightItemDto,
+  LlmStatusEvent,
   QueuedItemDto,
   QueueEvent,
   ReconcileEvent,
@@ -94,6 +95,10 @@ function parseReconcileEvent(): ReconcileEvent {
   return { type: "reconcile" };
 }
 
+function parseLlmStatusEvent(): LlmStatusEvent {
+  return { type: "llm-status" };
+}
+
 function decodeEvent(eventName: string, raw: string): ServerEvent | null {
   let data: unknown = null;
   if (raw.length > 0) {
@@ -112,6 +117,8 @@ function decodeEvent(eventName: string, raw: string): ServerEvent | null {
       return parseBinaryEvent(data);
     case "reconcile":
       return parseReconcileEvent();
+    case "llm-status":
+      return parseLlmStatusEvent();
     default:
       return null;
   }
@@ -145,6 +152,7 @@ export function SseProvider({ children }: { children: ReactNode }) {
     const handleQueue = makeHandler("queue");
     const handleBinary = makeHandler("binary");
     const handleReconcile = makeHandler("reconcile");
+    const handleLlmStatus = makeHandler("llm-status");
 
     source.addEventListener("open", handleOpen);
     source.addEventListener("error", handleError);
@@ -152,6 +160,7 @@ export function SseProvider({ children }: { children: ReactNode }) {
     source.addEventListener("queue", handleQueue);
     source.addEventListener("binary", handleBinary);
     source.addEventListener("reconcile", handleReconcile);
+    source.addEventListener("llm-status", handleLlmStatus);
 
     return () => {
       source.removeEventListener("open", handleOpen);
@@ -160,6 +169,7 @@ export function SseProvider({ children }: { children: ReactNode }) {
       source.removeEventListener("queue", handleQueue);
       source.removeEventListener("binary", handleBinary);
       source.removeEventListener("reconcile", handleReconcile);
+      source.removeEventListener("llm-status", handleLlmStatus);
       source.close();
     };
   }, [queryClient]);

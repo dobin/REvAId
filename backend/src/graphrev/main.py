@@ -24,6 +24,7 @@ from graphrev.api.routers import config as config_router
 from graphrev.api.routers import events as events_router
 from graphrev.api.routers import functions as functions_router
 from graphrev.api.routers import health as health_router
+from graphrev.api.routers import llm_status as llm_status_router
 from graphrev.api.routers import neighbours as neighbours_router
 from graphrev.api.routers import queue as queue_router
 from graphrev.api.routers import summaries as summaries_router
@@ -152,13 +153,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             payload = await queue_event_payload_with_items(session, summary_queue)
         event_bus.publish("queue", payload)
 
+    async def _publish_llm_status_changed() -> None:
+        """Notify connected clients to refetch their passive status record."""
+        event_bus.publish("llm-status", {})
+
     worker_pool = SummaryWorkerPool(
         queue=summary_queue,
         adapter=llm_adapter,
         session_factory=session_factory,
         concurrency=settings.summary_concurrency,
+        configured_model=settings.llm_model,
         result_listener=_publish_summary_event,
         queue_listener=_publish_queue_event,
+        outcome_listener=_publish_llm_status_changed,
     )
     app.state.summary_queue = summary_queue
     app.state.llm_adapter = llm_adapter
@@ -219,6 +226,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(config_router.router, prefix="/api/v1")
     app.include_router(health_router.router, prefix="/api/v1")
+    app.include_router(llm_status_router.router, prefix="/api/v1")
     app.include_router(binaries_router.router, prefix="/api/v1")
     app.include_router(functions_router.router, prefix="/api/v1")
     app.include_router(neighbours_router.router, prefix="/api/v1")

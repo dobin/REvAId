@@ -287,6 +287,7 @@ class LiteLlmAdapter:
                 summary_long=_NO_DECOMPILED_CODE_LONG,
                 model=self._settings.llm_model,
                 low_confidence=True,
+                provider_attempted=False,
             )
 
         input_truncated = False

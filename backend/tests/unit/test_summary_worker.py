@@ -17,7 +17,7 @@ from graphrev.adapters.llm.base import (
     TransientProviderError,
 )
 from graphrev.core.clock import utc_now_iso
-from graphrev.db.models import Binary, Function
+from graphrev.db.models import Binary, Function, LlmWorkerStatus
 from graphrev.summarization import worker as worker_module
 from graphrev.summarization.queue import SummaryQueue
 from graphrev.summarization.worker import run_one_item
@@ -56,9 +56,11 @@ class _StubAdapter:
         return outcome
 
 
-async def _make_function(session: AsyncSession, *, name: str = "do_thing") -> Function:
+async def _make_function(
+    session: AsyncSession, *, name: str = "do_thing", binary_name: str = "acme.exe"
+) -> Function:
     now = utc_now_iso()
-    binary = Binary(name="acme.exe", version="1.0", created_at=now, updated_at=now)
+    binary = Binary(name=binary_name, version="1.0", created_at=now, updated_at=now)
     session.add(binary)
     await session.flush()
     fn = Function(
@@ -98,6 +100,11 @@ async def test_successful_summarize_persists_ready_status(
     assert fn.summary_long == "long"
     assert fn.summary_model == "stub-v1"
     assert fn.summary_input_hash is not None
+    status = await session.get(LlmWorkerStatus, 1)
+    assert status is not None
+    assert status.outcome == "success"
+    assert status.adapter == "stub"
+    assert status.model == "stub"
 
 
 async def test_successful_summarize_logs_non_null_duration_and_attempt_count(
@@ -196,6 +203,10 @@ async def test_permanent_failure_persists_error_and_caches_nothing(
     assert fn.summary_status == "error"
     assert fn.summary_error_code == "SUMMARY_PROVIDER_ERROR"
     assert fn.summary_short is None  # C6: nothing cached on failure
+    status = await session.get(LlmWorkerStatus, 1)
+    assert status is not None
+    assert status.outcome == "failure"
+    assert status.error_code == "SUMMARY_PROVIDER_ERROR"
 
 
 async def test_pinned_error_code_is_persisted(
@@ -313,6 +324,58 @@ async def test_rate_limit_pauses_queue_and_requeues_without_erroring(
     await session.refresh(fn)
     assert fn.summary_status == "pending"  # untouched by the worker on rate limit
     assert fn.summary_error_code is None
+    status = await session.get(LlmWorkerStatus, 1)
+    assert status is not None
+    assert status.outcome == "rate_limited"
+    assert status.error_code == "SUMMARY_RATE_LIMITED"
+
+
+async def test_rate_limits_back_off_then_terminally_cancel_all_queued_requests(
+    session: AsyncSession, session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """An unknown provider limit gets 30s, 60s, 120s, then stops retrying.
+
+    Clearing the monotonic deadline in this unit test simulates each pause
+    elapsing without making the test wait three and a half minutes.
+    """
+    fn = await _make_function(session)
+    second_fn = await _make_function(session, name="other_thing", binary_name="other.exe")
+    queue = SummaryQueue(max_depth=10)
+    item = queue.enqueue(fn.id, priority=1)
+    queue.enqueue(second_fn.id, priority=1)
+    await queue.pop()
+    adapter = _StubAdapter(
+        [
+            RateLimitError("slow down"),
+            RateLimitError("slow down"),
+            RateLimitError("slow down"),
+            RateLimitError("slow down"),
+        ]
+    )
+
+    expected_backoffs = (30.0, 60.0, 120.0)
+    for expected_backoff in expected_backoffs:
+        before = worker_module.time.monotonic()
+        assert await run_one_item(
+            item, queue=queue, adapter=adapter, session_factory=session_factory
+        )
+        paused_until = queue.paused_until()
+        assert paused_until is not None
+        assert paused_until - before == pytest.approx(expected_backoff, abs=0.1)
+        queue._paused_until = None
+        item = await queue.pop()
+
+    assert not await run_one_item(
+        item, queue=queue, adapter=adapter, session_factory=session_factory
+    )
+    assert adapter.calls == 4
+    await session.refresh(fn)
+    assert fn.summary_status == "error"
+    assert fn.summary_error_code == "SUMMARY_RATE_LIMITED"
+    await session.refresh(second_fn)
+    assert second_fn.summary_status == "error"
+    assert second_fn.summary_error_code == "SUMMARY_RATE_LIMITED"
+    assert not queue.is_queued(fn.id)
 
 
 async def test_adapter_health_reports_reachable() -> None:

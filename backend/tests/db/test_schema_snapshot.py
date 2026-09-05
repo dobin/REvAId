@@ -25,6 +25,7 @@ EXPECTED_TABLES = {
     "app_meta",
     "binaries",
     "functions",
+    "llm_worker_statuses",
     "edges",
     "views",
     "view_nodes",

@@ -33,7 +33,7 @@ class ServerEvent:
     for the wire rendering (``id:``/``event:``/``data:`` lines, TAD §4.2 #22)."""
 
     id: int
-    event: str  # "summary" | "queue" | "binary" | "reconcile"
+    event: str  # "summary" | "queue" | "binary" | "llm-status" | "reconcile"
     data: dict[str, object]
 
 

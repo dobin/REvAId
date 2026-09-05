@@ -16,6 +16,7 @@ import type {
   SummaryEvent,
 } from "@/api/types";
 import { QUEUE_QUERY_KEY } from "@/api/queries/queue";
+import { LLM_STATUS_QUERY_KEY } from "@/api/queries/llmStatus";
 
 /**
  * Patch a single neighbour page's rows for one summary event. Shared by the
@@ -130,6 +131,7 @@ export function reconcileAfterReconnect(qc: QueryClient): void {
   // "neighbours" invalidation's prefix match, so invalidate it explicitly.
   void qc.invalidateQueries({ queryKey: ["neighbours-infinite"] });
   void qc.invalidateQueries({ queryKey: QUEUE_QUERY_KEY });
+  void qc.invalidateQueries({ queryKey: LLM_STATUS_QUERY_KEY });
 }
 
 /** Dispatch one already-decoded `ServerEvent` to the right cache patcher. */
@@ -140,6 +142,9 @@ export function applyServerEvent(qc: QueryClient, event: ServerEvent): void {
       return;
     case "queue":
       applyQueueEvent(qc, event);
+      return;
+    case "llm-status":
+      void qc.invalidateQueries({ queryKey: LLM_STATUS_QUERY_KEY });
       return;
     case "reconcile":
       reconcileAfterReconnect(qc);

@@ -47,7 +47,9 @@ from graphrev.adapters.llm.base import (
 from graphrev.core.clock import utc_now_iso
 from graphrev.core.hashing import summary_input_hash
 from graphrev.core.logging import get_logger, log_event
+from graphrev.db.enums import LlmWorkerOutcome
 from graphrev.db.uow import unit_of_work
+from graphrev.repositories.llm_status import record_worker_outcome
 from graphrev.summarization.context import build_summary_request
 from graphrev.summarization.queue import QueueItem, SummaryQueue
 
@@ -90,6 +92,12 @@ class QueueListener(Protocol):
     frontend's queue chip/panel only updated on demand mutations or the 15s
     fallback refetch — the "LLM is thinking" progress felt dead between
     completions. Async so `main.py` can fetch display names for the payload."""
+
+    def __call__(self) -> Awaitable[None]: ...
+
+
+class OutcomeListener(Protocol):
+    """Refreshes passive client status after a meaningful provider outcome."""
 
     def __call__(self) -> Awaitable[None]: ...
 
@@ -226,14 +234,18 @@ class SummaryWorkerPool:
         concurrency: int,
         result_listener: ResultListener | None = None,
         queue_listener: QueueListener | None = None,
+        outcome_listener: OutcomeListener | None = None,
+        configured_model: str | None = None,
     ) -> None:
         self._queue = queue
         self._adapter = adapter
         self._session_factory = session_factory
         #: AM1 — never exceed what the adapter itself declares safe.
         self._concurrency = max(1, min(concurrency, adapter.max_concurrency))
+        self._configured_model = configured_model or adapter.name
         self._result_listener = result_listener
         self._queue_listener = queue_listener
+        self._outcome_listener = outcome_listener
         self._tasks: list[asyncio.Task[None]] = []
 
     @property
@@ -290,7 +302,9 @@ class SummaryWorkerPool:
                         error_code="SUMMARY_PROVIDER_ERROR",
                         result_listener=self._result_listener,
                         adapter_name=self._adapter.name,
+                        model=self._configured_model,
                         reason="unexpected worker error; see preceding traceback",
+                        outcome_listener=self._outcome_listener,
                     )
                 except Exception:  # pragma: no cover - DB may be the original failure
                     logger.exception(
@@ -312,6 +326,8 @@ class SummaryWorkerPool:
             adapter=self._adapter,
             session_factory=self._session_factory,
             result_listener=self._result_listener,
+            outcome_listener=self._outcome_listener,
+            configured_model=self._configured_model,
         )
 
 
@@ -322,6 +338,8 @@ async def run_one_item(
     adapter: LlmAdapter,
     session_factory: async_sessionmaker[AsyncSession],
     result_listener: ResultListener | None = None,
+    outcome_listener: OutcomeListener | None = None,
+    configured_model: str | None = None,
 ) -> bool:
     """Process exactly one popped :class:`QueueItem` to completion (success,
     permanent failure, or a queue-wide-pause requeue). Split out from
@@ -332,6 +350,7 @@ async def run_one_item(
     caller must NOT call `queue.complete()` in that case — the item is back
     on the queue, not finished), ``False`` otherwise."""
     function_id = item.function_id
+    configured_model = configured_model or adapter.name
     started_at = time.monotonic()
 
     async with session_factory() as session:
@@ -358,9 +377,11 @@ async def run_one_item(
                     error_code="SUMMARY_PROVIDER_ERROR",
                     result_listener=result_listener,
                     adapter_name=adapter.name,
+                    model=configured_model,
                     reason=f"timeout after {_SUMMARIZE_TIMEOUT_SECONDS}s x{attempt}",
                     duration_ms=(time.monotonic() - started_at) * 1000,
                     attempt_count=attempt,
+                    outcome_listener=outcome_listener,
                 )
                 return False
             retry_delay_seconds = _backoff_seconds(attempt)
@@ -374,8 +395,29 @@ async def run_one_item(
             )
             await asyncio.sleep(retry_delay_seconds)
             continue
-        except RateLimitError as exc:
-            queue.pause(exc.retry_after_seconds or _BASE_BACKOFF_SECONDS)
+        except RateLimitError:
+            decision = queue.register_rate_limit()
+            if decision.cancelled_function_ids:
+                await _cancel_rate_limited_requests(
+                    session_factory,
+                    function_ids=decision.cancelled_function_ids,
+                    result_listener=result_listener,
+                    adapter_name=adapter.name,
+                    model=configured_model,
+                    outcome_listener=outcome_listener,
+                )
+                return False
+            # A concurrent in-flight request can observe the active pause;
+            # it must requeue but must not advance the shared backoff cycle.
+            await _record_outcome(
+                session_factory,
+                adapter_name=adapter.name,
+                model=configured_model,
+                outcome="rate_limited",
+                function_id=function_id,
+                error_code="SUMMARY_RATE_LIMITED",
+            )
+            await _notify_outcome(outcome_listener)
             log_event(
                 logger,
                 "summary_worker.rate_limited",
@@ -384,7 +426,7 @@ async def run_one_item(
                 outcome="rate_limited",
                 duration_ms=(time.monotonic() - started_at) * 1000,
                 attempt_count=attempt + 1,
-                retry_after_seconds=exc.retry_after_seconds,
+                retry_after_seconds=decision.retry_after_seconds,
             )
             # Requeue at the item's original priority, preserving its demand
             # refcount; do not consume a retry attempt or mark the function
@@ -400,9 +442,11 @@ async def run_one_item(
                     error_code="SUMMARY_PROVIDER_ERROR",
                     result_listener=result_listener,
                     adapter_name=adapter.name,
+                    model=configured_model,
                     reason=f"{type(exc).__name__}: {exc}",
                     duration_ms=(time.monotonic() - started_at) * 1000,
                     attempt_count=attempt,
+                    outcome_listener=outcome_listener,
                 )
                 return False
             retry_delay_seconds = _backoff_seconds(attempt)
@@ -423,9 +467,11 @@ async def run_one_item(
                 error_code=_error_code_for(exc),
                 result_listener=result_listener,
                 adapter_name=adapter.name,
+                model=configured_model,
                 reason=f"{type(exc).__name__}: {exc}",
                 duration_ms=(time.monotonic() - started_at) * 1000,
                 attempt_count=attempt + 1,
+                outcome_listener=outcome_listener,
             )
             return False
         else:
@@ -438,7 +484,11 @@ async def run_one_item(
                 result_listener=result_listener,
                 duration_ms=(time.monotonic() - started_at) * 1000,
                 attempt_count=attempt + 1,
+                outcome_listener=outcome_listener,
+                configured_model=configured_model,
             )
+            if result.provider_attempted:
+                queue.record_provider_success()
             return False
 
 
@@ -452,6 +502,8 @@ async def _succeed(
     result_listener: ResultListener | None,
     duration_ms: float,
     attempt_count: int,
+    outcome_listener: OutcomeListener | None,
+    configured_model: str,
 ) -> None:
     generated_at = utc_now_iso()
     async with unit_of_work(session_factory) as session:
@@ -463,6 +515,15 @@ async def _succeed(
             input_hash=input_hash,
             generated_at=generated_at,
         )
+        if result.provider_attempted:
+            await record_worker_outcome(
+                session,
+                adapter=adapter_name,
+                model=configured_model,
+                outcome="success",
+                observed_at=generated_at,
+                function_id=function_id,
+            )
     log_event(
         logger,
         "summary_worker.completed",
@@ -486,6 +547,8 @@ async def _succeed(
             error_code=None,
             name_llm=result.name_llm,
         )
+    if result.provider_attempted:
+        await _notify_outcome(outcome_listener)
 
 
 async def _fail(
@@ -495,12 +558,25 @@ async def _fail(
     error_code: str,
     result_listener: ResultListener | None,
     adapter_name: str | None = None,
+    model: str | None = None,
     reason: str | None = None,
     duration_ms: float | None = None,
     attempt_count: int | None = None,
+    outcome_listener: OutcomeListener | None = None,
+    outcome: LlmWorkerOutcome = "failure",
 ) -> None:
     async with unit_of_work(session_factory) as session:
         binary_id = await _persist_failure(session, function_id=function_id, error_code=error_code)
+        if adapter_name is not None and model is not None:
+            await record_worker_outcome(
+                session,
+                adapter=adapter_name,
+                model=model,
+                outcome=outcome,
+                observed_at=utc_now_iso(),
+                function_id=function_id,
+                error_code=error_code,
+            )
     log_event(
         logger,
         "summary_worker.failed",
@@ -527,3 +603,54 @@ async def _fail(
             generated_at=None,
             error_code=error_code,
         )
+    await _notify_outcome(outcome_listener)
+
+
+async def _cancel_rate_limited_requests(
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    function_ids: tuple[int, ...],
+    result_listener: ResultListener | None,
+    adapter_name: str,
+    model: str,
+    outcome_listener: OutcomeListener | None,
+) -> None:
+    """Terminally cancel all work sharing an exhausted provider circuit."""
+    for function_id in function_ids:
+        await _fail(
+            session_factory,
+            function_id=function_id,
+            error_code="SUMMARY_RATE_LIMITED",
+            result_listener=result_listener,
+            adapter_name=adapter_name,
+            model=model,
+            reason="provider remained rate limited after 30s, 60s, and 120s backoff",
+            outcome_listener=outcome_listener,
+            outcome="rate_limited",
+        )
+
+
+async def _record_outcome(
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    adapter_name: str,
+    model: str,
+    outcome: LlmWorkerOutcome,
+    function_id: int,
+    error_code: str | None = None,
+) -> None:
+    async with unit_of_work(session_factory) as session:
+        await record_worker_outcome(
+            session,
+            adapter=adapter_name,
+            model=model,
+            outcome=outcome,
+            observed_at=utc_now_iso(),
+            function_id=function_id,
+            error_code=error_code,
+        )
+
+
+async def _notify_outcome(listener: OutcomeListener | None) -> None:
+    if listener is not None:
+        await listener()

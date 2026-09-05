@@ -40,6 +40,7 @@ from graphrev.core.clock import utc_now_iso
 #: convention — see docs/specs/PLAN-I7-I8-I9-I13.md §0).
 MIN_PRIORITY = 0
 MAX_PRIORITY = 3
+RATE_LIMIT_BACKOFF_SECONDS: tuple[float, ...] = (30.0, 60.0, 120.0)
 
 
 @dataclass(order=True)
@@ -77,6 +78,14 @@ class QueueSnapshot:
     inflight_started_at: dict[int, str] = field(default_factory=dict)
 
 
+@dataclass(frozen=True, slots=True)
+class RateLimitDecision:
+    """One coordinated response to a provider-wide rate limit."""
+
+    retry_after_seconds: float | None
+    cancelled_function_ids: tuple[int, ...] = ()
+
+
 class QueueFullError(Exception):
     """Raised by :meth:`SummaryQueue.enqueue` only in the (rare) case that
     even eviction cannot make room — e.g. every item in the queue is already
@@ -106,6 +115,10 @@ class SummaryQueue:
         self._inflight_started_at: dict[int, str] = {}
         self._seq_counter = itertools.count()
         self._paused_until: float | None = None
+        #: Consecutive provider-wide rate-limit cycles. This belongs to the
+        #: shared queue rather than individual functions because they share a
+        #: provider/model budget.
+        self._rate_limit_cycles = 0
 
     # -- introspection ------------------------------------------------------
 
@@ -273,9 +286,40 @@ class SummaryQueue:
         self._index[function_id] = replacement
         self._pq.put_nowait(replacement)
 
+    def register_rate_limit(self) -> RateLimitDecision:
+        """Coordinate one provider-wide 429 response.
+
+        Calls that race after the first 429 reuse the active pause and do not
+        advance the sequence. After 30s, 60s, and 120s cooldown cycles, clear
+        all work so a persistent outage cannot retry forever.
+        """
+        if self.paused_until() is not None:
+            return RateLimitDecision(retry_after_seconds=None)
+        if self._rate_limit_cycles >= len(RATE_LIMIT_BACKOFF_SECONDS):
+            cancelled = tuple(self._index)
+            for item in self._index.values():
+                item.superseded = True
+            self._index.clear()
+            self._inflight.clear()
+            self._inflight_started_at.clear()
+            return RateLimitDecision(retry_after_seconds=None, cancelled_function_ids=cancelled)
+
+        retry_after_seconds = RATE_LIMIT_BACKOFF_SECONDS[self._rate_limit_cycles]
+        self._rate_limit_cycles += 1
+        self._paused_until = time.monotonic() + retry_after_seconds
+        return RateLimitDecision(retry_after_seconds=retry_after_seconds)
+
     def pause(self, retry_after_seconds: float) -> None:
-        """Queue-wide rate-limit backoff (§5.1) — one banner, not N errors."""
+        """Directly pause the queue for tests and non-provider callers.
+
+        Provider 429 handling must use :meth:`register_rate_limit`, which
+        owns the shared exponential circuit.
+        """
         self._paused_until = time.monotonic() + max(0.0, retry_after_seconds)
+
+    def record_provider_success(self) -> None:
+        """A real provider success resets the global rate-limit streak."""
+        self._rate_limit_cycles = 0
 
     # -- internals ------------------------------------------------------------
 

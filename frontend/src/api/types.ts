@@ -342,6 +342,23 @@ export interface LlmHealthDto {
   detail: string | null;
 }
 
+export type LlmWorkerOutcome = "success" | "failure" | "rate_limited" | "no_outcome";
+
+/** Passive evidence from the latest worker outcome for the active config. */
+export interface LlmStatusDto {
+  adapter: string;
+  model: string;
+  outcome: LlmWorkerOutcome;
+  observedAt: string | null;
+  errorCode: string | null;
+}
+
+/** The result of one deliberately user-triggered live provider probe. */
+export interface LlmProbeDto {
+  reachable: boolean;
+  detail: string | null;
+}
+
 export interface DecompilerHealthDto {
   reachable: boolean;
   detail: string | null;
@@ -472,4 +489,8 @@ export interface ReconcileEvent {
   type: "reconcile";
 }
 
-export type ServerEvent = SummaryEvent | QueueEvent | BinaryEvent | ReconcileEvent;
+export interface LlmStatusEvent {
+  type: "llm-status";
+}
+
+export type ServerEvent = SummaryEvent | QueueEvent | BinaryEvent | ReconcileEvent | LlmStatusEvent;

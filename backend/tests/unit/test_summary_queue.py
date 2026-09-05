@@ -8,7 +8,7 @@ import asyncio
 
 import pytest
 
-from graphrev.summarization.queue import QueueFullError, SummaryQueue
+from graphrev.summarization.queue import RATE_LIMIT_BACKOFF_SECONDS, QueueFullError, SummaryQueue
 
 
 def test_enqueue_creates_one_item_per_function() -> None:
@@ -130,17 +130,25 @@ def test_eviction_raises_when_everything_is_inflight() -> None:
         q.enqueue(2, priority=1)
 
 
-def test_pause_sets_paused_until_in_the_future() -> None:
+def test_rate_limit_registers_first_queue_wide_pause() -> None:
     q = SummaryQueue(max_depth=10)
     assert q.paused_until() is None
-    q.pause(retry_after_seconds=60)
+    decision = q.register_rate_limit()
+    assert decision.retry_after_seconds == RATE_LIMIT_BACKOFF_SECONDS[0]
     assert q.paused_until() is not None
 
 
-def test_pause_expires_after_retry_after() -> None:
+def test_rate_limit_backoff_escalates_and_then_cancels_everything() -> None:
     q = SummaryQueue(max_depth=10)
-    q.pause(retry_after_seconds=0)
-    assert q.paused_until() is None
+    q.enqueue(1, priority=1)
+    q.enqueue(2, priority=1)
+    for expected in RATE_LIMIT_BACKOFF_SECONDS:
+        decision = q.register_rate_limit()
+        assert decision.retry_after_seconds == expected
+        q._paused_until = None
+    decision = q.register_rate_limit()
+    assert set(decision.cancelled_function_ids) == {1, 2}
+    assert len(q) == 0
 
 
 async def test_pop_blocks_until_item_available() -> None:

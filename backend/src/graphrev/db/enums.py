@@ -56,3 +56,14 @@ UtilityOverride = Literal["always", "never"]
 UTILITY_OVERRIDE_VALUES: tuple[UtilityOverride, ...] = ("always", "never")
 
 UtilitySource = Literal["computed", "analyst"]
+
+#: The latest meaningful provider outcome for one configured adapter/model.
+#: This is deliberately separate from ``Function.summary_status``: it powers
+#: passive UI diagnostics and must not confuse a queued function with a
+#: provider-connectivity assertion.
+LlmWorkerOutcome = Literal["success", "failure", "rate_limited"]
+LLM_WORKER_OUTCOME_VALUES: tuple[LlmWorkerOutcome, ...] = (
+    "success",
+    "failure",
+    "rate_limited",
+)

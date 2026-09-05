@@ -30,6 +30,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 from graphrev.db.enums import (
     EDGE_KIND_VALUES,
     FUNCTION_KIND_VALUES,
+    LLM_WORKER_OUTCOME_VALUES,
     ORIGIN_KIND_VALUES,
     SUMMARY_STATUS_VALUES,
     UTILITY_OVERRIDE_VALUES,
@@ -297,6 +298,34 @@ class AppMeta(Base):
 
     key: Mapped[str] = mapped_column(primary_key=True)
     value: Mapped[str] = mapped_column()
+
+
+class LlmWorkerStatus(Base):
+    """Latest meaningful provider outcome for an adapter/model pair.
+
+    A one-row-per-configuration record survives process restarts while making
+    no claim that the provider is reachable *right now*. It intentionally
+    stores only a public error code; raw provider exceptions remain logs-only.
+    """
+
+    __tablename__ = "llm_worker_statuses"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    adapter: Mapped[str] = mapped_column()
+    model: Mapped[str] = mapped_column()
+    outcome: Mapped[str] = mapped_column()
+    observed_at: Mapped[str] = mapped_column()
+    function_id: Mapped[int | None] = mapped_column(default=None)
+    error_code: Mapped[str | None] = mapped_column(default=None)
+
+    __table_args__ = (
+        UniqueConstraint("adapter", "model", name="ux_llm_worker_statuses_adapter_model"),
+        CheckConstraint(
+            f"outcome IN {_sql_in_list(LLM_WORKER_OUTCOME_VALUES)}",
+            name="outcome_valid",
+        ),
+        Index("ix_llm_worker_statuses_adapter_model", "adapter", "model"),
+    )
 
 
 #: A3 guard: columns ingestion is allowed to overwrite on re-ingest. Anything
