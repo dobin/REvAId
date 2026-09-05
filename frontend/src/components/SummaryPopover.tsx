@@ -2,21 +2,20 @@
  * Thin wrapper over `@radix-ui/react-popover`, styled to match the app's
  * overlay house style (mirrors `Dialog.tsx` / the neighbour-row hover
  * tooltip). Used by `CardSummary` to turn the card's one-line summary into a
- * click-to-open floating panel that shows the full `short` + `long` text
+ * hover-open floating panel that shows the full `short` + `long` text
  * (§4.3 card affordances).
  *
  * A card summary is a *wall of small clamped text* inline; on the canvas the
- * card also sits inside React Flow's `overflow: hidden` wrapper. Radix Popover
- * solves both: `Portal` escapes the clipping/z-index war, and Radix gives
- * Esc-to-close, click-outside dismissal, click-again toggle and focus
- * management for free — none of which the hand-rolled hover tooltip has.
+ * card also sits inside React Flow's `overflow: hidden` wrapper. A portalled
+ * Radix Tooltip escapes the clipping/z-index war while revealing the full
+ * text on hover (and keyboard focus).
  *
  * The trigger is rendered `asChild` so the caller owns the trigger element
  * (and can `stopPropagation` on it so opening the popover doesn't also select
  * the card / open the detail panel). Controlled `open`/`onOpenChange` so the
  * caller can also close it after an in-popover action if needed.
  */
-import * as RadixPopover from "@radix-ui/react-popover";
+import * as RadixTooltip from "@radix-ui/react-tooltip";
 import type { ReactNode } from "react";
 
 const POPOVER_WIDTH_PX = 416; // 26rem @ 16px base — matches FunctionInfoTooltip.
@@ -55,25 +54,22 @@ export function SummaryPopover({
   children: ReactNode;
 }) {
   return (
-    <RadixPopover.Root open={open} onOpenChange={onOpenChange}>
-      <RadixPopover.Trigger asChild>{trigger}</RadixPopover.Trigger>
-      <RadixPopover.Portal>
-        <RadixPopover.Content
+    <RadixTooltip.Provider delayDuration={0} skipDelayDuration={0}>
+      <RadixTooltip.Root open={open} onOpenChange={onOpenChange}>
+        <RadixTooltip.Trigger asChild>{trigger}</RadixTooltip.Trigger>
+        <RadixTooltip.Portal>
+          <RadixTooltip.Content
           side="top"
           align="start"
           sideOffset={6}
           collisionPadding={8}
           style={contentStyle}
-          // The trigger lives inside a React Flow node whose click-drag pans
-          // the canvas; keep pointer events local to the popover.
-          onPointerDownOutside={() => {
-            onOpenChange(false);
-          }}
-        >
-          {children}
-          <RadixPopover.Arrow style={arrowStyle} />
-        </RadixPopover.Content>
-      </RadixPopover.Portal>
-    </RadixPopover.Root>
+          >
+            {children}
+            <RadixTooltip.Arrow style={arrowStyle} />
+          </RadixTooltip.Content>
+        </RadixTooltip.Portal>
+      </RadixTooltip.Root>
+    </RadixTooltip.Provider>
   );
 }

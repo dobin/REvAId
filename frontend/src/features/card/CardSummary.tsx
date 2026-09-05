@@ -10,12 +10,10 @@
  * 0, TAD C7) — this is the card-level counterpart to `SummaryCell`'s
  * row-level retry.
  *
- * The full `short` + `long` text used to hide behind a native `title=`
- * tooltip — a hover-only wall of small text you couldn't scroll or read
- * comfortably. It's now a click-to-open Radix `SummaryPopover` (Esc /
- * click-outside / click-again to close, formatted via the shared
- * `SummaryBody`). The inline card text stays a 2-line clamp; a small circled
- * "i" marks that more is available on click.
+ * Hovering the inline short summary opens a portalled `SummaryPopover` with
+ * the full `short` + `long` text, formatted via the shared `SummaryBody`.
+ * The inline card text stays a 2-line clamp; a small circled "i" marks that
+ * more is available on hover.
  */
 import { useState } from "react";
 import { Glyph } from "@/components/Glyph";
@@ -62,7 +60,7 @@ export function CardSummary({ fn }: { fn: FunctionDto }) {
 
   // The error state keeps its inline retry button and is never expandable —
   // there's no `short`/`long` prose to read. Every other state (ready/stale)
-  // opens the click popover with the full summary.
+  // opens the hover tooltip with the full summary.
   if (status === "error") {
     return (
       <div style={summaryTextStyle(color)}>
@@ -98,11 +96,11 @@ export function CardSummary({ fn }: { fn: FunctionDto }) {
         trigger={
           <button
             type="button"
-            aria-label="Show full summary"
-            title="Show full summary"
-            // Opening the popover must not also select the card / open the
-            // detail panel (the card header wraps this in a click-to-select
-            // handler).
+            aria-label="Show full summary on hover"
+            title="Show full summary on hover"
+            // Clicking the hover trigger must not also select the card / open
+            // the detail panel (the card header wraps this in a
+            // click-to-select handler).
             onClick={(e) => {
               e.stopPropagation();
             }}
@@ -113,8 +111,9 @@ export function CardSummary({ fn }: { fn: FunctionDto }) {
               border: "none",
               background: "none",
               font: "inherit",
-              fontSize: "0.75rem",
-              color,
+              fontSize: "0.9375rem",
+              lineHeight: 1.4,
+              color: "#000000",
               textAlign: "left",
               cursor: "pointer",
               overflow: "hidden",

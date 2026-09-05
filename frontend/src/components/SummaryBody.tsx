@@ -1,7 +1,7 @@
 /**
  * Shared presentation of an LLM summary's `short` + `long` text, used by both
  * the neighbour-row hover tooltip (`FunctionInfoTooltip`) and the card-level
- * click popover (`SummaryPopover` via `CardSummary`). Extracted so both
+ * card hover tooltip (`SummaryPopover` via `CardSummary`). Extracted so both
  * surfaces read identically: `summary_short` is set in semibold as its own
  * block (a scannable one-liner), `summary_long` follows below in normal weight
  * with `pre-wrap` so model-emitted paragraph breaks survive.

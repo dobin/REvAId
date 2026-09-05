@@ -65,10 +65,12 @@ describe("CardSummary", () => {
         fn={{ ...baseFn, summary: { ...baseFn.summary, status: "ready", short: "Entry point." } }}
       />,
     );
-    expect(screen.getByText(/entry point/i)).toBeInTheDocument();
+    const summary = screen.getByRole("button", { name: /show full summary on hover/i });
+    expect(summary).toHaveTextContent(/entry point/i);
+    expect(summary).toHaveStyle({ fontSize: "0.9375rem", color: "rgb(0, 0, 0)" });
   });
 
-  it("opens a popover with the full long summary on click", async () => {
+  it("opens a tooltip with the full long summary on hover", async () => {
     const user = userEvent.setup();
     renderWithClient(
       <CardSummary
@@ -88,14 +90,14 @@ describe("CardSummary", () => {
       screen.queryByText(/sets up the runtime then dispatches/i),
     ).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /show full summary/i }));
+    await user.hover(screen.getByRole("button", { name: /show full summary on hover/i }));
 
     expect(
       await screen.findByText(/sets up the runtime then dispatches/i),
     ).toBeInTheDocument();
   });
 
-  it("does not bubble the click that opens the popover (card stays unselected)", async () => {
+  it("does not bubble a click on the hover trigger (card stays unselected)", async () => {
     const user = userEvent.setup();
     const onParentClick = vi.fn();
     render(
@@ -112,7 +114,7 @@ describe("CardSummary", () => {
       </QueryClientProvider>,
     );
 
-    await user.click(screen.getByRole("button", { name: /show full summary/i }));
+    await user.click(screen.getByRole("button", { name: /show full summary on hover/i }));
     expect(onParentClick).not.toHaveBeenCalled();
   });
 
