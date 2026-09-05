@@ -74,6 +74,13 @@ class LlmHealthDto(ApiModel):
     detail: str | None = None
 
 
+class DecompilerHealthDto(ApiModel):
+    """Reachability of the configured local raw-binary decompiler."""
+
+    reachable: bool
+    detail: str | None = None
+
+
 class HealthDto(ApiModel):
     status: str
     db_ok: bool
@@ -81,3 +88,4 @@ class HealthDto(ApiModel):
     ghidra_adapter: str
     llm_adapter: str
     llm_health: LlmHealthDto
+    decompiler_health: DecompilerHealthDto

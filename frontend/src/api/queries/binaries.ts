@@ -106,7 +106,21 @@ export function useImportBinaryMutation() {
   });
 }
 
+/** Upload a raw executable for local decompilation before normal ingestion. */
+export function useDecompileBinaryMutation() {
+  return useMutation({
+    mutationFn: ({ file, name, version }: { file: File; name: string; version: string }) => {
+      const params = new URLSearchParams({ name, version });
+      return apiClient.postBinary<ImportJobAcceptedDto>(`/binaries/decompile?${params.toString()}`, file);
+    },
+  });
+}
+
 /** Read the progress and final outcome of an asynchronous binary import. */
 export function fetchImportJob(jobId: string): Promise<ImportJobStatusDto> {
   return apiClient.get<ImportJobStatusDto>(`/binaries/imports/${encodeURIComponent(jobId)}`);
+}
+
+export function cancelImportJob(jobId: string): Promise<ImportJobStatusDto> {
+  return apiClient.delete<ImportJobStatusDto>(`/binaries/imports/${encodeURIComponent(jobId)}`);
 }

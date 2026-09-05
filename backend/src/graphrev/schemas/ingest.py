@@ -144,6 +144,7 @@ class ImportJobPhase(StrEnum):
 
     UPLOADING = "uploading"
     QUEUED = "queued"
+    DECOMPILING = "decompiling"
     IMPORTING = "importing"
     COMPLETED = "completed"
     FAILED = "failed"
@@ -156,6 +157,7 @@ class ImportJobAcceptedDto(ApiModel):
     job_id: str
     phase: ImportJobPhase
     bytes_received: int
+    source_kind: str
 
 
 class ImportJobStatusDto(ApiModel):
@@ -168,6 +170,8 @@ class ImportJobStatusDto(ApiModel):
     job_id: str
     phase: ImportJobPhase
     bytes_received: int
+    source_kind: str
     result: ImportResultDto | None = None
     error_message: str | None = None
+    error_code: str | None = None
     failure_samples: list[str] = Field(default_factory=list)

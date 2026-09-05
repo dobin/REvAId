@@ -109,18 +109,19 @@ export function Sidebar({
         </SidebarSection>
       )}
 
+      <SidebarSection title="Actions">
+          <ImportBinaryButton onImported={onImported} />
       {viewId !== null ? (
-        <SidebarSection title="Actions">
+        <>
           {binaryId !== null && (
             <PlaceEntryPointButton binaryId={binaryId} viewId={viewId} />
           )}
           <RebalanceButton viewId={viewId} />
           {binaryId !== null && <ResetCanvasButton binaryId={binaryId} viewId={viewId} />}
           {binaryId !== null && <ResetSummariesButton binaryId={binaryId} />}
-          <ImportBinaryButton onImported={onImported} />
-
-        </SidebarSection>
+        </>
       ) : null}
+      </SidebarSection>
 
       <SidebarSection title="LLM Connection">
         <LlmConnectionStatus />

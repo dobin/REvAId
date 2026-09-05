@@ -89,6 +89,62 @@ async def import_binary(
         raise
 
 
+@router.post(
+    "/binaries/decompile",
+    response_model=ImportJobAcceptedDto,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def decompile_binary(
+    request: Request,
+    settings: SettingsDep,
+    manager: ImportJobManagerDep,
+    name: str = Query(..., min_length=1, max_length=255),
+    version: str = Query(default="", max_length=255),
+) -> ImportJobAcceptedDto:
+    """Stream a raw binary and analyze it with the configured local decompiler."""
+    content_type = request.headers.get("content-type", "").split(";", 1)[0]
+    if content_type != "application/octet-stream":
+        raise AppError(
+            ErrorCode.VALIDATION_ERROR,
+            "Raw binary uploads must use Content-Type application/octet-stream.",
+        )
+    content_length = request.headers.get("content-length")
+    if content_length is not None:
+        try:
+            if int(content_length) > settings.decompiler_max_upload_bytes:
+                raise AppError(
+                    ErrorCode.IMPORT_TOO_LARGE,
+                    "Binary exceeds the configured upload limit.",
+                    details={"maxBytes": settings.decompiler_max_upload_bytes},
+                )
+        except ValueError as exc:
+            raise AppError(ErrorCode.VALIDATION_ERROR, "Invalid Content-Length header.") from exc
+
+    path: Path = manager.staging_path(".bin")
+    bytes_received = 0
+    try:
+        with path.open("xb") as staged_file:
+            async for chunk in request.stream():
+                bytes_received += len(chunk)
+                if bytes_received > settings.decompiler_max_upload_bytes:
+                    raise AppError(
+                        ErrorCode.IMPORT_TOO_LARGE,
+                        "Binary exceeds the configured upload limit.",
+                        details={"maxBytes": settings.decompiler_max_upload_bytes},
+                    )
+                staged_file.write(chunk)
+        return await manager.submit(
+            path,
+            bytes_received=bytes_received,
+            source_kind="raw_binary",
+            binary_name=name,
+            binary_version=version,
+        )
+    except Exception:
+        path.unlink(missing_ok=True)
+        raise
+
+
 @router.get("/binaries/imports/{job_id}", response_model=ImportJobStatusDto)
 async def get_import_status(job_id: str, manager: ImportJobManagerDep) -> ImportJobStatusDto:
     return manager.status(job_id)

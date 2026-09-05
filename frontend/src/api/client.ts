@@ -37,7 +37,7 @@ function isErrorEnvelope(value: unknown): value is ErrorEnvelope {
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
-  headers.set("Content-Type", "application/json");
+  if (!headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   const response = await fetch(`${API_BASE}${path}`, { ...init, headers });
 
   if (!response.ok) {
@@ -66,6 +66,12 @@ function jsonInit(method: string, body?: unknown): RequestInit {
 export const apiClient = {
   get: <T>(path: string) => request<T>(path, { method: "GET" }),
   post: <T>(path: string, body?: unknown) => request<T>(path, jsonInit("POST", body)),
+  postBinary: <T>(path: string, body: Blob) =>
+    request<T>(path, {
+      method: "POST",
+      body,
+      headers: { "Content-Type": "application/octet-stream" },
+    }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, jsonInit("PATCH", body)),
   delete: <T>(path: string, params?: Record<string, string>) => {
     const suffix = params ? `?${new URLSearchParams(params).toString()}` : "";

@@ -8,7 +8,13 @@
 import { useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ApiError } from "@/api/client";
-import { fetchImportJob, useBinariesQuery, useImportBinaryMutation } from "@/api/queries/binaries";
+import {
+  cancelImportJob,
+  fetchImportJob,
+  useBinariesQuery,
+  useDecompileBinaryMutation,
+  useImportBinaryMutation,
+} from "@/api/queries/binaries";
 import type { BinaryId, GhidraExportDocument } from "@/api/types";
 import { Dialog } from "@/components/Dialog";
 
@@ -27,9 +33,19 @@ const primaryButtonStyle: React.CSSProperties = {
   padding: "0.375rem 0.75rem",
   fontSize: "0.8125rem",
   borderRadius: "0.375rem",
-  border: "1px solid #d1d5db",
+  borderWidth: "1px",
+  borderStyle: "solid",
+  borderColor: "#d1d5db",
   background: "#f9fafb",
   cursor: "pointer",
+};
+
+const selectedSourceTabStyle: React.CSSProperties = {
+  ...primaryButtonStyle,
+  borderColor: "#2563eb",
+  background: "#dbeafe",
+  color: "#1d4ed8",
+  fontWeight: 600,
 };
 
 const importPollIntervalMs = 500;
@@ -55,6 +71,10 @@ export function ImportBinaryButton({
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [sourceKind, setSourceKind] = useState<"json" | "binary">("binary");
+  const [rawFile, setRawFile] = useState<File | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
+  const [phase, setPhase] = useState<string | null>(null);
   const [document, setDocument] = useState<GhidraExportDocument | null>(null);
   const [duplicateChoice, setDuplicateChoice] = useState<"overwrite" | "new" | null>(null);
   const [newBinaryName, setNewBinaryName] = useState("");
@@ -64,11 +84,15 @@ export function ImportBinaryButton({
   const inputRef = useRef<HTMLInputElement>(null);
   const importGeneration = useRef(0);
   const importMutation = useImportBinaryMutation();
+  const decompileMutation = useDecompileBinaryMutation();
   const { data: binaries } = useBinariesQuery();
 
   const reset = () => {
     importGeneration.current += 1;
     setFileName(null);
+    setRawFile(null);
+    setJobId(null);
+    setPhase(null);
     setDocument(null);
     setDuplicateChoice(null);
     setNewBinaryName("");
@@ -76,6 +100,7 @@ export function ImportBinaryButton({
     setImportError(null);
     setIsWaitingForImport(false);
     importMutation.reset();
+    decompileMutation.reset();
     if (inputRef.current) inputRef.current.value = "";
   };
 
@@ -99,25 +124,25 @@ export function ImportBinaryButton({
     }
   };
 
-  const handleImport = () => {
-    if (!document) return;
-    const binaryName = duplicateChoice === "new" ? newBinaryName.trim() : document.binary.name;
-    if (!binaryName) return;
-    const importDocument =
-      binaryName === document.binary.name
-        ? document
-        : { ...document, binary: { ...document.binary, name: binaryName } };
+  const handleRawFile = (file: File) => {
+    setParseError(null);
+    setRawFile(file);
+    setFileName(file.name);
+    setDuplicateChoice(null);
+    setNewBinaryName("");
+  };
+
+  const waitForImport = (accepted: { jobId: string }) => {
+    setJobId(accepted.jobId);
     const generation = importGeneration.current;
     setImportError(null);
-    importMutation.mutate(importDocument, {
-      onSuccess: (accepted) => {
-        if (generation !== importGeneration.current) return;
-        setIsWaitingForImport(true);
-        void (async () => {
+    setIsWaitingForImport(true);
+    void (async () => {
           try {
             while (generation === importGeneration.current) {
               const status = await fetchImportJob(accepted.jobId);
               if (generation !== importGeneration.current) return;
+              setPhase(status.phase);
 
               if (status.phase === "completed" && status.result !== null) {
                 await queryClient.invalidateQueries({ queryKey: ["binaries"] });
@@ -144,9 +169,28 @@ export function ImportBinaryButton({
             setImportError(err instanceof Error ? err.message : "Could not check import progress.");
             setIsWaitingForImport(false);
           }
-        })();
-      },
-    });
+    })();
+  };
+
+  const handleImport = () => {
+    if (sourceKind === "binary") {
+      if (!rawFile) return;
+      const binaryName = duplicateChoice === "new" ? newBinaryName.trim() : rawFile.name;
+      if (!binaryName) return;
+      decompileMutation.mutate(
+        { file: rawFile, name: binaryName, version: "" },
+        { onSuccess: waitForImport },
+      );
+      return;
+    }
+    if (!document) return;
+    const binaryName = duplicateChoice === "new" ? newBinaryName.trim() : document.binary.name;
+    if (!binaryName) return;
+    const importDocument =
+      binaryName === document.binary.name
+        ? document
+        : { ...document, binary: { ...document.binary, name: binaryName } };
+    importMutation.mutate(importDocument, { onSuccess: waitForImport });
   };
 
   const apiErrorMessage =
@@ -155,38 +199,77 @@ export function ImportBinaryButton({
       ? importMutation.error.message
       : importMutation.error
         ? "Import failed."
-        : null);
+        : decompileMutation.error instanceof ApiError
+          ? decompileMutation.error.message
+          : decompileMutation.error
+            ? "Analysis upload failed."
+            : null);
 
+  const selectedBinaryName = sourceKind === "json" ? document?.binary.name : rawFile?.name;
+  const selectedBinaryVersion = sourceKind === "json" ? (document?.binary.version ?? "") : "";
   const existingBinary =
-    document && Array.isArray(binaries)
+    selectedBinaryName && Array.isArray(binaries)
       ? binaries.find(
           (binary) =>
-            binary.name === document.binary.name &&
-            binary.version === (document.binary.version ?? ""),
+            binary.name === selectedBinaryName && binary.version === selectedBinaryVersion,
         ) ?? null
       : null;
   const needsDuplicateChoice = existingBinary !== null;
   const canImport =
-    document &&
-    (!needsDuplicateChoice || duplicateChoice !== null) &&
-    (duplicateChoice !== "new" || newBinaryName.trim().length > 0) &&
-    !importMutation.isPending &&
+    (sourceKind === "binary"
+      ? rawFile !== null &&
+        (!needsDuplicateChoice || duplicateChoice !== null) &&
+        (duplicateChoice !== "new" || newBinaryName.trim().length > 0)
+      : document &&
+        (!needsDuplicateChoice || duplicateChoice !== null) &&
+        (duplicateChoice !== "new" || newBinaryName.trim().length > 0)) &&
+    !importMutation.isPending && !decompileMutation.isPending &&
     !isWaitingForImport;
 
   return (
     <Dialog
       open={open}
       onOpenChange={handleOpenChange}
-      title="Import binary from Ghidra export"
+      title="Import or analyze binary"
       trigger={
-        <button type="button" style={buttonStyle} title="Import a Ghidra JSON export">
+        <button type="button" style={buttonStyle} title="Import a JSON export or analyze a raw binary">
           ⬆ (Re) Import binary
         </button>
       }
     >
+      <div role="tablist" aria-label="Import source" style={{ display: "flex", gap: "0.5rem", marginBottom: "0.75rem" }}>
+        <button
+          id="raw-binary-tab"
+          type="button"
+          role="tab"
+          aria-selected={sourceKind === "binary"}
+          aria-controls="binary-import-source"
+          style={sourceKind === "binary" ? selectedSourceTabStyle : primaryButtonStyle}
+          onClick={() => setSourceKind("binary")}
+        >
+          Raw binary
+        </button>
+        <button
+          id="decompiler-export-tab"
+          type="button"
+          role="tab"
+          aria-selected={sourceKind === "json"}
+          aria-controls="binary-import-source"
+          style={sourceKind === "json" ? selectedSourceTabStyle : primaryButtonStyle}
+          onClick={() => setSourceKind("json")}
+        >
+          .json Export
+        </button>
+      </div>
+
+      <div
+        id="binary-import-source"
+        role="tabpanel"
+        aria-labelledby={sourceKind === "binary" ? "raw-binary-tab" : "decompiler-export-tab"}
+      >
+      {sourceKind === "json" ? <>
       <p style={{ margin: "0 0 0.75rem", fontSize: "0.8125rem", color: "#6b7280" }}>
-        Select a JSON file produced by <code>GraphRevExport.java</code>. Re-importing the
-        same binary updates it without losing your names or notes.
+        Select a JSON file produced by <code>GraphRevExport.java</code>. Re-importing the same binary updates it without losing your names or notes.
       </p>
 
       <input
@@ -207,7 +290,16 @@ export function ImportBinaryButton({
         </p>
       )}
 
-      {needsDuplicateChoice && document && !isWaitingForImport && (
+      </> : <>
+        <p style={{ margin: "0 0 0.75rem", fontSize: "0.8125rem", color: "#6b7280" }}>
+          Upload a binary for analysis by the configured local <code>kuna</code> decompiler.
+        </p>
+        <input ref={inputRef} type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) handleRawFile(file); }} style={{ fontSize: "0.8125rem", marginBottom: "0.75rem" }} />
+        {rawFile && <p style={{ margin: "0 0 0.75rem", fontSize: "0.8125rem" }}>Ready to analyze <strong>{rawFile.name}</strong> ({Math.ceil(rawFile.size / 1024)} KiB).</p>}
+      </>}
+      </div>
+
+      {needsDuplicateChoice && selectedBinaryName && !isWaitingForImport && (
         <div
           role="alert"
           style={{
@@ -219,7 +311,7 @@ export function ImportBinaryButton({
             fontSize: "0.8125rem",
           }}
         >
-          <strong>{document.binary.name}</strong> already exists.
+          <strong>{selectedBinaryName}</strong> already exists.
           <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
             <button
               type="button"
@@ -245,7 +337,7 @@ export function ImportBinaryButton({
                 type="text"
                 value={newBinaryName}
                 onChange={(event) => setNewBinaryName(event.target.value)}
-                placeholder={`${document.binary.name} (copy)`}
+                placeholder={`${selectedBinaryName} (copy)`}
                 style={{ display: "block", width: "100%", boxSizing: "border-box", marginTop: "0.25rem" }}
               />
             </label>
@@ -254,22 +346,25 @@ export function ImportBinaryButton({
       )}
 
       {parseError && (
-        <p style={{ margin: "0 0 0.75rem", fontSize: "0.8125rem", color: "#b91c1c" }}>
+        <p role="alert" style={{ margin: "0 0 0.75rem", fontSize: "0.8125rem", color: "#b91c1c" }}>
           {parseError}
         </p>
       )}
 
       {apiErrorMessage && (
-        <p style={{ margin: "0 0 0.75rem", fontSize: "0.8125rem", color: "#b91c1c" }}>
+        <p role="alert" style={{ margin: "0 0 0.75rem", fontSize: "0.8125rem", color: "#b91c1c" }}>
           {apiErrorMessage}
         </p>
       )}
+
+      {isWaitingForImport && <p aria-live="polite" style={{ margin: "0 0 0.75rem", fontSize: "0.8125rem", color: "#6b7280" }}>{phase === "decompiling" ? "Decompiling binary…" : phase === "importing" ? "Importing analysis…" : "Queued for import…"}</p>}
 
       <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
         <button
           type="button"
           style={{ ...primaryButtonStyle, background: "#ffffff" }}
           onClick={() => {
+            if (jobId && phase === "decompiling") void cancelImportJob(jobId);
             handleOpenChange(false);
           }}
         >
@@ -285,7 +380,7 @@ export function ImportBinaryButton({
           disabled={!canImport}
           onClick={handleImport}
         >
-          {importMutation.isPending || isWaitingForImport ? "Importing…" : "Import"}
+          {importMutation.isPending || decompileMutation.isPending || isWaitingForImport ? "Working…" : sourceKind === "binary" ? "Analyze binary" : "Import"}
         </button>
       </div>
     </Dialog>

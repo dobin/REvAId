@@ -321,3 +321,28 @@ async def test_import_status_404_for_unknown_job(client: AsyncClient) -> None:
     response = await client.get("/api/v1/binaries/imports/not-a-job")
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "IMPORT_JOB_NOT_FOUND"
+
+
+@pytest.mark.asyncio
+async def test_decompile_binary_rejects_wrong_content_type(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/v1/binaries/decompile?name=sample.exe",
+        content=b"MZ",
+        headers={"content-type": "application/json"},
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+@pytest.mark.asyncio
+async def test_decompile_binary_reports_unavailable_decompiler(client: AsyncClient) -> None:
+    response = await client.post(
+        "/api/v1/binaries/decompile?name=sample.exe&version=1.0",
+        content=b"MZ",
+        headers={"content-type": "application/octet-stream"},
+    )
+    assert response.status_code == 202
+    body = await _wait_for_import(client, response.json()["jobId"])
+    assert body["phase"] == "failed"
+    assert body["errorCode"] == "DECOMPILER_UNAVAILABLE"
+    assert body["sourceKind"] == "raw_binary"

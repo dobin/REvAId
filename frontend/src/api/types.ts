@@ -72,13 +72,14 @@ export interface ImportResultDto {
   failures: string[];
 }
 
-export type ImportJobPhase = "uploading" | "queued" | "importing" | "completed" | "failed" | "cancelled";
+export type ImportJobPhase = "uploading" | "queued" | "decompiling" | "importing" | "completed" | "failed" | "cancelled";
 
 /** `POST /binaries/import` response. The import continues asynchronously. */
 export interface ImportJobAcceptedDto {
   jobId: string;
   phase: ImportJobPhase;
   bytesReceived: number;
+  sourceKind?: "json_export" | "raw_binary";
 }
 
 /** `GET /binaries/imports/{jobId}` response. */
@@ -88,6 +89,7 @@ export interface ImportJobStatusDto {
   bytesReceived: number;
   result: ImportResultDto | null;
   errorMessage: string | null;
+  errorCode?: string | null;
   failureSamples: string[];
 }
 
@@ -340,6 +342,11 @@ export interface LlmHealthDto {
   detail: string | null;
 }
 
+export interface DecompilerHealthDto {
+  reachable: boolean;
+  detail: string | null;
+}
+
 export interface HealthDto {
   status: string;
   dbOk: boolean;
@@ -349,6 +356,7 @@ export interface HealthDto {
   // AM5: adapter reachability, so the UI can tell "no summaries because
   // misconfigured" from "no summaries yet".
   llmHealth: LlmHealthDto;
+  decompilerHealth: DecompilerHealthDto;
 }
 
 /** Machine-readable error codes (E4). */
@@ -363,6 +371,12 @@ export type ErrorCode =
   | "SUMMARY_PROVIDER_ERROR"
   | "SUMMARY_RATE_LIMITED"
   | "QUEUE_FULL"
+  | "IMPORT_TOO_LARGE"
+  | "IMPORT_JOB_NOT_FOUND"
+  | "DECOMPILER_UNAVAILABLE"
+  | "DECOMPILER_TIMEOUT"
+  | "DECOMPILER_FAILED"
+  | "DECOMPILER_OUTPUT_TOO_LARGE"
   | "LAST_VIEW_DELETE_FORBIDDEN"
   | "PUBLIC_MODE_FORBIDDEN"
   | "GHIDRA_PROGRAM_MISMATCH"

@@ -24,6 +24,7 @@ function jsonFile(name: string, content: string): File {
 
 function openDialogAndUpload(file: File) {
   fireEvent.click(screen.getByRole("button", { name: /\(re\) import binary/i }));
+  fireEvent.click(screen.getByRole("tab", { name: /.json export/i }));
   const input = document.querySelector('input[type="file"]') as HTMLInputElement;
   fireEvent.change(input, { target: { files: [file] } });
 }
@@ -94,9 +95,9 @@ describe("ImportBinaryButton", () => {
     renderButton();
     openDialogAndUpload(jsonFile("bad.json", "not json{"));
 
-    expect(
-      await screen.findByText(/could not read the file|not a ghidra|unexpected|json/i),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /could not read the file|not a ghidra|unexpected|json/i,
+    );
   });
 
   it("refreshes after the import job completes, then calls onImported", async () => {
