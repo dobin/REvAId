@@ -43,15 +43,23 @@ export function useViewNodeActions(viewId: ViewId) {
 
   return {
     setVisible: (functionId: FunctionId, visible: boolean) => {
-      // Hiding a card orphans its callees (their connector edges vanish with
-      // the parent, D8b), so hide the whole provenance subtree with it.
+      // A shown fan-in node means this card sits within an expanded branch;
+      // hide its callee subtree with it. With no shown callers it is the
+      // left-most displayed card, so retain its children to shorten the tree
+      // one card at a time.
       // Re-showing only restores the card itself — the user can re-fan-out.
       let upsert: { functionId: FunctionId; visible: boolean }[] = [
         { functionId, visible },
       ];
       if (!visible) {
         const view = queryClient.getQueryData<ViewDto>(["view", viewId]);
-        if (view) {
+        const hasShownCaller = view?.nodes.some(
+          (node) =>
+            node.visible &&
+            node.originFunctionId === functionId &&
+            node.originKind === "fanin",
+        );
+        if (view && hasShownCaller) {
           upsert = upsert.concat(
             [...descendantCallees(view.nodes, functionId)].map((id) => ({
               functionId: id,
