@@ -18,12 +18,17 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from graphrev.core.config import Settings
 from graphrev.core.errors import AppError, ErrorCode
+from graphrev.core.logging import get_logger, log_event
 from graphrev.schemas.ingest import (
     ImportJobAcceptedDto,
     ImportJobPhase,
     ImportJobStatusDto,
 )
 from graphrev.services.binary_service import import_ghidra_export, load_ghidra_export_file
+
+logger = get_logger(__name__)
+
+_DECOMPILER_DIAGNOSTIC_LIMIT = 16 * 1024
 
 
 @dataclass
@@ -189,8 +194,10 @@ class ImportJobManager:
                     source_kind=job.source_kind,
                     error_message=exc.message,
                     error_code=exc.code,
+                    error_details=exc.details,
                 )
-            except Exception:
+                self._log_failure(job, error_code=exc.code, message=exc.message, details=exc.details)
+            except Exception as exc:
                 job.phase = ImportJobPhase.FAILED
                 job.result = ImportJobStatusDto(
                     job_id=job.job_id,
@@ -199,6 +206,7 @@ class ImportJobManager:
                     source_kind=job.source_kind,
                     error_message="Import failed unexpectedly.",
                 )
+                self._log_failure(job, message="Import failed unexpectedly.", exception=exc)
             finally:
                 job.path.unlink(missing_ok=True)
                 if job.output_path is not None:
@@ -214,6 +222,34 @@ class ImportJobManager:
             source_kind=job.source_kind,
         )
 
+    def _log_failure(
+        self,
+        job: _ImportJob,
+        *,
+        message: str,
+        error_code: ErrorCode | None = None,
+        details: dict[str, object] | None = None,
+        exception: Exception | None = None,
+    ) -> None:
+        """Record terminal import failures without exposing diagnostics by default."""
+        log_event(
+            logger,
+            "ingestion.import_failed",
+            function_id=None,
+            binary_id=None,
+            duration_ms=0,
+            adapter="kuna" if job.source_kind == "raw_binary" else "file",
+            model=None,
+            outcome="error",
+            job_id=job.job_id,
+            source_kind=job.source_kind,
+            phase=job.phase,
+            error_code=error_code,
+            message=message,
+            details=details,
+            error=str(exception) if exception is not None else None,
+        )
+
     async def _run_decompiler(self, job: _ImportJob) -> None:
         executable = self._settings.decompiler_executable
         if executable is None or not Path(executable).is_file():
@@ -221,36 +257,53 @@ class ImportJobManager:
                 ErrorCode.DECOMPILER_UNAVAILABLE, "The configured decompiler is unavailable."
             )
         assert job.output_path is not None
-        job.process = await asyncio.create_subprocess_exec(
-            executable,
-            "graph-export",
-            str(job.path),
-            "-o",
-            str(job.output_path),
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-        )
-        process = job.process
         try:
-            return_code = await asyncio.wait_for(
-                process.wait(), timeout=self._settings.decompiler_timeout_seconds
+            job.process = await asyncio.create_subprocess_exec(
+                executable,
+                "decompile-graph",
+                str(job.path),
+                "-o",
+                str(job.output_path),
+                stdout=asyncio.subprocess.DEVNULL,
+                stderr=asyncio.subprocess.PIPE,
             )
+        except OSError as exc:
+            raise AppError(
+                ErrorCode.DECOMPILER_UNAVAILABLE,
+                "The configured decompiler could not be started.",
+                details={"reason": str(exc)},
+            ) from exc
+        process = job.process
+        communicate_task = asyncio.create_task(process.communicate())
+        try:
+            _stdout, stderr = await asyncio.wait_for(
+                asyncio.shield(communicate_task), timeout=self._settings.decompiler_timeout_seconds
+            )
+            return_code = process.returncode
         except TimeoutError as exc:
             process.terminate()
             try:
                 await asyncio.wait_for(
-                    process.wait(), timeout=self._settings.decompiler_kill_grace_seconds
+                    asyncio.shield(communicate_task), timeout=self._settings.decompiler_kill_grace_seconds
                 )
             except TimeoutError:
                 process.kill()
-                await process.wait()
+                await communicate_task
             raise AppError(ErrorCode.DECOMPILER_TIMEOUT, "Decompiler timed out.") from exc
         finally:
             job.process = None
         if job.cancelled:
             return
         if return_code != 0:
-            raise AppError(ErrorCode.DECOMPILER_FAILED, "Decompiler failed to export the binary.")
+            diagnostic = (stderr or b"").decode("utf-8", errors="replace").strip()
+            details: dict[str, object] = {"exitCode": return_code}
+            if diagnostic:
+                details["stderr"] = diagnostic[:_DECOMPILER_DIAGNOSTIC_LIMIT]
+            raise AppError(
+                ErrorCode.DECOMPILER_FAILED,
+                "Decompiler failed to export the binary. Check the error details or server log.",
+                details=details,
+            )
         if not job.output_path.is_file() or job.output_path.stat().st_size == 0:
             raise AppError(ErrorCode.DECOMPILER_FAILED, "Decompiler did not produce an export.")
         if job.output_path.stat().st_size > self._settings.decompiler_max_output_bytes:

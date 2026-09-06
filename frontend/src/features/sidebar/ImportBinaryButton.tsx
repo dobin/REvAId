@@ -48,6 +48,23 @@ const selectedSourceTabStyle: React.CSSProperties = {
   fontWeight: 600,
 };
 
+const selectedDuplicateChoiceStyle: React.CSSProperties = {
+  ...primaryButtonStyle,
+  borderColor: "#b45309",
+  background: "#fef3c7",
+  color: "#78350f",
+  boxShadow: "0 0 0 2px #fde68a",
+  fontWeight: 700,
+};
+
+const fileSelectionStyle: React.CSSProperties = {
+  marginBottom: "0.75rem",
+  padding: "0.75rem",
+  border: "1px solid #bfdbfe",
+  borderRadius: "0.5rem",
+  background: "#eff6ff",
+};
+
 const importPollIntervalMs = 500;
 
 function parseExport(text: string): GhidraExportDocument {
@@ -61,6 +78,17 @@ function parseExport(text: string): GhidraExportDocument {
     throw new Error("Not a Ghidra export: missing 'schemaVersion' or 'binary'.");
   }
   return parsed as GhidraExportDocument;
+}
+
+function importFailureMessage(status: {
+  phase: string;
+  errorMessage: string | null;
+  errorDetails?: Record<string, unknown> | null;
+}): string {
+  const fallback = status.phase === "cancelled" ? "Import was cancelled." : "Import failed.";
+  const message = status.errorMessage ?? fallback;
+  const diagnostic = status.errorDetails?.reason ?? status.errorDetails?.stderr;
+  return typeof diagnostic === "string" && diagnostic ? `${message} ${diagnostic}` : message;
 }
 
 export function ImportBinaryButton({
@@ -152,10 +180,7 @@ export function ImportBinaryButton({
                 return;
               }
               if (status.phase === "failed" || status.phase === "cancelled") {
-                setImportError(
-                  status.errorMessage ??
-                    (status.phase === "cancelled" ? "Import was cancelled." : "Import failed."),
-                );
+                setImportError(importFailureMessage(status));
                 setIsWaitingForImport(false);
                 return;
               }
@@ -266,8 +291,10 @@ export function ImportBinaryButton({
         id="binary-import-source"
         role="tabpanel"
         aria-labelledby={sourceKind === "binary" ? "raw-binary-tab" : "decompiler-export-tab"}
+        style={fileSelectionStyle}
       >
       {sourceKind === "json" ? <>
+      <strong style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>1. Select export file</strong>
       <p style={{ margin: "0 0 0.75rem", fontSize: "0.8125rem", color: "#6b7280" }}>
         Select a JSON file produced by <code>GraphRevExport.java</code>. Re-importing the same binary updates it without losing your names or notes.
       </p>
@@ -291,6 +318,7 @@ export function ImportBinaryButton({
       )}
 
       </> : <>
+        <strong style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>1. Select binary file</strong>
         <p style={{ margin: "0 0 0.75rem", fontSize: "0.8125rem", color: "#6b7280" }}>
           Upload a binary for analysis by the configured local <code>kuna</code> decompiler.
         </p>
@@ -312,10 +340,11 @@ export function ImportBinaryButton({
           }}
         >
           <strong>{selectedBinaryName}</strong> already exists.
+          <strong style={{ display: "block", marginTop: "0.5rem" }}>2. Choose how to handle it</strong>
           <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
             <button
               type="button"
-              style={primaryButtonStyle}
+              style={duplicateChoice === "overwrite" ? selectedDuplicateChoiceStyle : primaryButtonStyle}
               aria-pressed={duplicateChoice === "overwrite"}
               onClick={() => { setDuplicateChoice("overwrite"); }}
             >
@@ -323,7 +352,7 @@ export function ImportBinaryButton({
             </button>
             <button
               type="button"
-              style={primaryButtonStyle}
+              style={duplicateChoice === "new" ? selectedDuplicateChoiceStyle : primaryButtonStyle}
               aria-pressed={duplicateChoice === "new"}
               onClick={() => { setDuplicateChoice("new"); }}
             >

@@ -13,6 +13,7 @@ of the API, TAD §4) and ``snake_case`` in Python via :class:`ApiModel`.
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Any, Literal
 
 from pydantic import Field, model_validator
 
@@ -174,4 +175,5 @@ class ImportJobStatusDto(ApiModel):
     result: ImportResultDto | None = None
     error_message: str | None = None
     error_code: str | None = None
+    error_details: dict[str, Any] | None = None
     failure_samples: list[str] = Field(default_factory=list)

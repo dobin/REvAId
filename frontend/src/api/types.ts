@@ -90,6 +90,7 @@ export interface ImportJobStatusDto {
   result: ImportResultDto | null;
   errorMessage: string | null;
   errorCode?: string | null;
+  errorDetails?: Record<string, unknown> | null;
   failureSamples: string[];
 }
 

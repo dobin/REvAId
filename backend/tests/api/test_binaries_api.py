@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from pathlib import Path
 
 import pytest
 from httpx import AsyncClient
@@ -298,6 +299,53 @@ async def test_import_binary_rejects_unsupported_schema(client: AsyncClient) -> 
 async def test_import_binary_rejects_malformed_body(client: AsyncClient) -> None:
     body = await _submit_import(client, {"not": "an export"})
     assert body["phase"] == "failed"
+    assert body["errorCode"] == "VALIDATION_ERROR"
+    assert body["errorMessage"] == "The staged export is not a valid GraphRev Ghidra JSON document."
+    assert "schemaVersion" in body["errorDetails"]["reason"]
+
+
+@pytest.mark.asyncio
+async def test_import_binary_reports_parse_failure_and_logs_it(
+    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    events: list[tuple[str, dict[str, object]]] = []
+
+    def record_event(_logger: object, event: str, **fields: object) -> None:
+        events.append((event, fields))
+
+    monkeypatch.setattr("graphrev.ingestion.import_jobs.log_event", record_event)
+    response = await client.post(
+        "/api/v1/binaries/import",
+        content=b'{"schemaVersion":',
+        headers={"content-type": "application/json"},
+    )
+    assert response.status_code == 202
+
+    body = await _wait_for_import(client, response.json()["jobId"])
+    assert body["phase"] == "failed"
+    assert body["errorCode"] == "VALIDATION_ERROR"
+    assert body["errorMessage"] == "The staged export is not a valid GraphRev Ghidra JSON document."
+    assert "Expecting value" in body["errorDetails"]["reason"]
+    assert events == [
+        (
+            "ingestion.import_failed",
+            {
+                "function_id": None,
+                "binary_id": None,
+                "duration_ms": 0,
+                "adapter": "file",
+                "model": None,
+                "outcome": "error",
+                "job_id": body["jobId"],
+                "source_kind": "json_export",
+                "phase": "failed",
+                "error_code": "VALIDATION_ERROR",
+                "message": body["errorMessage"],
+                "details": body["errorDetails"],
+                "error": None,
+            },
+        )
+    ]
 
 
 @pytest.mark.asyncio
@@ -370,3 +418,25 @@ async def test_decompile_binary_reports_unavailable_decompiler(
     assert body["phase"] == "failed"
     assert body["errorCode"] == "DECOMPILER_UNAVAILABLE"
     assert body["sourceKind"] == "raw_binary"
+
+
+@pytest.mark.asyncio
+async def test_decompile_binary_reports_start_failure(
+    client: AsyncClient, settings: Settings, tmp_path: Path
+) -> None:
+    executable = tmp_path / "not-executable-kuna"
+    executable.write_text("not an executable", encoding="utf-8")
+    settings.decompiler_executable = str(executable)
+
+    response = await client.post(
+        "/api/v1/binaries/decompile?name=sample.exe",
+        content=b"MZ",
+        headers={"content-type": "application/octet-stream"},
+    )
+    assert response.status_code == 202
+    body = await _wait_for_import(client, response.json()["jobId"])
+    assert body["phase"] == "failed"
+    assert body["errorCode"] == "DECOMPILER_UNAVAILABLE"
+    assert body["errorMessage"] == "The configured decompiler could not be started."
+    assert body["errorDetails"] is not None
+    assert "Permission denied" in body["errorDetails"]["reason"]
