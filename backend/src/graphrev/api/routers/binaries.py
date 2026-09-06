@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 from fastapi import APIRouter, Query, Request, status
@@ -15,6 +16,20 @@ from graphrev.schemas.search import EntryPointsDto, FunctionSearchPageDto
 from graphrev.services import binary_service, function_service, search_service
 
 router = APIRouter(tags=["binaries"])
+
+
+_SAFE_BINARY_FILENAME_RE = re.compile(r"^[A-Za-z0-9_.()-]+$")
+
+
+def _validate_binary_filename(name: str) -> None:
+    """Allow only safe filename characters supplied by raw-binary upload clients."""
+    if not _SAFE_BINARY_FILENAME_RE.fullmatch(name):
+        raise AppError(
+            ErrorCode.VALIDATION_ERROR,
+            "Binary filename must contain only ASCII letters, digits, hyphens, underscores, "
+            "dots, and parentheses.",
+            details={"name": name},
+        )
 
 
 def _parse_address(raw: str) -> int:
@@ -102,6 +117,7 @@ async def decompile_binary(
     version: str = Query(default="", max_length=255),
 ) -> ImportJobAcceptedDto:
     """Stream a raw binary and analyze it with the configured local decompiler."""
+    _validate_binary_filename(name)
     content_type = request.headers.get("content-type", "").split(";", 1)[0]
     if content_type != "application/octet-stream":
         raise AppError(

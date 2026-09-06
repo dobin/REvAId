@@ -335,9 +335,33 @@ async def test_decompile_binary_rejects_wrong_content_type(client: AsyncClient) 
 
 
 @pytest.mark.asyncio
-async def test_decompile_binary_reports_unavailable_decompiler(client: AsyncClient) -> None:
+@pytest.mark.parametrize("name", ["sample copy.exe", "sample!.exe", "../sample.exe", "résumé.exe"])
+async def test_decompile_binary_rejects_unsafe_filename(
+    client: AsyncClient, name: str
+) -> None:
     response = await client.post(
-        "/api/v1/binaries/decompile?name=sample.exe&version=1.0",
+        "/api/v1/binaries/decompile",
+        params={"name": name},
+        content=b"MZ",
+        headers={"content-type": "application/octet-stream"},
+    )
+    assert response.status_code == 422
+    assert response.json()["error"] == {
+        "code": "VALIDATION_ERROR",
+        "message": "Binary filename must contain only ASCII letters, digits, hyphens, underscores, "
+        "dots, and parentheses.",
+        "details": {"name": name},
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("name", ["sample.exe", "sample.tar.gz", "sample(copy).exe"])
+async def test_decompile_binary_reports_unavailable_decompiler(
+    client: AsyncClient, name: str
+) -> None:
+    response = await client.post(
+        "/api/v1/binaries/decompile",
+        params={"name": name, "version": "1.0"},
         content=b"MZ",
         headers={"content-type": "application/octet-stream"},
     )
