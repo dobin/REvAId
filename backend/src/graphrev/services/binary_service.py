@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from graphrev.adapters.ghidra import create_file_adapter
 from graphrev.core.config import Settings
 from graphrev.core.errors import AppError, ErrorCode
+from graphrev.core.ids import public_binary_name
 from graphrev.ingestion.pipeline import run_ingestion
 from graphrev.repositories.binaries import (
     delete_binary,
@@ -134,9 +135,33 @@ async def import_ghidra_export(
             },
         )
 
+    if settings.public_mode:
+        document = document.model_copy(
+            update={
+                "binary": document.binary.model_copy(
+                    update={"name": public_binary_name(document.binary.name)}
+                )
+            }
+        )
+        async with session_factory() as session:
+            existing = await get_binary_by_name_version(
+                session,
+                name=document.binary.name,
+                version=document.binary.version,
+            )
+        if existing is not None:
+            raise AppError(
+                ErrorCode.BINARY_ALREADY_EXISTS,
+                "Public mode does not allow overwriting an existing binary.",
+                details={"name": document.binary.name, "version": document.binary.version},
+            )
+
     adapter = create_file_adapter(document)
     reports = await run_ingestion(
-        session_factory, adapter, settings, binary_filter=document.binary.name
+        session_factory,
+        adapter,
+        settings,
+        binary_filter=document.binary.name,
     )
 
     # `run_ingestion` yields one report; `binary_filter` restricts it to the

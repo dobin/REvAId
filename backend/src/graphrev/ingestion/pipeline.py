@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from graphrev.adapters.ghidra.base import GhidraAdapter, RawBinaryRef, RawEdge, RawFunction
 from graphrev.core.config import Settings
+from graphrev.core.errors import AppError, ErrorCode
 from graphrev.core.logging import get_logger, log_event
 from graphrev.db.models import Function, View
 from graphrev.db.seed import create_default_view
@@ -82,13 +83,19 @@ async def _ingest_one_binary(
 ) -> BinaryIngestionReport:
     report = BinaryIngestionReport(binary_name=binary_ref.name)
 
-    binary, _created = await get_or_create_binary(
+    binary, created = await get_or_create_binary(
         session,
         name=binary_ref.name,
         version=binary_ref.version,
         source_path=binary_source_path,
         analysis_image_base=analysis_image_base,
     )
+    if settings.public_mode and not created:
+        raise AppError(
+            ErrorCode.BINARY_ALREADY_EXISTS,
+            "Public mode does not allow overwriting an existing binary.",
+            details={"name": binary_ref.name, "version": binary_ref.version},
+        )
 
     # -- functions -------------------------------------------------------
     # The adapter may raise while yielding. Preserve the historic A4 behaviour
@@ -241,6 +248,7 @@ async def _ingest_edge_batch(
             EdgeUpsertValues(
                 caller_id=address_to_id[edge.caller_address],
                 callee_id=address_to_id[edge.callee_address],
+                kind=edge.kind,
                 callee_order=edge.callee_order,
             )
             for edge in edges
@@ -261,6 +269,7 @@ async def _ingest_edge_batch(
                         binary_id=binary_id,
                         caller_id=caller_id,
                         callee_id=callee_id,
+                        kind=edge.kind,
                         callee_order=edge.callee_order,
                     )
                 if inserted:
@@ -330,6 +339,8 @@ async def run_ingestion(
                 )
                 await _write_utility_threshold_bookkeeping(session, settings)
             reports.append(report)
+        except AppError:
+            raise
         except Exception as exc:
             failed_report = BinaryIngestionReport(binary_name=raw_binary.name)
             failed_report.binary_failed = True

@@ -56,6 +56,10 @@ When `publicMode` is **true**:
   disclosed by a listing.
 - `GET /binaries` redacts `lastViewId` to `null` so the owner's last-used
   view cannot leak through the binary listing.
+- Binary imports are always created under a new name prefixed with four
+  cryptographically random lowercase letters and an underscore (for example,
+  `abcd_sample.exe`). If that generated `(name, version)` already exists, the
+  import fails rather than refreshing or overwriting it.
 
 **Frontend (no listing call at all).**
 

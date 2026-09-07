@@ -287,6 +287,31 @@ async def test_import_binary_is_idempotent(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
+async def test_public_import_randomizes_name_and_refuses_overwrite(
+    client: AsyncClient,
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings.public_mode = True
+    monkeypatch.setattr(
+        "graphrev.services.binary_service.public_binary_name",
+        lambda name: f"abcd_{name}",
+    )
+
+    first = await _submit_import(client, _import_document())
+    assert first["phase"] == "completed"
+    assert first["result"]["name"] == "abcd_imported.exe"
+
+    second = await _submit_import(client, _import_document())
+    assert second["phase"] == "failed"
+    assert second["errorCode"] == "BINARY_ALREADY_EXISTS"
+    assert second["errorMessage"] == "Public mode does not allow overwriting an existing binary."
+
+    listing = (await client.get("/api/v1/binaries")).json()
+    assert [b["name"] for b in listing] == ["abcd_imported.exe"]
+
+
+@pytest.mark.asyncio
 async def test_import_binary_rejects_unsupported_schema(client: AsyncClient) -> None:
     doc = _import_document()
     doc["schemaVersion"] = 999
