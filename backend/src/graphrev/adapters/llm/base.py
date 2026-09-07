@@ -55,6 +55,10 @@ class SummaryRequest:
     binary_name: str
     binary_version: str
     source_path: str | None
+    #: Stable for one queued generation, including provider and rate-limit
+    #: retries. Used by providers such as OpenCode Go for routing and prompt
+    #: caching; a later explicit regeneration receives a fresh value.
+    session_id: str = ""
 
 
 @dataclass(frozen=True, slots=True)

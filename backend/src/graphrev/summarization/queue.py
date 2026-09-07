@@ -30,6 +30,7 @@ from __future__ import annotations
 import asyncio
 import itertools
 import time
+import uuid
 from dataclasses import dataclass, field
 
 from graphrev.core.clock import utc_now_iso
@@ -58,6 +59,7 @@ class QueueItem:
     seq: int
     function_id: int = field(compare=False)
     demand: int = field(compare=False, default=0)
+    session_id: str = field(compare=False, default_factory=lambda: uuid.uuid4().hex)
     #: Set on the stale copy left behind by a priority upgrade so the pop
     #: loop can silently discard it instead of re-processing a function
     #: that already has a fresher, live `QueueItem` in `_index`.
@@ -282,6 +284,7 @@ class SummaryQueue:
             seq=next(self._seq_counter),
             function_id=function_id,
             demand=demand,
+            session_id=current.session_id if current is not None else uuid.uuid4().hex,
         )
         self._index[function_id] = replacement
         self._pq.put_nowait(replacement)
@@ -330,6 +333,7 @@ class SummaryQueue:
             seq=next(self._seq_counter),
             function_id=item.function_id,
             demand=item.demand,
+            session_id=item.session_id,
         )
         self._index[item.function_id] = replacement
         self._pq.put_nowait(replacement)

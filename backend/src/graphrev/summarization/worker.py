@@ -29,6 +29,7 @@ import contextlib
 import random
 import time
 from collections.abc import Awaitable
+from dataclasses import replace
 from typing import Protocol, cast
 
 from sqlalchemy import text
@@ -355,6 +356,7 @@ async def run_one_item(
 
     async with session_factory() as session:
         req = await build_summary_request(session, function_id=function_id)
+    req = replace(req, session_id=item.session_id)
 
     input_hash = summary_input_hash(
         name=req.analyst_name or req.name,

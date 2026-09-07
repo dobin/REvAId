@@ -33,6 +33,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import uuid
+from urllib.parse import urlparse
 
 import litellm
 from litellm.exceptions import (
@@ -84,6 +86,25 @@ _SUMMARY_SHORT_MAX_CHARS = 120
 #: decompiled functions; the point is to fail fast on pathological inputs
 #: before they cost a provider round-trip.
 _CODE_C_MAX_CHARS = 60_000
+
+#: OpenCode Go rejects generic SDK identities and uses this session header to
+#: route a conversation consistently and reuse its prompt cache.
+_USER_AGENT = "graphrev/0.1.0"
+
+
+def _is_opencode_go(api_base: str | None) -> bool:
+    """Return whether ``api_base`` targets OpenCode's Console Go endpoint."""
+    if not api_base:
+        return False
+    parsed = urlparse(api_base)
+    return parsed.hostname == "opencode.ai" and parsed.path.rstrip("/").startswith("/zen/go")
+
+
+def _request_headers(*, api_base: str | None, session_id: str) -> dict[str, str]:
+    headers = {"User-Agent": _USER_AGENT}
+    if _is_opencode_go(api_base):
+        headers["x-opencode-session"] = session_id
+    return headers
 
 _SYSTEM_PROMPT = (
     "You are a reverse-engineering assistant summarising one function of a "
@@ -237,7 +258,13 @@ class LiteLlmAdapter:
         # Stateless HTTP calls — the global setting is the only bound (AM1).
         return self._settings.summary_concurrency
 
-    async def _complete(self, messages: list[dict[str, str]], *, input_truncated: bool) -> object:
+    async def _complete(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        input_truncated: bool,
+        session_id: str,
+    ) -> object:
         """One provider round-trip, with every failure already mapped onto the
         taxonomy. Separated from :meth:`summarize` so the JSON-parse retry loop
         does not have to duplicate the error mapping."""
@@ -258,6 +285,10 @@ class LiteLlmAdapter:
                     # `_extract_json` remains the backstop either way.
                     response_format={"type": "json_object"},
                     drop_params=True,
+                    extra_headers=_request_headers(
+                        api_base=self._settings.llm_api_base,
+                        session_id=session_id,
+                    ),
                 )
         except SummarizationError:
             raise
@@ -304,8 +335,13 @@ class LiteLlmAdapter:
         # surface `PermanentProviderError` once the attempts are exhausted —
         # otherwise one unlucky response permanently marks a function errored.
         attempts = self._settings.llm_json_attempts
+        session_id = req.session_id or uuid.uuid4().hex
         for attempt in range(1, attempts + 1):
-            response = await self._complete(messages, input_truncated=input_truncated)
+            response = await self._complete(
+                messages,
+                input_truncated=input_truncated,
+                session_id=session_id,
+            )
             content = response.choices[0].message.content or ""  # type: ignore[attr-defined]
             try:
                 payload = _extract_json(content)
@@ -356,6 +392,10 @@ class LiteLlmAdapter:
                     api_key=self._settings.llm_api_key,
                     temperature=self._settings.llm_temperature,
                     drop_params=True,
+                    extra_headers=_request_headers(
+                        api_base=self._settings.llm_api_base,
+                        session_id=uuid.uuid4().hex,
+                    ),
                 )
         except Exception as exc:
             return LlmHealth(reachable=False, detail=str(exc))

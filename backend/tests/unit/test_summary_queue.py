@@ -33,6 +33,16 @@ def test_duplicate_enqueue_increments_demand() -> None:
     assert item.demand == 2
 
 
+def test_duplicate_and_priority_upgrade_preserve_session() -> None:
+    q = SummaryQueue(max_depth=10)
+    original = q.enqueue(1, priority=3)
+    duplicate = q.enqueue(1, priority=3)
+    upgraded = q.enqueue(1, priority=0)
+
+    assert duplicate.session_id == original.session_id
+    assert upgraded.session_id == original.session_id
+
+
 async def test_priority_upgrade_reorders_pop_order() -> None:
     q = SummaryQueue(max_depth=10)
     q.enqueue(1, priority=3)
@@ -102,6 +112,27 @@ async def test_release_never_cancels_inflight_item() -> None:
     q.complete(1)
     assert not q.is_inflight(1)
     assert not q.is_queued(1)
+
+
+async def test_rate_limit_requeue_preserves_session() -> None:
+    q = SummaryQueue(max_depth=10)
+    original = q.enqueue(1, priority=1)
+    await q.pop()
+
+    q.requeue_inflight(1)
+
+    assert q._index[1].session_id == original.session_id
+
+
+async def test_completed_generation_gets_new_session() -> None:
+    q = SummaryQueue(max_depth=10)
+    original = q.enqueue(1, priority=1)
+    await q.pop()
+    q.complete(1)
+
+    regenerated = q.enqueue(1, priority=1)
+
+    assert regenerated.session_id != original.session_id
 
 
 def test_bounded_queue_evicts_lowest_priority_oldest_item() -> None:

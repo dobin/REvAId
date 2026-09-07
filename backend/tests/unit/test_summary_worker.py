@@ -39,6 +39,7 @@ class _StubAdapter:
     def __init__(self, outcomes: list[Exception | SummaryResult]) -> None:
         self._outcomes = list(outcomes)
         self.calls = 0
+        self.requests: list[SummaryRequest] = []
 
     @property
     def name(self) -> str:
@@ -50,6 +51,7 @@ class _StubAdapter:
 
     async def summarize(self, req: SummaryRequest) -> SummaryResult:
         self.calls += 1
+        self.requests.append(req)
         outcome = self._outcomes.pop(0)
         if isinstance(outcome, Exception):
             raise outcome
@@ -299,6 +301,7 @@ async def test_transient_failure_recovers_on_retry(
     assert retrying["error_type"] == "TransientProviderError"
     assert retrying["reason"] == "try again"
     assert retrying["retry_delay_seconds"] == 0
+    assert [req.session_id for req in adapter.requests] == [item.session_id, item.session_id]
 
 
 async def test_rate_limit_pauses_queue_and_requeues_without_erroring(

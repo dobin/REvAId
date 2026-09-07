@@ -44,6 +44,7 @@ def _req(**overrides: Any) -> SummaryRequest:
         "binary_name": "demo.exe",
         "binary_version": "1.0",
         "source_path": None,
+        "session_id": "summary-session-123",
     }
     defaults.update(overrides)
     return SummaryRequest(**defaults)
@@ -209,6 +210,53 @@ async def test_summarize_requests_json_mode(
     await adapter.summarize(_req())
     assert calls[0]["response_format"] == {"type": "json_object"}
     assert calls[0]["drop_params"] is True
+
+
+@pytest.mark.asyncio
+async def test_opencode_go_request_identifies_graphrev_and_session(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = LiteLlmAdapter(
+        settings=_settings(llm_api_base="https://opencode.ai/zen/go/v1")
+    )
+    calls = _install_completion_kwargs(monkeypatch, lambda **kw: _ok_response(_VALID_JSON))
+
+    await adapter.summarize(_req(session_id="stable-conversation-id"))
+
+    assert calls[0]["extra_headers"] == {
+        "User-Agent": "graphrev/0.1.0",
+        "x-opencode-session": "stable-conversation-id",
+    }
+
+
+@pytest.mark.asyncio
+async def test_opencode_go_session_is_stable_across_json_retries(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = LiteLlmAdapter(
+        settings=_settings(llm_api_base="https://opencode.ai/zen/go/v1")
+    )
+    responses = [_ok_response("not JSON"), _ok_response(_VALID_JSON)]
+    calls = _install_completion_kwargs(monkeypatch, lambda **kw: responses.pop(0))
+
+    await adapter.summarize(_req(session_id="stable-conversation-id"))
+
+    assert len(calls) == 2
+    assert {
+        call["extra_headers"]["x-opencode-session"] for call in calls
+    } == {"stable-conversation-id"}
+
+
+@pytest.mark.asyncio
+async def test_non_opencode_request_does_not_leak_session_header(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = LiteLlmAdapter(settings=_settings(llm_api_base="https://api.openai.com/v1"))
+    calls = _install_completion_kwargs(monkeypatch, lambda **kw: _ok_response(_VALID_JSON))
+
+    await adapter.summarize(_req())
+
+    assert calls[0]["extra_headers"] == {"User-Agent": "graphrev/0.1.0"}
 
 
 @pytest.mark.asyncio
@@ -429,6 +477,22 @@ async def test_health_reports_reachable_on_success(
     health = await adapter.health()
     assert health.reachable is True
     assert health.detail is None
+
+
+@pytest.mark.asyncio
+async def test_opencode_go_health_sends_required_identity_headers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    adapter = LiteLlmAdapter(
+        settings=_settings(llm_api_base="https://opencode.ai/zen/go/v1")
+    )
+    calls = _install_completion_kwargs(monkeypatch, lambda **kw: _ok_response(_VALID_JSON))
+
+    health = await adapter.health()
+
+    assert health.reachable is True
+    assert calls[0]["extra_headers"]["User-Agent"] == "graphrev/0.1.0"
+    assert calls[0]["extra_headers"]["x-opencode-session"]
 
 
 @pytest.mark.asyncio
