@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from pathlib import Path
 
@@ -205,6 +206,7 @@ def _import_document() -> dict:
             "version": "2.0",
             "sourcePath": "/tmp/imported.exe",
             "analysisImageBase": 0x400000,
+            "sha256": "a" * 64,
         },
         "functions": [
             {
@@ -270,17 +272,18 @@ async def test_import_binary_creates_new_binary(client: AsyncClient) -> None:
 
 
 @pytest.mark.asyncio
-async def test_import_binary_is_idempotent(client: AsyncClient) -> None:
+async def test_import_binary_rejects_duplicate_hash(client: AsyncClient) -> None:
     first_status = await _submit_import(client, _import_document())
-    second_status = await _submit_import(client, _import_document())
+    renamed = _import_document()
+    renamed["binary"]["name"] = "renamed.exe"
+    second_status = await _submit_import(client, renamed)
     first = first_status["result"]
-    second = second_status["result"]
 
     assert first is not None
-    assert second is not None
-    assert second["binaryId"] == first["binaryId"]
-    assert second["functionsInserted"] == 0
-    assert second["functionsUpdated"] > 0
+    assert second_status["phase"] == "failed"
+    assert second_status["errorCode"] == "BINARY_ALREADY_EXISTS"
+    assert second_status["errorDetails"]["match"] == "sha256"
+    assert second_status["errorDetails"]["existingBinaryId"] == first["binaryId"]
 
     listing = (await client.get("/api/v1/binaries")).json()
     assert len([b for b in listing if b["name"] == "imported.exe"]) == 1
@@ -309,6 +312,28 @@ async def test_public_import_randomizes_name_and_refuses_overwrite(
 
     listing = (await client.get("/api/v1/binaries")).json()
     assert [b["name"] for b in listing] == ["abcd_imported.exe"]
+
+
+@pytest.mark.asyncio
+async def test_public_import_allows_same_hash_under_distinct_random_names(
+    client: AsyncClient,
+    settings: Settings,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings.public_mode = True
+    names = iter(("abcd_imported.exe", "wxyz_imported.exe"))
+    monkeypatch.setattr(
+        "graphrev.services.binary_service.public_binary_name",
+        lambda _name: next(names),
+    )
+
+    first = await _submit_import(client, _import_document())
+    second = await _submit_import(client, _import_document())
+
+    assert first["phase"] == "completed"
+    assert second["phase"] == "completed"
+    listing = (await client.get("/api/v1/binaries")).json()
+    assert [b["name"] for b in listing] == ["abcd_imported.exe", "wxyz_imported.exe"]
 
 
 @pytest.mark.asyncio
@@ -465,3 +490,45 @@ async def test_decompile_binary_reports_start_failure(
     assert body["errorMessage"] == "The configured decompiler could not be started."
     assert body["errorDetails"] is not None
     assert "Permission denied" in body["errorDetails"]["reason"]
+
+
+@pytest.mark.asyncio
+async def test_decompile_binary_computes_hash_and_rejects_same_content(
+    client: AsyncClient, settings: Settings, tmp_path: Path
+) -> None:
+    export = _import_document()
+    export["binary"].pop("sha256")
+    executable = tmp_path / "fake-kuna"
+    executable.write_text(
+        "#!/bin/sh\n"
+        "cat > \"$4\" <<'JSON'\n"
+        f"{json.dumps(export)}\n"
+        "JSON\n",
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+    settings.decompiler_executable = str(executable)
+    content = b"MZ\x00same executable bytes"
+
+    first_response = await client.post(
+        "/api/v1/binaries/decompile?name=first.exe",
+        content=content,
+        headers={"content-type": "application/octet-stream"},
+    )
+    first = await _wait_for_import(client, first_response.json()["jobId"])
+    assert first["phase"] == "completed"
+
+    second_response = await client.post(
+        "/api/v1/binaries/decompile?name=renamed.exe",
+        content=content,
+        headers={"content-type": "application/octet-stream"},
+    )
+    second = await _wait_for_import(client, second_response.json()["jobId"])
+    assert second["phase"] == "failed"
+    assert second["errorCode"] == "BINARY_ALREADY_EXISTS"
+    assert second["errorDetails"]["match"] == "sha256"
+
+    expected_hash = hashlib.sha256(content).hexdigest()
+    assert second["errorDetails"]["existingName"] == "first.exe"
+    assert len((await client.get("/api/v1/binaries")).json()) == 1
+    assert len(expected_hash) == 64

@@ -68,19 +68,32 @@ async def test_edges_columns_match_model(engine: AsyncEngine, migrated_db: Path)
 
 
 @pytest.mark.asyncio
+async def test_binaries_columns_match_model(engine: AsyncEngine, migrated_db: Path) -> None:
+    expected_columns = {c.name for c in Base.metadata.tables["binaries"].columns}
+    async with engine.connect() as conn:
+
+        def _columns(sync_conn: object) -> list[str]:
+            return [c["name"] for c in inspect(sync_conn).get_columns("binaries")]  # type: ignore[arg-type]
+
+        columns = await conn.run_sync(_columns)
+    assert set(columns) == expected_columns
+
+
+@pytest.mark.asyncio
 async def test_indexes_present(engine: AsyncEngine, migrated_db: Path) -> None:
     async with engine.connect() as conn:
 
         def _index_names(sync_conn: object) -> set[str]:
             insp = inspect(sync_conn)
             names: set[str] = set()
-            for table in ("functions", "edges", "views", "view_nodes"):
+            for table in ("binaries", "functions", "edges", "views", "view_nodes"):
                 names |= {ix["name"] for ix in insp.get_indexes(table)}  # type: ignore[arg-type]
             return names
 
         index_names = await conn.run_sync(_index_names)
 
     expected = {
+        "ix_binaries_sha256",
         "ix_functions_binary_name",
         "ix_functions_binary_analystname",
         "ix_functions_status",

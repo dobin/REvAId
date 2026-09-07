@@ -123,7 +123,7 @@ export function ImportBinaryButton({
   const [jobId, setJobId] = useState<string | null>(null);
   const [phase, setPhase] = useState<string | null>(null);
   const [document, setDocument] = useState<GhidraExportDocument | null>(null);
-  const [duplicateChoice, setDuplicateChoice] = useState<"overwrite" | "new" | null>(null);
+  const [duplicateChoice, setDuplicateChoice] = useState<"new" | null>(null);
   const [newBinaryName, setNewBinaryName] = useState("");
   const [parseError, setParseError] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -366,14 +366,6 @@ export function ImportBinaryButton({
           <strong>{selectedBinaryName}</strong> already exists.
           <strong style={{ display: "block", marginTop: "0.5rem" }}>2. Choose how to handle it</strong>
           <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem", flexWrap: "wrap" }}>
-            <button
-              type="button"
-              style={duplicateChoice === "overwrite" ? selectedDuplicateChoiceStyle : primaryButtonStyle}
-              aria-pressed={duplicateChoice === "overwrite"}
-              onClick={() => { setDuplicateChoice("overwrite"); }}
-            >
-              Overwrite / refresh
-            </button>
             <button
               type="button"
               style={duplicateChoice === "new" ? selectedDuplicateChoiceStyle : primaryButtonStyle}

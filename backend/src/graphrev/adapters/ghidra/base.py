@@ -37,6 +37,7 @@ class RawBinary:
     version: str
     source_path: str | None = None
     analysis_image_base: int | None = None
+    sha256: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

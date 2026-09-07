@@ -9,6 +9,7 @@ cleans staged files and loses their status.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -29,6 +30,14 @@ from graphrev.services.binary_service import import_ghidra_export, load_ghidra_e
 logger = get_logger(__name__)
 
 _DECOMPILER_DIAGNOSTIC_LIMIT = 16 * 1024
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 @dataclass
@@ -148,6 +157,9 @@ class ImportJobManager:
                 if job.cancelled:
                     continue
                 if job.source_kind == "raw_binary":
+                    # Hash the original bytes, not the decompiler's generated
+                    # JSON or its UUID staging filename.
+                    uploaded_sha256 = await asyncio.to_thread(_sha256_file, job.path)
                     job.phase = ImportJobPhase.DECOMPILING
                     job.result = self._status(job)
                     job.output_path = self.staging_path(".json")
@@ -166,6 +178,7 @@ class ImportJobManager:
                                     "name": job.binary_name,
                                     "version": job.binary_version,
                                     "source_path": job.binary_name,
+                                    "sha256": uploaded_sha256,
                                 }
                             )
                         }
@@ -196,7 +209,12 @@ class ImportJobManager:
                     error_code=exc.code,
                     error_details=exc.details,
                 )
-                self._log_failure(job, error_code=exc.code, message=exc.message, details=exc.details)
+                self._log_failure(
+                    job,
+                    error_code=exc.code,
+                    message=exc.message,
+                    details=exc.details,
+                )
             except Exception as exc:
                 job.phase = ImportJobPhase.FAILED
                 job.result = ImportJobStatusDto(
@@ -284,7 +302,8 @@ class ImportJobManager:
             process.terminate()
             try:
                 await asyncio.wait_for(
-                    asyncio.shield(communicate_task), timeout=self._settings.decompiler_kill_grace_seconds
+                    asyncio.shield(communicate_task),
+                    timeout=self._settings.decompiler_kill_grace_seconds,
                 )
             except TimeoutError:
                 process.kill()

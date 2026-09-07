@@ -18,11 +18,14 @@ from graphrev.repositories.binaries import (
 
 @pytest.mark.asyncio
 async def test_get_or_create_binary_creates_new_row(session: AsyncSession) -> None:
-    binary, created = await get_or_create_binary(session, name="acme.exe", version="1.0")
+    binary, created = await get_or_create_binary(
+        session, name="acme.exe", version="1.0", sha256="a" * 64
+    )
     await session.commit()
     assert created is True
     assert binary.name == "acme.exe"
     assert binary.version == "1.0"
+    assert binary.sha256 == "a" * 64
 
 
 @pytest.mark.asyncio
@@ -53,6 +56,21 @@ async def test_get_or_create_binary_refreshes_analysis_image_base(session: Async
     assert was_created is False
     assert refreshed.id == binary.id
     assert refreshed.analysis_image_base == 0x180000000
+
+
+@pytest.mark.asyncio
+async def test_get_or_create_binary_refreshes_sha256(session: AsyncSession) -> None:
+    binary, _ = await get_or_create_binary(session, name="legacy.exe", version="1.0")
+    await session.commit()
+
+    refreshed, created = await get_or_create_binary(
+        session, name="legacy.exe", version="1.0", sha256="b" * 64
+    )
+    await session.commit()
+
+    assert created is False
+    assert refreshed.id == binary.id
+    assert refreshed.sha256 == "b" * 64
 
 
 @pytest.mark.asyncio

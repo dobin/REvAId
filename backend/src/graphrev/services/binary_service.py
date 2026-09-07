@@ -115,11 +115,11 @@ async def import_ghidra_export(
 ) -> ImportResultDto:
     """Ingest a Ghidra JSON export as a binary (I12).
 
-    Re-importing the same `(name, version)` is idempotent: the ingestion
-    pipeline upserts inherent fields and preserves analyst-owned columns
-    (`summary_*`, `name_analyst`, `notes`, `utility_override`) exactly as
-    re-ingestion does (A3). Raises `VALIDATION_ERROR` for an unsupported
-    schema version or if the pipeline reports the binary as failed.
+    Private-mode imports reject duplicates by SHA-256 when available, falling
+    back to `(name, version)` for legacy hashless exports. Public mode gives
+    each import a randomised name and permits repeated content, while still
+    refusing the unlikely random-name collision. Raises `VALIDATION_ERROR`
+    for an unsupported schema version or if the pipeline reports failure.
 
     Takes the session *factory* rather than a request session because
     `run_ingestion` owns its own `unit_of_work` transactions (one per binary).
@@ -162,6 +162,7 @@ async def import_ghidra_export(
         adapter,
         settings,
         binary_filter=document.binary.name,
+        reject_duplicates=not settings.public_mode,
     )
 
     # `run_ingestion` yields one report; `binary_filter` restricts it to the

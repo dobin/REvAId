@@ -23,6 +23,7 @@ async def get_or_create_binary(
     version: str,
     source_path: str | None = None,
     analysis_image_base: int | None = None,
+    sha256: str | None = None,
 ) -> tuple[Binary, bool]:
     """Return the `Binary` row for `(name, version)`, creating it if absent.
 
@@ -38,6 +39,7 @@ async def get_or_create_binary(
     if existing is not None:
         existing.source_path = source_path
         existing.analysis_image_base = analysis_image_base
+        existing.sha256 = sha256
         existing.updated_at = now
         await session.flush()
         return existing, False
@@ -47,6 +49,7 @@ async def get_or_create_binary(
         version=version,
         source_path=source_path,
         analysis_image_base=analysis_image_base,
+        sha256=sha256,
         created_at=now,
         updated_at=now,
     )
@@ -103,6 +106,19 @@ async def get_binary_by_name_version(
     the binary the ingestion pipeline just upserted."""
     result = await session.execute(
         select(Binary).where(Binary.name == name, Binary.version == version)
+    )
+    return result.scalar_one_or_none()
+
+
+async def get_binary_by_sha256(session: AsyncSession, *, sha256: str) -> Binary | None:
+    """The first binary with this content digest, or ``None``.
+
+    Multiple rows may have the same digest in public mode, where every import
+    receives a new randomised name, so this intentionally does not use
+    ``scalar_one_or_none``.
+    """
+    result = await session.execute(
+        select(Binary).where(Binary.sha256 == sha256).order_by(Binary.id).limit(1)
     )
     return result.scalar_one_or_none()
 

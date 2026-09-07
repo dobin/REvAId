@@ -16,7 +16,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Any, Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from graphrev.db.enums import EdgeKind, FunctionKind
 from graphrev.schemas.common import ApiModel
@@ -78,8 +78,8 @@ class GhidraExportBinary(ApiModel):
     """Binary metadata from the export (maps to ``RawBinary``).
 
     ``version`` is free text (AS11); the exporter defaults it to ``""``.
-    ``sha256``/``function_count``/``edge_count`` are informational only — the
-    server recomputes counts from what it actually ingested.
+    ``sha256`` is the preferred content identity. It remains optional for
+    legacy exports; ``function_count``/``edge_count`` are informational only.
     """
 
     name: str
@@ -91,6 +91,16 @@ class GhidraExportBinary(ApiModel):
     sha256: str | None = None
     function_count: int | None = None
     edge_count: int | None = None
+
+    @field_validator("sha256")
+    @classmethod
+    def _normalise_sha256(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalised = value.lower()
+        if len(normalised) != 64 or any(c not in "0123456789abcdef" for c in normalised):
+            raise ValueError("sha256 must be exactly 64 hexadecimal characters")
+        return normalised
 
 
 class GhidraExportDocument(ApiModel):

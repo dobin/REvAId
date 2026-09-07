@@ -30,7 +30,11 @@ from graphrev.db.seed import create_default_view
 from graphrev.db.uow import unit_of_work
 from graphrev.ingestion.placeholders import placeholder_name
 from graphrev.ingestion.report import BinaryIngestionReport
-from graphrev.repositories.binaries import get_or_create_binary
+from graphrev.repositories.binaries import (
+    get_binary_by_name_version,
+    get_binary_by_sha256,
+    get_or_create_binary,
+)
 from graphrev.repositories.edges import EdgeUpsertValues, upsert_edge, upsert_edges_batch
 from graphrev.repositories.functions import (
     FunctionBatchValues,
@@ -80,8 +84,33 @@ async def _ingest_one_binary(
     binary_ref: RawBinaryRef,
     binary_source_path: str | None,
     analysis_image_base: int | None,
+    sha256: str | None,
+    reject_duplicates: bool,
 ) -> BinaryIngestionReport:
     report = BinaryIngestionReport(binary_name=binary_ref.name)
+
+    if reject_duplicates:
+        existing = None
+        if sha256 is not None:
+            existing = await get_binary_by_sha256(session, sha256=sha256)
+        if existing is None:
+            existing = await get_binary_by_name_version(
+                session, name=binary_ref.name, version=binary_ref.version
+            )
+        if existing is not None:
+            match_kind = (
+                "sha256" if sha256 is not None and existing.sha256 == sha256 else "filename"
+            )
+            raise AppError(
+                ErrorCode.BINARY_ALREADY_EXISTS,
+                "This binary has already been imported.",
+                details={
+                    "match": match_kind,
+                    "existingBinaryId": existing.id,
+                    "existingName": existing.name,
+                    "existingVersion": existing.version,
+                },
+            )
 
     binary, created = await get_or_create_binary(
         session,
@@ -89,6 +118,7 @@ async def _ingest_one_binary(
         version=binary_ref.version,
         source_path=binary_source_path,
         analysis_image_base=analysis_image_base,
+        sha256=sha256,
     )
     if settings.public_mode and not created:
         raise AppError(
@@ -313,6 +343,7 @@ async def run_ingestion(
     settings: Settings,
     *,
     binary_filter: str | None = None,
+    reject_duplicates: bool = False,
 ) -> list[BinaryIngestionReport]:
     """Ingest every binary the adapter reports (or just `binary_filter`, if given).
 
@@ -336,6 +367,8 @@ async def run_ingestion(
                     binary_ref,
                     raw_binary.source_path,
                     raw_binary.analysis_image_base,
+                    raw_binary.sha256,
+                    reject_duplicates,
                 )
                 await _write_utility_threshold_bookkeeping(session, settings)
             reports.append(report)

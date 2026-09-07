@@ -33,6 +33,7 @@ def _document() -> GhidraExportDocument:
             version="1.0",
             source_path="/tmp/sample.exe",
             analysis_image_base=0x400000,
+            sha256="a" * 64,
         ),
         functions=[
             GhidraExportFunction(
@@ -116,6 +117,7 @@ async def test_import_creates_binary_with_functions_and_placeholder(
 
     assert binary is not None
     assert binary.analysis_image_base == 0x400000
+    assert binary.sha256 == "a" * 64
     assert edge_orders == [0, 1]
 
 
@@ -189,7 +191,7 @@ async def test_import_kuna_schema_v4_document_preserves_edge_kinds(
 
 
 @pytest.mark.asyncio
-async def test_reimport_is_idempotent_and_preserves_analyst_fields(
+async def test_reimport_with_same_hash_is_rejected(
     session_factory: async_sessionmaker[AsyncSession], settings: Settings
 ) -> None:
     first = await binary_service.import_ghidra_export(session_factory, settings, _document())
@@ -207,11 +209,17 @@ async def test_reimport_is_idempotent_and_preserves_analyst_fields(
         fn.notes = "attacker reachable"
         await session.commit()
 
-    second = await binary_service.import_ghidra_export(session_factory, settings, _document())
-
-    assert second.binary_id == first.binary_id
-    assert second.functions_inserted == 0
-    assert second.functions_updated > 0
+    renamed = _document()
+    renamed.binary.name = "renamed.exe"
+    with pytest.raises(AppError) as excinfo:
+        await binary_service.import_ghidra_export(session_factory, settings, renamed)
+    assert excinfo.value.code == ErrorCode.BINARY_ALREADY_EXISTS
+    assert excinfo.value.details == {
+        "match": "sha256",
+        "existingBinaryId": first.binary_id,
+        "existingName": "sample.exe",
+        "existingVersion": "1.0",
+    }
 
     async with session_factory() as session:
         fn = (
@@ -223,6 +231,46 @@ async def test_reimport_is_idempotent_and_preserves_analyst_fields(
         ).scalar_one()
     assert fn.name_analyst == "entrypoint"
     assert fn.notes == "attacker reachable"
+
+
+@pytest.mark.asyncio
+async def test_import_same_filename_with_different_hash_is_rejected(
+    session_factory: async_sessionmaker[AsyncSession], settings: Settings
+) -> None:
+    await binary_service.import_ghidra_export(session_factory, settings, _document())
+    changed = _document()
+    changed.binary.sha256 = "b" * 64
+
+    with pytest.raises(AppError) as excinfo:
+        await binary_service.import_ghidra_export(session_factory, settings, changed)
+    assert excinfo.value.code == ErrorCode.BINARY_ALREADY_EXISTS
+    assert excinfo.value.details["match"] == "filename"
+
+
+@pytest.mark.asyncio
+async def test_hashless_import_falls_back_to_filename_duplicate_check(
+    session_factory: async_sessionmaker[AsyncSession], settings: Settings
+) -> None:
+    first = _document()
+    first.binary.sha256 = None
+    await binary_service.import_ghidra_export(session_factory, settings, first)
+
+    with pytest.raises(AppError) as excinfo:
+        await binary_service.import_ghidra_export(session_factory, settings, first)
+    assert excinfo.value.code == ErrorCode.BINARY_ALREADY_EXISTS
+    assert excinfo.value.details["match"] == "filename"
+
+
+def test_sha256_is_normalised_and_validated() -> None:
+    doc = _document()
+    doc.binary.sha256 = "A" * 64
+    validated = GhidraExportDocument.model_validate(doc.model_dump())
+    assert validated.binary.sha256 == "a" * 64
+
+    payload = doc.model_dump()
+    payload["binary"]["sha256"] = "not-a-digest"
+    with pytest.raises(ValueError, match="64 hexadecimal"):
+        GhidraExportDocument.model_validate(payload)
 
 
 @pytest.mark.asyncio

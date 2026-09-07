@@ -69,6 +69,9 @@ class Binary(Base):
     name: Mapped[str] = mapped_column()
     version: Mapped[str] = mapped_column(default="")  # free text (AS11)
     source_path: Mapped[str | None] = mapped_column(default=None)
+    # Content identity reported by JSON exporters or computed from a raw
+    # upload before decompilation. Nullable for legacy adapters/exports.
+    sha256: Mapped[str | None] = mapped_column(default=None)
     # Ghidra's static program image base captured at export time. This is
     # ingestion-owned metadata used to translate ASLR runtime VAs; it is
     # nullable for legacy/non-Ghidra imports that did not report it.
@@ -107,7 +110,12 @@ class Binary(Base):
         foreign_keys="View.binary_id",
     )
 
-    __table_args__ = (UniqueConstraint("name", "version", name="ux_binaries_name_version"),)
+    __table_args__ = (
+        UniqueConstraint("name", "version", name="ux_binaries_name_version"),
+        # Deliberately non-unique: public mode permits separate anonymous
+        # imports of identical content under independently randomised names.
+        Index("ix_binaries_sha256", "sha256"),
+    )
 
 
 class Function(Base):
