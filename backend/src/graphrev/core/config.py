@@ -189,7 +189,7 @@ class Settings(BaseSettings):
     decompiler_max_output_bytes: int = Field(default=2 * 1024**3, gt=0)
     #: Empty means raw-binary analysis is unavailable; JSON import still works.
     decompiler_executable: str | None = Field(default=None)
-    decompiler_timeout_seconds: float = Field(default=300.0, gt=0)
+    decompiler_timeout_seconds: float = Field(default=3600.0, gt=0)
     decompiler_kill_grace_seconds: float = Field(default=5.0, gt=0)
     import_staging_dir: str = Field(default="./.graphrev-imports")
     #: SQLite has one writer; a single import worker prevents competing large
