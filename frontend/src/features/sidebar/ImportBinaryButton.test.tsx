@@ -5,6 +5,12 @@ import { apiClient } from "@/api/client";
 import type { ImportJobAcceptedDto, ImportJobStatusDto } from "@/api/types";
 import { ImportBinaryButton } from "./ImportBinaryButton";
 
+const configMock = vi.hoisted(() => ({ publicMode: false }));
+
+vi.mock("@/config/ConfigProvider", () => ({
+  useConfig: () => configMock,
+}));
+
 function renderButton(onImported = vi.fn()) {
   const queryClient = new QueryClient();
   render(
@@ -30,6 +36,7 @@ function openDialogAndUpload(file: File) {
 }
 
 afterEach(() => {
+  configMock.publicMode = false;
   vi.restoreAllMocks();
 });
 
@@ -88,6 +95,64 @@ describe("ImportBinaryButton", () => {
     expect(post).toHaveBeenCalledWith(
       "/binaries/import",
       expect.objectContaining({ binary: expect.objectContaining({ name: "sample-copy.exe" }) }),
+    );
+  });
+
+  it("imports immediately without offering overwrite when public mode randomizes names", async () => {
+    configMock.publicMode = true;
+    vi.spyOn(apiClient, "get").mockImplementation(async (path) => {
+      if (path === "/binaries") {
+        return [{
+          id: 7,
+          name: "sample.exe",
+          version: "1.0",
+          analysisImageBase: null,
+          functionCount: 1,
+          edgeCount: 0,
+          lastViewId: null,
+          createdAt: "2026-01-01T00:00:00Z",
+        }];
+      }
+      return {
+        jobId: "job-public",
+        phase: "completed",
+        bytesReceived: 1,
+        result: {
+          binaryId: 8,
+          name: "abcd_sample.exe",
+          version: "1.0",
+          functionsInserted: 1,
+          functionsUpdated: 0,
+          edgesInserted: 0,
+          placeholdersCreated: 0,
+          failures: [],
+        },
+        errorMessage: null,
+        failureSamples: [],
+      } satisfies ImportJobStatusDto;
+    });
+    const post = vi.spyOn(apiClient, "post").mockResolvedValue({
+      jobId: "job-public",
+      phase: "queued",
+      bytesReceived: 1,
+    });
+    const { onImported } = renderButton();
+    openDialogAndUpload(jsonFile("sample.json", JSON.stringify({
+      schemaVersion: 1,
+      binary: { name: "sample.exe", version: "1.0" },
+      functions: [],
+      edges: [],
+    })));
+
+    expect(await screen.findByText(/ready to import/i)).toBeInTheDocument();
+    expect(screen.queryByText(/already exists/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /overwrite \/ refresh/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText("Import"));
+
+    await waitFor(() => { expect(onImported).toHaveBeenCalledWith(8); });
+    expect(post).toHaveBeenCalledWith(
+      "/binaries/import",
+      expect.objectContaining({ binary: expect.objectContaining({ name: "sample.exe" }) }),
     );
   });
 

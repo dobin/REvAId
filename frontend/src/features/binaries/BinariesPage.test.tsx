@@ -4,7 +4,34 @@ import { MemoryRouter, useLocation } from "react-router";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { BinariesPage } from "./BinariesPage";
-import type { BinarySummaryDto } from "@/api/types";
+import { ConfigProvider } from "@/config/ConfigProvider";
+import type { AppConfigDto, BinarySummaryDto, HealthDto } from "@/api/types";
+
+const config: AppConfigDto = {
+  tableRowCap: 64,
+  callerSuppressThreshold: 32,
+  utilityFanInThreshold: 50,
+  fanOutAllHardCap: 50,
+  nodeCountSoftWarning: 150,
+  cardWidthPx: 440,
+  summaryConcurrency: 4,
+  layoutHeightChangeThresholdPx: 8,
+  layoutAnimationMs: 400,
+  summaryDemandDebounceMs: 250,
+  publicMode: true,
+  nodeColorPalette: ["slate"],
+  adapters: { ghidra: "kuna", llm: "litellm", llmModel: "openai/gpt-5-mini" },
+};
+
+const health: HealthDto = {
+  status: "ok",
+  dbOk: true,
+  migrationRevision: "0010",
+  ghidraAdapter: "kuna",
+  llmAdapter: "litellm",
+  llmHealth: { reachable: true, detail: null },
+  decompilerHealth: { reachable: true, detail: "Kuna 1.2.3" },
+};
 
 const binaries: BinarySummaryDto[] = [
   {
@@ -39,8 +66,10 @@ function renderPage(path = "/") {
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[path]}>
-        <BinariesPage />
-        <LocationProbe />
+        <ConfigProvider fallback={<div>Loading configuration…</div>}>
+          <BinariesPage />
+          <LocationProbe />
+        </ConfigProvider>
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -55,6 +84,12 @@ describe("BinariesPage", () => {
         if (url.endsWith("/api/v1/binaries")) {
           return Promise.resolve(new Response(JSON.stringify(binaries), { status: 200 }));
         }
+        if (url.endsWith("/api/v1/config")) {
+          return Promise.resolve(new Response(JSON.stringify(config), { status: 200 }));
+        }
+        if (url.endsWith("/api/v1/health")) {
+          return Promise.resolve(new Response(JSON.stringify(health), { status: 200 }));
+        }
         return Promise.reject(new Error(`Unexpected fetch: ${url}`));
       }),
     );
@@ -66,7 +101,7 @@ describe("BinariesPage", () => {
 
   it("shows a loading state, then one row per binary with stats", async () => {
     renderPage();
-    expect(screen.getByText(/loading binaries/i)).toBeInTheDocument();
+    expect(screen.getByText(/loading (configuration|binaries)/i)).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.getByText("test.exe")).toBeInTheDocument();
@@ -74,6 +109,17 @@ describe("BinariesPage", () => {
     expect(screen.getByText("libparse.dll")).toBeInTheDocument();
     expect(screen.getByText("180")).toBeInTheDocument();
     expect(screen.getByText("400")).toBeInTheDocument();
+  });
+
+  it("shows the page title and configuration overview", async () => {
+    renderPage();
+
+    expect(await screen.findByRole("heading", { name: "GraphRev" })).toBeInTheDocument();
+    expect(screen.getByText("litellm")).toBeInTheDocument();
+    expect(screen.getByText("openai/gpt-5-mini")).toBeInTheDocument();
+    expect(await screen.findByText("Available")).toBeInTheDocument();
+    expect(screen.getByText("Kuna 1.2.3")).toBeInTheDocument();
+    expect(screen.getByText("On")).toBeInTheDocument();
   });
 
   it("navigates to /{name}/ when Open is clicked", async () => {
@@ -110,6 +156,12 @@ describe("BinariesPage", () => {
       const url = input instanceof Request ? input.url : String(input);
       if (url.endsWith("/api/v1/binaries")) {
         return Promise.resolve(new Response(JSON.stringify(binaries), { status: 200 }));
+      }
+      if (url.endsWith("/api/v1/config")) {
+        return Promise.resolve(new Response(JSON.stringify(config), { status: 200 }));
+      }
+      if (url.endsWith("/api/v1/health")) {
+        return Promise.resolve(new Response(JSON.stringify(health), { status: 200 }));
       }
       if (url.includes("/api/v1/binaries/1") && init?.method === "DELETE") {
         expect(url).toContain("confirm=test.exe");

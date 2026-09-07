@@ -17,6 +17,7 @@ import {
 } from "@/api/queries/binaries";
 import type { BinaryId, GhidraExportDocument } from "@/api/types";
 import { Dialog } from "@/components/Dialog";
+import { useConfig } from "@/config/ConfigProvider";
 
 const buttonStyle: React.CSSProperties = {
   display: "block",
@@ -27,6 +28,21 @@ const buttonStyle: React.CSSProperties = {
   background: "none",
   border: "none",
   cursor: "pointer",
+};
+
+const prominentButtonStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: "0.5rem",
+  padding: "0.625rem 1rem",
+  border: "1px solid #1d4ed8",
+  borderRadius: "0.5rem",
+  background: "#2563eb",
+  boxShadow: "0 2px 5px rgb(37 99 235 / 25%)",
+  color: "#ffffff",
+  cursor: "pointer",
+  fontSize: "0.875rem",
+  fontWeight: 700,
 };
 
 const primaryButtonStyle: React.CSSProperties = {
@@ -93,9 +109,12 @@ function importFailureMessage(status: {
 
 export function ImportBinaryButton({
   onImported,
+  prominent = false,
 }: {
   onImported: (binaryId: BinaryId) => void;
+  prominent?: boolean;
 }) {
+  const { publicMode } = useConfig();
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -239,7 +258,7 @@ export function ImportBinaryButton({
             binary.name === selectedBinaryName && binary.version === selectedBinaryVersion,
         ) ?? null
       : null;
-  const needsDuplicateChoice = existingBinary !== null;
+  const needsDuplicateChoice = !publicMode && existingBinary !== null;
   const canImport =
     (sourceKind === "binary"
       ? rawFile !== null &&
@@ -257,8 +276,13 @@ export function ImportBinaryButton({
       onOpenChange={handleOpenChange}
       title="Import or analyze binary"
       trigger={
-        <button type="button" style={buttonStyle} title="Import a JSON export or analyze a raw binary">
-          ⬆ (Re) Import binary
+        <button
+          type="button"
+          style={prominent ? prominentButtonStyle : buttonStyle}
+          title="Import a JSON export or analyze a raw binary"
+        >
+          <span aria-hidden="true">⬆</span>
+          {prominent ? "Import or analyze binary" : "(Re) Import binary"}
         </button>
       }
     >

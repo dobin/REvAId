@@ -10,6 +10,7 @@ import type { BinarySummaryDto } from "@/api/types";
 import { EmptyState } from "@/components/EmptyState";
 import { Dialog } from "@/components/Dialog";
 import { ImportBinaryButton } from "@/features/sidebar/ImportBinaryButton";
+import { ConfigurationOverview } from "./ConfigurationOverview";
 import { DeleteBinaryDialog } from "./DeleteBinaryDialog";
 
 const pageStyle: React.CSSProperties = {
@@ -105,16 +106,27 @@ export function BinariesPage() {
 
   return (
     <div style={pageStyle}>
+      <header style={{ marginBottom: "2rem" }}>
+        <h1 style={{ margin: 0, fontSize: "1.75rem" }}>GraphRev</h1>
+        <p style={{ margin: "0.375rem 0 0", color: "var(--gr-color-muted, #6b7280)" }}>
+          Reverse-engineering call graph explorer
+        </p>
+      </header>
+
+      <ConfigurationOverview />
+
       <div
         style={{
           display: "flex",
           alignItems: "baseline",
           justifyContent: "space-between",
+          marginTop: "2.25rem",
           marginBottom: "1.5rem",
         }}
       >
-        <h1 style={{ margin: 0, fontSize: "1.25rem" }}>Binaries</h1>
+        <h2 style={{ margin: 0, fontSize: "1.25rem" }}>Binaries</h2>
         <ImportBinaryButton
+          prominent
           onImported={() => {
             // The list refreshes via query invalidation; stay on the page.
           }}
