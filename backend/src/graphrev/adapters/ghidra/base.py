@@ -18,7 +18,7 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from typing import Protocol, TypedDict
 
-from graphrev.db.enums import FunctionKind
+from graphrev.db.enums import EdgeKind, FunctionKind
 
 
 class RawParam(TypedDict):
@@ -94,6 +94,7 @@ class RawEdge:
 
     caller_address: int
     callee_address: int
+    kind: EdgeKind = "call"
     callee_module: str | None = None
     #: Static first-call-site ordinal from schema-v2 exports; ``None`` when an
     #: adapter or legacy source cannot report a trustworthy order.

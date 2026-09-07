@@ -296,7 +296,7 @@ export function ImportBinaryButton({
       {sourceKind === "json" ? <>
       <strong style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>1. Select export file</strong>
       <p style={{ margin: "0 0 0.75rem", fontSize: "0.8125rem", color: "#6b7280" }}>
-        Select a JSON file produced by <code>GraphRevExport.java</code>. Re-importing the same binary updates it without losing your names or notes.
+        Select a JSON file produced by <code>GraphRevExport.java</code>.
       </p>
 
       <input
@@ -320,7 +320,7 @@ export function ImportBinaryButton({
       </> : <>
         <strong style={{ display: "block", marginBottom: "0.5rem", fontSize: "0.875rem" }}>1. Select binary file</strong>
         <p style={{ margin: "0 0 0.75rem", fontSize: "0.8125rem", color: "#6b7280" }}>
-          Upload a binary for analysis by the configured local <code>kuna</code> decompiler.
+          Upload a binary for analysis by the <code>kuna</code> decompiler.
         </p>
         <input ref={inputRef} type="file" onChange={(event) => { const file = event.target.files?.[0]; if (file) handleRawFile(file); }} style={{ fontSize: "0.8125rem", marginBottom: "0.75rem" }} />
         {rawFile && <p style={{ margin: "0 0 0.75rem", fontSize: "0.8125rem" }}>Ready to analyze <strong>{rawFile.name}</strong> ({Math.ceil(rawFile.size / 1024)} KiB).</p>}

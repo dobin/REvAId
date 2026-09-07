@@ -16,6 +16,7 @@ one binary to serve.
 from __future__ import annotations
 
 from collections.abc import Iterator, Sequence
+from typing import cast
 
 from graphrev.adapters.ghidra.base import (
     GhidraAdapter,
@@ -25,6 +26,7 @@ from graphrev.adapters.ghidra.base import (
     RawFunction,
     RawParam,
 )
+from graphrev.db.enums import FunctionKind
 from graphrev.schemas.ingest import (
     GhidraExportDocument,
     GhidraExportEdge,
@@ -43,16 +45,24 @@ def _to_raw_function(fn: GhidraExportFunction) -> RawFunction:
         signature=fn.signature,
         assembly=fn.assembly,
         code_c=fn.code_c,
-        kind=fn.kind,
+        # Kuna schema-v4 ``data`` rows are known, bodyless non-functions.
+        # GraphRev's persisted kinds predate that distinction; represent them
+        # as the semantically equivalent non-executable ``external`` kind.
+        kind=_normalise_function_kind(fn.kind),
         has_indirect_calls=fn.has_indirect_calls,
         is_entry_point=fn.is_entry_point,
     )
+
+
+def _normalise_function_kind(kind: str) -> FunctionKind:
+    return "external" if kind == "data" else cast(FunctionKind, kind)
 
 
 def _to_raw_edge(edge: GhidraExportEdge) -> RawEdge:
     return RawEdge(
         caller_address=edge.caller_address,
         callee_address=edge.callee_address,
+        kind=edge.kind,
         callee_module=edge.callee_module,
         callee_order=edge.callee_order,
     )

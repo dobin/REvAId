@@ -20,11 +20,10 @@ FUNCTION_KIND_VALUES: tuple[FunctionKind, ...] = (
     "placeholder",
 )
 
-#: PRD Module-B: "`call` (only value in M0). Reserved for `data_xref` /
-#: `string_ref` (A10)." Narrowed deliberately (docs/adr/0004) so a future
-#: widening breaks the build at every site that must handle it.
-EdgeKind = Literal["call"]
-EDGE_KIND_VALUES: tuple[EdgeKind, ...] = ("call",)
+#: Kuna schema-v4 exports static control-flow and address-taken references in
+#: addition to direct calls. Consumers that model only calls filter explicitly.
+EdgeKind = Literal["call", "jump", "data"]
+EDGE_KIND_VALUES: tuple[EdgeKind, ...] = ("call", "jump", "data")
 
 #: Module-B enum table lists five values (adds "stale" beyond B5's four).
 #: C10 (Should) is what introduces "stale"; kept from day one per docs/adr/0004.

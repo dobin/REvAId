@@ -97,25 +97,25 @@ async def test_import_creates_binary_with_functions_and_placeholder(
             .scalars()
             .all()
         )
+        binary = await session.get(Binary, result.binary_id)
+        edge_orders = (
+            (
+                await session.execute(
+                    select(Edge.callee_order)
+                    .where(Edge.binary_id == result.binary_id)
+                    .order_by(Edge.callee_order)
+                )
+            )
+            .scalars()
+            .all()
+        )
     kinds = sorted(r.kind for r in rows)
     # 3 real (normal/normal/import) + 1 placeholder.
     assert "placeholder" in kinds
     assert len([k for k in kinds if k != "placeholder"]) == 3
 
-    binary = await session.get(Binary, result.binary_id)
     assert binary is not None
     assert binary.analysis_image_base == 0x400000
-    edge_orders = (
-        (
-            await session.execute(
-                select(Edge.callee_order)
-                .where(Edge.binary_id == result.binary_id)
-                .order_by(Edge.callee_order)
-            )
-        )
-        .scalars()
-        .all()
-    )
     assert edge_orders == [0, 1]
 
 
@@ -154,6 +154,38 @@ async def test_import_schema_v1_document_leaves_callee_order_unknown(
             .all()
         )
     assert orders == [None, None]
+
+
+@pytest.mark.asyncio
+async def test_import_kuna_schema_v4_document_preserves_edge_kinds(
+    session_factory: async_sessionmaker[AsyncSession], settings: Settings
+) -> None:
+    doc = _document()
+    doc.schema_version = 4
+    doc.functions.append(
+        GhidraExportFunction(
+            address=0x401300,
+            name="import_slot",
+            kind="data",
+        )
+    )
+    doc.edges[0].kind = "jump"
+    doc.edges[1].kind = "data"
+
+    result = await binary_service.import_ghidra_export(session_factory, settings, doc)
+
+    async with session_factory() as session:
+        edge_kinds = (await session.execute(select(Edge.kind).order_by(Edge.id))).scalars().all()
+        data_row = (
+            await session.execute(
+                select(Function).where(
+                    Function.binary_id == result.binary_id, Function.address == 0x401300
+                )
+            )
+        ).scalar_one()
+    assert edge_kinds == ["jump", "data"]
+    assert data_row.kind == "external"
+    assert data_row.code_c is None
 
 
 @pytest.mark.asyncio

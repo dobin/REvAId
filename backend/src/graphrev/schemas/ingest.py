@@ -1,9 +1,10 @@
-"""Ghidra JSON-export import DTOs (I12 — file-based ingestion).
+"""Graph-export import DTOs (I12 — file-based ingestion).
 
-The wire shape mirrors the JSON produced by ``tools/ghidra/GraphRevExport.java``
-(schemas v1 and v2). These DTOs are the *only* validation boundary for an uploaded
-export — everything past :class:`GhidraExportDocument` is trusted, already-typed
-data fed into the ingestion pipeline via
+The wire shape accepts the legacy JSON produced by
+``tools/ghidra/GraphRevExport.java`` (schemas v1 and v2) and Kuna's
+``decompile-graph`` schema v4. These DTOs are the *only* validation boundary
+for an uploaded export — everything past :class:`GhidraExportDocument` is
+trusted, already-typed data fed into the ingestion pipeline via
 :class:`graphrev.adapters.ghidra.file.FileGhidraAdapter`.
 
 Field names are ``camelCase`` on the wire (matching the exporter and the rest
@@ -17,12 +18,17 @@ from typing import Any, Literal
 
 from pydantic import Field, model_validator
 
-from graphrev.db.enums import FunctionKind
+from graphrev.db.enums import EdgeKind, FunctionKind
 from graphrev.schemas.common import ApiModel
 
-#: Versions accepted by this build. Schema v2 adds per-caller ``calleeOrder``;
-#: v1 remains accepted so existing exports can still be imported as unordered.
-SUPPORTED_EXPORT_SCHEMA_VERSIONS = frozenset({1, 2})
+#: Schema v2 adds per-caller ``calleeOrder``; Kuna schema v4 adds ``data``
+#: function rows and ``call``/``jump``/``data`` edge kinds. v1 remains
+#: accepted so existing exports can still be imported as unordered.
+SUPPORTED_EXPORT_SCHEMA_VERSIONS = frozenset({1, 2, 4})
+
+#: Kuna's ``data`` rows have no executable body. GraphRev stores them as the
+#: existing ``external`` kind while retaining all supported executable kinds.
+ExportFunctionKind = FunctionKind | Literal["data"]
 
 
 class GhidraExportParam(ApiModel):
@@ -36,10 +42,9 @@ class GhidraExportParam(ApiModel):
 class GhidraExportFunction(ApiModel):
     """One exported function (maps to ``RawFunction``).
 
-    ``kind`` is one of the four *observable* kinds the exporter emits
-    (``normal``/``import``/``thunk``/``external``); ``placeholder`` is never
-    supplied by an adapter — it is materialised by ingestion from unresolved
-    cross-module edges (B17).
+    ``placeholder`` is never supplied by an adapter — it is materialised by
+    ingestion from unresolved cross-module edges (B17). Kuna schema v4 also
+    reports non-executable address rows as ``data``.
     """
 
     address: int
@@ -48,7 +53,7 @@ class GhidraExportFunction(ApiModel):
     signature: str | None = None
     assembly: str | None = None
     code_c: str | None = None
-    kind: FunctionKind = "normal"
+    kind: ExportFunctionKind = "normal"
     has_indirect_calls: bool = False
     is_entry_point: bool = False
 
@@ -62,6 +67,7 @@ class GhidraExportEdge(ApiModel):
 
     caller_address: int
     callee_address: int
+    kind: EdgeKind = "call"
     callee_module: str | None = None
     #: Schema-v2 static first-call-site ordinal. ``None`` represents a legacy
     #: schema-v1 export, which has no trustworthy imported order.
@@ -97,19 +103,22 @@ class GhidraExportDocument(ApiModel):
 
     @model_validator(mode="after")
     def _validate_callee_order(self) -> GhidraExportDocument:
-        """Enforce schema-v2's distinct, contiguous per-caller order contract."""
-        if self.schema_version != 2:
+        """Enforce v2/v4's distinct, contiguous per-caller order contract."""
+        if self.schema_version not in {2, 4}:
             return self
 
         orders_by_caller: dict[int, list[int]] = {}
         seen_pairs: set[tuple[int, int]] = set()
         for edge in self.edges:
             if edge.callee_order is None:
-                raise ValueError("schemaVersion 2 requires calleeOrder on every edge")
+                raise ValueError(
+                    f"schemaVersion {self.schema_version} requires calleeOrder on every edge"
+                )
             pair = (edge.caller_address, edge.callee_address)
             if pair in seen_pairs:
                 raise ValueError(
-                    "schemaVersion 2 must not contain duplicate callerAddress/calleeAddress pairs"
+                    f"schemaVersion {self.schema_version} must not contain duplicate "
+                    "callerAddress/calleeAddress pairs"
                 )
             seen_pairs.add(pair)
             orders_by_caller.setdefault(edge.caller_address, []).append(edge.callee_order)
@@ -117,7 +126,8 @@ class GhidraExportDocument(ApiModel):
         for caller_address, orders in orders_by_caller.items():
             if sorted(orders) != list(range(len(orders))):
                 raise ValueError(
-                    f"schemaVersion 2 calleeOrder values for callerAddress {caller_address} "
+                    f"schemaVersion {self.schema_version} calleeOrder values for "
+                    f"callerAddress {caller_address} "
                     "must be contiguous from 0"
                 )
         return self

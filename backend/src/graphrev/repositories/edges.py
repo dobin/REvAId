@@ -22,6 +22,7 @@ class EdgeUpsertValues:
 
     caller_id: int
     callee_id: int
+    kind: EdgeKind = "call"
     callee_order: int | None = None
 
 
@@ -68,7 +69,6 @@ async def upsert_edges_batch(
     *,
     binary_id: int,
     edges: list[EdgeUpsertValues],
-    kind: EdgeKind = "call",
 ) -> tuple[int, int]:
     """Insert unique edge pairs or refresh their non-null imported order.
 
@@ -103,7 +103,7 @@ async def upsert_edges_batch(
                 "caller_id": edge.caller_id,
                 "callee_id": edge.callee_id,
                 "callee_order": edge.callee_order,
-                "kind": kind,
+                "kind": edge.kind,
             }
             for edge in values
         ]
