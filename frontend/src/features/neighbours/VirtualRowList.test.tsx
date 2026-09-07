@@ -20,6 +20,7 @@ function makeRow(id: number): NeighbourRowDto {
     fanIn: 1,
     isSelf: false,
     hasNotes: false,
+    canFanOut: true,
   };
 }
 

@@ -166,6 +166,8 @@ export interface NeighbourRowDto {
   fanIn: number;
   isSelf: boolean; // ↻ recursion, fan-out disabled
   hasNotes: boolean;
+  /** False for module/external placeholders and functions with no code body. */
+  canFanOut: boolean;
 }
 
 export interface NeighbourPageDto {

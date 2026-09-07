@@ -42,6 +42,7 @@ const utilityPage: NeighbourPageDto = {
     fanIn: 291,
     isSelf: false,
     hasNotes: false,
+    canFanOut: true,
   })),
   total: 7,
   totalPrimary: 16,

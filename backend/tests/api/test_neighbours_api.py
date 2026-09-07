@@ -102,6 +102,45 @@ async def test_neighbour_rows_use_llm_name_when_no_analyst_rename(
 
 
 @pytest.mark.asyncio
+async def test_neighbour_row_fan_out_requires_code_and_no_placeholder_module(
+    client: AsyncClient, session: AsyncSession, ingested: None
+) -> None:
+    from sqlalchemy import update
+
+    binary_id = await _get_binary_id(client, "acme.exe")
+    function_id = await _get_function_id_by_name(client, binary_id, "main")
+    view_id = await _get_view_id(session, binary_id)
+    url = f"/api/v1/functions/{function_id}/neighbours"
+    params = {"viewId": view_id, "direction": "callees", "group": "primary"}
+
+    response = await client.get(url, params=params)
+    target = response.json()["rows"][0]
+    assert target["canFanOut"] is True
+
+    await session.execute(
+        update(Function)
+        .where(Function.id == target["id"])
+        .values(assembly=None, code_c=None)
+    )
+    await session.commit()
+    response = await client.get(url, params=params)
+    assert next(r for r in response.json()["rows"] if r["id"] == target["id"])[
+        "canFanOut"
+    ] is False
+
+    await session.execute(
+        update(Function)
+        .where(Function.id == target["id"])
+        .values(assembly="RET", placeholder_module="OTHER.DLL")
+    )
+    await session.commit()
+    response = await client.get(url, params=params)
+    assert next(r for r in response.json()["rows"] if r["id"] == target["id"])[
+        "canFanOut"
+    ] is False
+
+
+@pytest.mark.asyncio
 async def test_dispatch_large_callees_are_capped_at_table_row_cap(
     client: AsyncClient, session: AsyncSession, ingested: None
 ) -> None:

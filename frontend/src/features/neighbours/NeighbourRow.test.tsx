@@ -24,6 +24,7 @@ const baseRow: NeighbourRowDto = {
   fanIn: 3,
   isSelf: false,
   hasNotes: false,
+  canFanOut: true,
 };
 
 describe("NeighbourRow", () => {
@@ -76,5 +77,19 @@ describe("NeighbourRow", () => {
     // nothing. A row that isn't on-canvas and has no origin must be disabled.
     renderWithActions(baseRow, undefined, makeActions());
     expect(screen.getByRole("button", { name: "fan-out-or-focus" })).toBeDisabled();
+  });
+
+  it("does not show fan-out for a function without a usable code body", () => {
+    renderWithActions(
+      { ...baseRow, canFanOut: false },
+      { functionId: 1, direction: "callees" },
+      makeActions(),
+    );
+    expect(screen.queryByRole("button", { name: "fan-out-or-focus" })).not.toBeInTheDocument();
+  });
+
+  it("still shows the hide control for an ineligible function already on canvas", () => {
+    renderWithActions({ ...baseRow, canFanOut: false, onCanvas: true }, undefined, makeActions());
+    expect(screen.getByRole("button", { name: "fan-out-or-focus" })).toBeEnabled();
   });
 });

@@ -89,40 +89,42 @@ export function NeighbourRow({
           </FunctionInfoTooltip>
         </span>
       </span>
-      <button
-        type="button"
-        disabled={disabled}
-        title={
-          row.isSelf
-            ? "Recursive call — cannot fan out"
-            : row.onCanvas
-              ? "Hide — remove from canvas"
-              : origin?.direction === "callers"
-                ? "Fan out caller — add to canvas (left)"
-                : "Fan out — add to canvas"
-        }
-        aria-label="fan-out-or-focus"
-        onClick={handleClick}
-        style={{
-          border: "none",
-          background: "none",
-          padding: "0.125rem 0.25rem",
-          cursor: disabled ? "default" : "pointer",
-          borderRadius: "0.25rem",
-          transition: "background 0.15s",
-          lineHeight: 1,
-        }}
-        onMouseEnter={(e) => {
-          if (!disabled) {
-            (e.currentTarget).style.background = "#f3f4f6";
+      {(row.onCanvas || row.canFanOut) && (
+        <button
+          type="button"
+          disabled={disabled}
+          title={
+            row.isSelf
+              ? "Recursive call — cannot fan out"
+              : row.onCanvas
+                ? "Hide — remove from canvas"
+                : origin?.direction === "callers"
+                  ? "Fan out caller — add to canvas (left)"
+                  : "Fan out — add to canvas"
           }
-        }}
-        onMouseLeave={(e) => {
-          (e.currentTarget).style.background = "none";
-        }}
-      >
-        <Glyph name={row.onCanvas ? "onCanvas" : "fanOut"} />
-      </button>
+          aria-label="fan-out-or-focus"
+          onClick={handleClick}
+          style={{
+            border: "none",
+            background: "none",
+            padding: "0.125rem 0.25rem",
+            cursor: disabled ? "default" : "pointer",
+            borderRadius: "0.25rem",
+            transition: "background 0.15s",
+            lineHeight: 1,
+          }}
+          onMouseEnter={(e) => {
+            if (!disabled) {
+              (e.currentTarget).style.background = "#f3f4f6";
+            }
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget).style.background = "none";
+          }}
+        >
+          <Glyph name={row.onCanvas ? "onCanvas" : "fanOut"} />
+        </button>
+      )}
     </div>
   );
 }

@@ -29,6 +29,7 @@ class NeighbourRowDto(ApiModel):
     fan_in: int
     is_self: bool
     has_notes: bool
+    can_fan_out: bool
 
 
 class NeighbourPageDto(ApiModel):

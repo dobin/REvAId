@@ -41,6 +41,7 @@ function makeRow(id: number, overrides: Partial<NeighbourRowDto> = {}): Neighbou
     fanIn: 1,
     isSelf: false,
     hasNotes: false,
+    canFanOut: true,
     ...overrides,
   };
 }

@@ -42,6 +42,11 @@ def _neighbour_row_dto(row: NeighbourRow) -> NeighbourRowDto:
         fan_in=fn.fan_in,
         is_self=row.is_self,
         has_notes=fn.notes != "",
+        # External/module placeholders and bodyless functions cannot produce
+        # a useful function card. Keep this as a derived UI capability rather
+        # than exposing code or module metadata in the narrow neighbour DTO.
+        can_fan_out=fn.placeholder_module is None
+        and (fn.assembly is not None or fn.code_c is not None),
     )
 
 
