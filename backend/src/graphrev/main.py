@@ -43,6 +43,7 @@ from graphrev.core.logging import (
     clear_request_context,
     configure_logging,
     get_logger,
+    restore_uvicorn_formatters,
 )
 from graphrev.db.engine import create_engine, create_session_factory, dispose_engine
 from graphrev.db.startup import recompute_utility_if_threshold_changed, recover_pending_summaries
@@ -171,6 +172,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.llm_adapter = llm_adapter
     app.state.summary_worker_pool = worker_pool
     worker_pool.start()
+
+    # LiteLLM/provider initialization may replace stdlib handlers during
+    # startup. Restore Uvicorn's format-aware handlers after adapters are live.
+    restore_uvicorn_formatters()
 
     logger.info(
         "startup.ready",

@@ -18,6 +18,7 @@ from typing import Any
 
 import structlog
 from structlog.contextvars import bind_contextvars, clear_contextvars
+from uvicorn.logging import AccessFormatter, DefaultFormatter
 
 from graphrev.core.config import Settings
 
@@ -35,10 +36,43 @@ MANDATORY_EVENT_FIELDS = (
 )
 
 
+def restore_uvicorn_formatters() -> None:
+    """Keep Uvicorn's parameterized lifecycle/access records renderable.
+
+    Some provider SDKs reconfigure stdlib logging while the application starts.
+    Uvicorn emits lifecycle messages as a format string plus arguments, so a
+    replacement handler that renders only ``record.msg`` leaks placeholders
+    such as ``%s`` and ``%d``. Give its non-propagating loggers fresh handlers
+    with Uvicorn's own formatters after application logging is configured.
+    """
+    error_handler = logging.StreamHandler(sys.stderr)
+    # Disable Uvicorn's alternate ``color_message`` path: provider startup can
+    # leave those styled templates unexpanded even though ``record.args`` is
+    # intact. The ordinary message path always calls ``record.getMessage()``.
+    error_handler.setFormatter(
+        DefaultFormatter("%(levelprefix)s %(message)s", use_colors=False)
+    )
+    uvicorn_logger = logging.getLogger("uvicorn")
+    uvicorn_logger.handlers = [error_handler]
+    uvicorn_logger.propagate = False
+
+    access_handler = logging.StreamHandler(sys.stdout)
+    access_handler.setFormatter(
+        AccessFormatter(
+            '%(levelprefix)s %(client_addr)s - "%(request_line)s" %(status_code)s',
+            use_colors=False,
+        )
+    )
+    access_logger = logging.getLogger("uvicorn.access")
+    access_logger.handlers = [access_handler]
+    access_logger.propagate = False
+
+
 def configure_logging(settings: Settings) -> None:
     """Configure structlog + stdlib logging. Call once at process startup."""
     level = getattr(logging, settings.log_level.upper(), logging.INFO)
     logging.basicConfig(format="%(message)s", stream=sys.stdout, level=level)
+    restore_uvicorn_formatters()
 
     shared_processors: list[Any] = [
         structlog.contextvars.merge_contextvars,
