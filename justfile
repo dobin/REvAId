@@ -28,7 +28,7 @@ prod domain="":
     set -euo pipefail
     trap 'kill 0' EXIT
     export GRAPHREV_WEB_DOMAIN="{{ domain }}"
-    cd frontend && npm run build
+    (cd frontend && npm run build)
     just api-prod &
     just web-prod &
     wait
