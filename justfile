@@ -1,4 +1,6 @@
 set shell := ["bash", "-cu"]
+set dotenv-load := true
+set dotenv-path := "backend/.env"
 
 default:
     @just --list
