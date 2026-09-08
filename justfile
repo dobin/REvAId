@@ -28,10 +28,37 @@ prod domain="":
     set -euo pipefail
     trap 'kill 0' EXIT
     export GRAPHREV_WEB_DOMAIN="{{ domain }}"
-    (cd frontend && npm run build)
+    just web-build
     just api-prod &
     just web-prod &
     wait
+
+# Build only when the saved bundle is missing or a frontend input changed.
+web-build:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    output="frontend/dist/index.html"
+    if [[ ! -f "$output" ]] || \
+       find frontend/src \
+            frontend/index.html \
+            frontend/package.json \
+            frontend/package-lock.json \
+            frontend/vite.config.ts \
+            frontend/tsconfig.json \
+            frontend/tsconfig.app.json \
+            frontend/tsconfig.node.json \
+            frontend/postcss.config.js \
+            frontend/tailwind.config.ts \
+            -type f -newer "$output" -print -quit | grep -q .; then
+        cd frontend
+        npm run build
+    else
+        echo "Frontend bundle is up to date; reusing frontend/dist"
+    fi
+
+# Rebuild the SPA even when the saved bundle appears current.
+web-build-force:
+    cd frontend && npm run build
 
 api-prod:
     cd backend && uv run uvicorn graphrev.main:app \
