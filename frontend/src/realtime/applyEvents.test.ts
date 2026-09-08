@@ -96,6 +96,7 @@ function makeNeighbourPage(): NeighbourPageDto {
         fanIn: 0,
         isSelf: false,
         hasNotes: false,
+        canFanOut: true,
       },
     ],
     total: 1,

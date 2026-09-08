@@ -99,6 +99,7 @@ function makeRow(id: number): NeighbourPageDto["rows"][number] {
     fanIn: 1,
     isSelf: false,
     hasNotes: false,
+    canFanOut: true,
   };
 }
 

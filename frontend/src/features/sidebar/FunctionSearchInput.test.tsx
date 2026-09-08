@@ -28,7 +28,7 @@ function neighbourRow(overrides: Partial<NeighbourRowDto> & { id: number }): Nei
     isSelf: false,
     hasNotes: false,
     ...overrides,
-    ...overrides,
+    canFanOut: overrides.canFanOut ?? true,
   };
 }
 
