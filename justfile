@@ -75,6 +75,9 @@ web-prod:
 api:
     cd backend && uv run uvicorn graphrev.main:app --reload --host 127.0.0.1 --port 8000
 
+mcp:
+    cd backend && uv run graphrev-mcp
+
 web:
     cd frontend && npm run dev
 

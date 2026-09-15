@@ -27,6 +27,7 @@ async def _make_function(
     notes: str = "",
     fan_out: int = 0,
     is_entry_point: bool = False,
+    code_c: str | None = None,
 ) -> Function:
     now = utc_now_iso()
     fn = Function(
@@ -38,6 +39,7 @@ async def _make_function(
         notes=notes,
         fan_out=fan_out,
         is_entry_point=is_entry_point,
+        code_c=code_c,
         created_at=now,
         updated_at=now,
     )
@@ -128,6 +130,35 @@ async def test_search_functions_matches_name_llm(session: AsyncSession) -> None:
     )
     assert total == 1
     assert rows[0].name_ghidra == "FUN_00401000"
+
+
+@pytest.mark.asyncio
+async def test_search_functions_can_include_decompiled_c(session: AsyncSession) -> None:
+    binary, _ = await get_or_create_binary(session, name="acme.exe", version="1.0")
+    await _make_function(
+        session,
+        binary_id=binary.id,
+        address=0x1000,
+        name_ghidra="FUN_00401000",
+        code_c="if (packet_is_malicious(input)) { quarantine(input); }",
+    )
+    await session.commit()
+
+    default_rows, _ = await search_functions(
+        session, binary_id=binary.id, query="quarantine", limit=50, offset=0
+    )
+    mcp_rows, total = await search_functions(
+        session,
+        binary_id=binary.id,
+        query="quarantine",
+        limit=50,
+        offset=0,
+        include_code_c=True,
+    )
+
+    assert default_rows == []
+    assert total == 1
+    assert mcp_rows[0].name_ghidra == "FUN_00401000"
 
 
 @pytest.mark.asyncio

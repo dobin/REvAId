@@ -13,7 +13,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from graphrev.db.enums import EdgeKind
-from graphrev.db.models import Edge
+from graphrev.db.models import Edge, Function
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,8 +22,43 @@ class EdgeUpsertValues:
 
     caller_id: int
     callee_id: int
-    kind: EdgeKind = "call"
     callee_order: int | None = None
+    kind: EdgeKind = "call"
+
+
+@dataclass(frozen=True, slots=True)
+class RelatedFunction:
+    """A function connected by one call edge and that edge's metadata."""
+
+    function: Function
+    callee_order: int | None
+    kind: str
+
+
+async def list_callers(session: AsyncSession, *, function_id: int) -> list[RelatedFunction]:
+    """Return direct callers ordered by address."""
+    rows = (
+        await session.execute(
+            select(Function, Edge.callee_order, Edge.kind)
+            .join(Edge, Edge.caller_id == Function.id)
+            .where(Edge.callee_id == function_id)
+            .order_by(Function.address, Function.id)
+        )
+    ).all()
+    return [RelatedFunction(function=fn, callee_order=order, kind=kind) for fn, order, kind in rows]
+
+
+async def list_callees(session: AsyncSession, *, function_id: int) -> list[RelatedFunction]:
+    """Return direct callees in imported call order, then by address."""
+    rows = (
+        await session.execute(
+            select(Function, Edge.callee_order, Edge.kind)
+            .join(Edge, Edge.callee_id == Function.id)
+            .where(Edge.caller_id == function_id)
+            .order_by(Edge.callee_order.is_(None), Edge.callee_order, Function.address, Function.id)
+        )
+    ).all()
+    return [RelatedFunction(function=fn, callee_order=order, kind=kind) for fn, order, kind in rows]
 
 
 async def upsert_edge(

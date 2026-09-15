@@ -143,6 +143,10 @@ class Settings(BaseSettings):
     function_search_default_limit: int = Field(default=50, gt=0, description="I3 / B11 / E1a.")
     function_search_max_limit: int = Field(default=200, gt=0, description="I3 / B11 / E1a.")
 
+    #: Local Streamable HTTP endpoint for the agent-facing GraphRev MCP server.
+    mcp_host: str = Field(default="127.0.0.1")
+    mcp_port: int = Field(default=8001, gt=0, le=65535)
+
     #: Debounce intervals (ms). The PRD requires debouncing in five places but
     #: specifies no millisecond value anywhere — these are TAD choices.
     node_patch_debounce_ms: int = Field(default=250, gt=0, description="E3 node PATCH batching.")

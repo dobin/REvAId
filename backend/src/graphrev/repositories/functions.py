@@ -9,9 +9,10 @@ the model it guards (``db/models.py``).
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from typing import TypedDict
 
-from sqlalchemy import String, cast, func, or_, select, text
+from sqlalchemy import String, cast, func, or_, select, text, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,11 +22,14 @@ from graphrev.db.models import INGESTION_OWNED_COLUMNS, Function
 
 __all__ = [
     "INGESTION_OWNED_COLUMNS",
+    "get_function_by_address",
     "get_function_by_id",
     "list_entry_points",
     "recompute_fan_in_fan_out_and_utility",
     "resolve_function_by_address",
+    "resolve_functions_by_name",
     "search_functions",
+    "update_llm_fields",
     "upsert_function",
     "upsert_functions_batch",
 ]
@@ -242,6 +246,68 @@ async def get_function_by_id(session: AsyncSession, function_id: int) -> Functio
     return await session.get(Function, function_id)
 
 
+async def get_function_by_address(
+    session: AsyncSession, *, binary_id: int, address: int
+) -> Function | None:
+    """Return the function starting exactly at ``address`` in one binary."""
+    result = await session.execute(
+        select(Function).where(Function.binary_id == binary_id, Function.address == address)
+    )
+    return result.scalar_one_or_none()
+
+
+async def resolve_functions_by_name(
+    session: AsyncSession, *, binary_id: int, name: str
+) -> list[Function]:
+    """Return exact case-insensitive matches across all stored function names."""
+    result = await session.execute(
+        select(Function)
+        .where(
+            Function.binary_id == binary_id,
+            or_(
+                Function.name_ghidra.collate("NOCASE") == name,
+                Function.name_llm.collate("NOCASE") == name,
+                Function.name_analyst.collate("NOCASE") == name,
+            ),
+        )
+        .order_by(Function.address, Function.id)
+    )
+    return list(result.scalars().all())
+
+
+async def update_llm_fields(
+    session: AsyncSession,
+    *,
+    function_id: int,
+    values: Mapping[str, str | None],
+) -> Function | None:
+    """Partially update the three LLM-authored fields exposed through MCP.
+
+    The explicit allowlist preserves A3 ownership and prevents callers from
+    turning this generic mapping into an arbitrary function-row update.
+    """
+    allowed = {"name_llm", "summary_short", "summary_long"}
+    unknown = set(values) - allowed
+    if unknown:
+        raise ValueError(f"unsupported LLM fields: {sorted(unknown)}")
+
+    fn = await session.get(Function, function_id)
+    if fn is None:
+        return None
+    if not values:
+        return fn
+
+    now = utc_now_iso()
+    await session.execute(
+        update(Function)
+        .where(Function.id == function_id)
+        .values(**values, summary_status="ready", updated_at=now)
+    )
+    await session.flush()
+    await session.refresh(fn)
+    return fn
+
+
 async def update_utility_override(
     session: AsyncSession, *, function_id: int, utility_override: str | None
 ) -> Function | None:
@@ -275,6 +341,7 @@ async def search_functions(
     query: str | None,
     limit: int,
     offset: int,
+    include_code_c: bool = False,
 ) -> tuple[list[Function], int]:
     """Paginated, case-insensitive substring search over a binary's functions
     (B11/E1a).
@@ -293,16 +360,17 @@ async def search_functions(
         address_query = query.strip()
         if address_query.lower().startswith("0x"):
             address_query = address_query[2:]
-        filters.append(
-            or_(
-                Function.name_ghidra.collate("NOCASE").like(like),
-                Function.name_llm.collate("NOCASE").like(like),
-                Function.name_analyst.collate("NOCASE").like(like),
-                Function.notes.collate("NOCASE").like(like),
-                cast(Function.address, String).like(like),
-                func.printf("%X", Function.address).like(f"%{address_query.upper()}%"),
-            )
-        )
+        match_expressions = [
+            Function.name_ghidra.collate("NOCASE").like(like),
+            Function.name_llm.collate("NOCASE").like(like),
+            Function.name_analyst.collate("NOCASE").like(like),
+            Function.notes.collate("NOCASE").like(like),
+            cast(Function.address, String).like(like),
+            func.printf("%X", Function.address).like(f"%{address_query.upper()}%"),
+        ]
+        if include_code_c:
+            match_expressions.append(Function.code_c.collate("NOCASE").like(like))
+        filters.append(or_(*match_expressions))
 
     base_stmt = select(Function).where(*filters)
     total = (
