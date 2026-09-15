@@ -22,6 +22,7 @@ FORBIDDEN_COLUMNS = frozenset(
         "notes",
         "notes_updated_at",
         "utility_override",
+        "is_featured",
     }
 )
 

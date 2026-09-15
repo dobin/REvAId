@@ -12,6 +12,7 @@ from sqlalchemy.orm import selectinload
 
 from graphrev.core.clock import utc_now_iso
 from graphrev.db.models import View, ViewNode
+from graphrev.db.seed import seed_featured_view_nodes
 
 __all__ = [
     "count_views_by_binary",
@@ -61,6 +62,7 @@ async def create_view(
         view.id = view_id
     session.add(view)
     await session.flush()
+    await seed_featured_view_nodes(session, view)
     return view
 
 

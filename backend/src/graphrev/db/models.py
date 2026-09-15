@@ -164,6 +164,10 @@ class Function(Base):
     notes: Mapped[str] = mapped_column(default="")
     notes_updated_at: Mapped[str | None] = mapped_column(default=None)
     utility_override: Mapped[str | None] = mapped_column(default=None)  # D36
+    # Operator-curated membership in the template copied into newly created
+    # views. Function-scoped and sticky across re-ingestion, like the other
+    # analyst-owned fields; this is distinct from a view node's layout pin.
+    is_featured: Mapped[bool] = mapped_column(default=False)
     # I3: "is this an entry point" (E1b suggestions). Analyst-owned by
     # construction — ingestion supplies an initial value only on first
     # INSERT (e.g. the mock adapter flags `main`/module roots) and never
@@ -255,6 +259,7 @@ class View(Base):
         cascade="all, delete-orphan",
         passive_deletes=True,
         foreign_keys="ViewNode.view_id",
+        order_by="ViewNode.id",
     )
 
     __table_args__ = (Index("ix_views_binary", "binary_id"),)

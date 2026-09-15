@@ -20,6 +20,25 @@ const emptyView: ViewDto = {
   updatedAt: "2026-01-01T00:00:00Z",
 };
 
+const featuredView: ViewDto = {
+  ...emptyView,
+  rootFunctionId: 77,
+  nodes: [
+    {
+      functionId: 77,
+      visible: true,
+      collapsed: false,
+      color: null,
+      posX: 0,
+      posY: 0,
+      pinned: false,
+      originFunctionId: null,
+      originKind: "root",
+      originImplied: false,
+    },
+  ],
+};
+
 function renderWithClient(node: React.ReactNode) {
   render(<QueryClientProvider client={new QueryClient()}>{node}</QueryClientProvider>);
 }
@@ -48,6 +67,22 @@ describe("entry-point placement", () => {
       expect(patchSpy).toHaveBeenNthCalledWith(2, "/views/5", { rootFunctionId: 42 });
     });
     expect(patchSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not add an entry point when featured nodes seeded the view", async () => {
+    const patchSpy = vi.spyOn(apiClient, "patch").mockResolvedValue({ nodes: [] });
+    const getSpy = vi.spyOn(apiClient, "get").mockImplementation((url: string) => {
+      if (url === "/views/5") return Promise.resolve(featuredView);
+      if (url === "/binaries/1/entry-points") return Promise.resolve(entryPoints);
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
+
+    renderWithClient(<AutoPlaceEntryPoint binaryId={1} viewId={5} />);
+
+    await waitFor(() => {
+      expect(getSpy).toHaveBeenCalledTimes(2);
+    });
+    expect(patchSpy).not.toHaveBeenCalled();
   });
 
   it("places the entry point when requested manually", async () => {

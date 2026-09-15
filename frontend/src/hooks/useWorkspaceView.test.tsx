@@ -42,9 +42,22 @@ const createdView: ViewDto = {
   id: 42,
   binaryId: 1,
   name: "My view",
-  rootFunctionId: null,
+  rootFunctionId: 77,
   camera: { x: 0, y: 0, zoom: 1 },
-  nodes: [],
+  nodes: [
+    {
+      functionId: 77,
+      visible: true,
+      collapsed: false,
+      color: null,
+      posX: 0,
+      posY: 0,
+      pinned: false,
+      originFunctionId: null,
+      originKind: "root",
+      originImplied: false,
+    },
+  ],
   createdAt: "2026-01-03T00:00:00Z",
   updatedAt: "2026-01-03T00:00:00Z",
 };
@@ -98,7 +111,7 @@ describe("useWorkspaceView", () => {
     expect(result.current.viewId).toBe(6);
   });
 
-  it("public mode: creates a fresh view on first visit and records it", async () => {
+  it("public mode: creates a fresh featured view on first visit and records it", async () => {
     configMock.publicMode = true;
     const postSpy = vi.spyOn(apiClient, "post").mockResolvedValue(createdView);
     const getSpy = vi.spyOn(apiClient, "get");

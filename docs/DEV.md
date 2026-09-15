@@ -74,6 +74,75 @@ Caveat: enable public mode on a fresh DB (or re-ingest), since random ids
 are only assigned at view-creation time — flipping it on a DB that already
 has sequential view ids leaves those old ids guessable.
 
+#### Curating the initial canvas
+
+`functions.is_featured` is an operator-owned marker for functions that should
+appear in every **new** view. This is especially useful in public mode: a new
+anonymous `My view` starts with the curated functions instead of an empty
+canvas. Private-mode view creation uses the same template. Featured functions
+become independent root nodes and the normal ELK layout arranges them; the
+lowest-address featured function anchors the initial camera.
+
+The template is copied only when a view is created. Changing the marker does
+not mutate existing views, and removing a featured node from one view remains
+durable. Re-ingestion also preserves the marker. With the app stopped, mark
+functions using SQLite (adjust the binary name and addresses):
+
+```sql
+BEGIN IMMEDIATE;
+UPDATE functions
+SET is_featured = 1
+WHERE binary_id = (
+	SELECT id FROM binaries WHERE name = 'sample.exe' AND version = ''
+)
+AND address IN (4198400, 4198448);
+COMMIT;
+```
+
+Addresses are stored as integers; SQLite accepts hexadecimal integer literals
+such as `0x401000` as well. Newly created views now receive those functions.
+To backfill missing featured nodes into an already-existing `Default` view
+without overwriting its current nodes, positions, or colors:
+
+```sql
+BEGIN IMMEDIATE;
+INSERT OR IGNORE INTO view_nodes (
+	view_id, function_id, visible, collapsed, color, pos_x, pos_y, pinned,
+	origin_function_id, origin_kind, origin_implied, created_at, updated_at
+)
+SELECT
+	v.id, f.id, 1, 0, NULL, 0.0, 0.0, 0,
+	NULL, 'root', 0,
+	strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
+	strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+FROM views AS v
+JOIN binaries AS b ON b.id = v.binary_id
+JOIN functions AS f ON f.binary_id = b.id AND f.is_featured = 1
+WHERE b.name = 'sample.exe' AND b.version = '' AND v.name = 'Default';
+
+UPDATE views
+SET root_function_id = (
+		SELECT f.id
+		FROM functions AS f
+		WHERE f.binary_id = views.binary_id AND f.is_featured = 1
+		ORDER BY f.address, f.id
+		LIMIT 1
+	),
+	updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+WHERE name = 'Default'
+  AND binary_id = (
+	  SELECT id FROM binaries WHERE name = 'sample.exe' AND version = ''
+  )
+  AND EXISTS (
+	  SELECT 1 FROM functions AS f
+	  WHERE f.binary_id = views.binary_id AND f.is_featured = 1
+  );
+COMMIT;
+```
+
+If no functions are featured, the existing empty-view entry-point fallback is
+unchanged.
+
 
 ### LLM 
 

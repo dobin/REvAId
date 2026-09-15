@@ -68,6 +68,11 @@ When `publicMode` is **true**:
   /views` round trip.
 - The workspace resolves its view from that list (creating a fresh view on
   first visit); the `useViewsQuery` listing query is disabled in public mode.
+- A newly created view receives a creation-time snapshot of the binary's
+  operator-curated `functions.is_featured` functions as independent root
+  nodes. This gives first-time anonymous visitors a useful canvas without
+  sharing mutable view state. Existing views are never synchronized or
+  mutated when featured membership changes.
 - The picker lists only owned views and skips the `last-view` write.
 
 When `publicMode` is **false** (private instance), nothing changes: the

@@ -6,8 +6,11 @@ import asyncio
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from graphrev.core.config import get_settings
+from graphrev.db.models import Function
 
 
 async def _get_binary_id(client: AsyncClient, name: str) -> int:
@@ -74,6 +77,53 @@ async def test_create_view_and_get_view_round_trip(client: AsyncClient, ingested
     get_response = await client.get(f"/api/v1/views/{created['id']}")
     assert get_response.status_code == 200
     assert get_response.json() == created
+
+
+@pytest.mark.asyncio
+async def test_create_view_seeds_featured_functions_in_address_order(
+    client: AsyncClient, session: AsyncSession, ingested: None
+) -> None:
+    binary_id = await _get_binary_id(client, "acme.exe")
+    functions = list(
+        (
+            await session.execute(
+                select(Function)
+                .where(Function.binary_id == binary_id)
+                .order_by(Function.address.desc())
+                .limit(2)
+            )
+        ).scalars()
+    )
+    assert len(functions) == 2
+    for function in functions:
+        function.is_featured = True
+    await session.commit()
+    expected_ids = [function.id for function in sorted(functions, key=lambda row: row.address)]
+
+    response = await client.post(
+        f"/api/v1/binaries/{binary_id}/views", json={"name": "featured template"}
+    )
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["rootFunctionId"] == expected_ids[0]
+    assert [node["functionId"] for node in body["nodes"]] == expected_ids
+    assert all(
+        node
+        == {
+            "functionId": node["functionId"],
+            "visible": True,
+            "collapsed": False,
+            "color": None,
+            "posX": 0.0,
+            "posY": 0.0,
+            "pinned": False,
+            "originFunctionId": None,
+            "originKind": "root",
+            "originImplied": False,
+        }
+        for node in body["nodes"]
+    )
 
 
 @pytest.mark.asyncio
@@ -448,3 +498,37 @@ async def test_create_view_is_fetchable_by_its_random_id_in_public_mode(
     assert fetched.status_code == 200
     assert fetched.json()["id"] == view_id
     assert fetched.json()["name"] == "mine"
+
+
+@pytest.mark.asyncio
+async def test_public_create_view_seeds_featured_functions(
+    client: AsyncClient,
+    session: AsyncSession,
+    ingested: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binary_id = await _get_binary_id(client, "acme.exe")
+    function = (
+        (
+            await session.execute(
+                select(Function).where(Function.binary_id == binary_id).order_by(Function.address)
+            )
+        )
+        .scalars()
+        .first()
+    )
+    assert function is not None
+    function.is_featured = True
+    await session.commit()
+
+    _enable_public_mode(monkeypatch)
+    try:
+        response = await client.post(f"/api/v1/binaries/{binary_id}/views", json={"name": "mine"})
+    finally:
+        get_settings.cache_clear()
+
+    assert response.status_code == 201
+    body = response.json()
+    assert body["id"] > 1000
+    assert body["rootFunctionId"] == function.id
+    assert [node["functionId"] for node in body["nodes"]] == [function.id]

@@ -77,6 +77,7 @@ async def test_reingest_preserves_llm_and_analyst_fields(session: AsyncSession) 
     fn.name_analyst = "parse_config"
     fn.notes = "Confirmed this handles the v2 format only."
     fn.utility_override = "never"
+    fn.is_featured = True
     await session.commit()
 
     # Re-ingestion: ground truth changed (Ghidra now has a symbolic name and
@@ -106,6 +107,7 @@ async def test_reingest_preserves_llm_and_analyst_fields(session: AsyncSession) 
     assert refreshed.name_analyst == "parse_config"
     assert refreshed.notes == "Confirmed this handles the v2 format only."
     assert refreshed.utility_override == "never"
+    assert refreshed.is_featured is True
 
 
 @pytest.mark.asyncio

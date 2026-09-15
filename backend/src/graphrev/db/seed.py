@@ -1,4 +1,4 @@
-"""Default-view seeding helper (B9).
+"""View seeding helpers (B9 and operator-curated featured functions).
 
 Written now, called by the ingestion pipeline in I2: every binary must have at
 least one view so the picker is never empty after ingestion.
@@ -6,13 +6,59 @@ least one view so the picker is never empty after ingestion.
 
 from __future__ import annotations
 
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from graphrev.core.clock import utc_now_iso
 from graphrev.core.config import get_settings
 from graphrev.core.ids import random_view_id
-from graphrev.db.models import View
+from graphrev.db.models import Function, View, ViewNode
+
+
+async def seed_featured_view_nodes(session: AsyncSession, view: View) -> None:
+    """Copy this binary's featured functions into a newly created view.
+
+    Featured membership is a creation-time template, not a live link: once
+    these rows exist, normal view edits are authoritative. Independent root
+    provenance avoids inventing call relationships between curated entries.
+    """
+    featured_ids = list(
+        (
+            await session.execute(
+                select(Function.id)
+                .where(Function.binary_id == view.binary_id, Function.is_featured.is_(True))
+                .order_by(Function.address, Function.id)
+            )
+        ).scalars()
+    )
+    if not featured_ids:
+        return
+
+    now = utc_now_iso()
+    view.root_function_id = featured_ids[0]
+    view.updated_at = now
+    session.add_all(
+        [
+            ViewNode(
+                view_id=view.id,
+                function_id=function_id,
+                visible=True,
+                collapsed=False,
+                color=None,
+                pos_x=0.0,
+                pos_y=0.0,
+                pinned=False,
+                origin_function_id=None,
+                origin_kind="root",
+                origin_implied=False,
+                created_at=now,
+                updated_at=now,
+            )
+            for function_id in featured_ids
+        ]
+    )
+    await session.flush()
 
 
 async def create_default_view(session: AsyncSession, binary_id: int, name: str = "Default") -> View:
@@ -37,6 +83,7 @@ async def create_default_view(session: AsyncSession, binary_id: int, name: str =
                 view.id = random_view_id()
                 session.add(view)
                 await session.flush()
+                await seed_featured_view_nodes(session, view)
                 return view
             except IntegrityError:
                 await session.rollback()
@@ -56,4 +103,5 @@ async def create_default_view(session: AsyncSession, binary_id: int, name: str =
         # than failing ingestion outright.
     session.add(view)
     await session.flush()
+    await seed_featured_view_nodes(session, view)
     return view

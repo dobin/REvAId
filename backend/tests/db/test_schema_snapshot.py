@@ -56,6 +56,21 @@ async def test_functions_columns_match_model(engine: AsyncEngine, migrated_db: P
 
 
 @pytest.mark.asyncio
+async def test_is_featured_is_non_nullable_and_defaults_false(
+    engine: AsyncEngine, migrated_db: Path
+) -> None:
+    async with engine.connect() as conn:
+
+        def _columns(sync_conn: object) -> list[dict[str, object]]:
+            return inspect(sync_conn).get_columns("functions")  # type: ignore[arg-type,return-value]
+
+        columns = await conn.run_sync(_columns)
+    column = next(column for column in columns if column["name"] == "is_featured")
+    assert column["nullable"] is False
+    assert str(column["default"]) in {"0", "false", "(0)"}
+
+
+@pytest.mark.asyncio
 async def test_edges_columns_match_model(engine: AsyncEngine, migrated_db: Path) -> None:
     expected_columns = {c.name for c in Base.metadata.tables["edges"].columns}
     async with engine.connect() as conn:
