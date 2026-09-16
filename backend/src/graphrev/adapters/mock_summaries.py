@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import hashlib
 
-#: name_ghidra -> (summary_short, summary_long). Hand-written so the mock
+#: name -> (summary_short, summary_long). Hand-written so the mock
 #: corpus reads like plausible analyst output for the 15 functions that
 #: `adapters/ghidra/mock.py::_build_acme_exe`/`_build_libparse_dll` name
 #: explicitly (main, the three fan-in hubs, the two dispatchers, the
@@ -175,11 +175,11 @@ MOCK_SUMMARIES: dict[str, tuple[str, str]] = {
     ),
 }
 
-#: name_ghidra -> LLM-proposed name (C13 auto-display variant). The mock
+#: name -> LLM-proposed name (C13 auto-display variant). The mock
 #: corpus functions already have meaningful Ghidra names, so the LLM names
 #: are deliberately *different* (what an LLM might propose from behaviour
 #: alone) — that way the UI precedence (`name_analyst ?? name_llm ??
-#: name_ghidra`) is actually observable in a mock demo.
+#: name`) is actually observable in a mock demo.
 MOCK_LLM_NAMES: dict[str, str] = {
     "main": "program_bootstrap",
     "check_config": "validate_config_fields",

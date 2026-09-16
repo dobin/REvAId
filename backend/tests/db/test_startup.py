@@ -25,7 +25,7 @@ async def test_recover_pending_summaries_requeues_pending_work(session: AsyncSes
     fn = Function(
         binary_id=binary.id,
         address=0x1,
-        name_ghidra="a",
+        name="a",
         summary_status="pending",
         created_at=_now(),
         updated_at=_now(),
@@ -52,7 +52,7 @@ async def test_recover_pending_summaries_leaves_other_statuses(session: AsyncSes
     fn = Function(
         binary_id=binary.id,
         address=0x1,
-        name_ghidra="a",
+        name="a",
         summary_status="ready",
         created_at=_now(),
         updated_at=_now(),
@@ -78,7 +78,7 @@ async def test_recover_pending_summaries_resets_rows_evicted_by_reduced_capacity
         Function(
             binary_id=binary.id,
             address=address,
-            name_ghidra=f"fn_{address}",
+            name=f"fn_{address}",
             summary_status="pending",
             created_at=_now(),
             updated_at=_now(),
@@ -118,7 +118,7 @@ async def test_recompute_utility_flips_is_utility_when_threshold_changes(
     fn = Function(
         binary_id=binary.id,
         address=0x1,
-        name_ghidra="a",
+        name="a",
         fan_in=40,
         is_utility=False,
         created_at=_now(),

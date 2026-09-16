@@ -35,5 +35,6 @@ def test_ingestion_owned_columns_excludes_llm_and_analyst_fields() -> None:
 def test_ingestion_owned_columns_is_non_empty() -> None:
     # Sanity check: the frozenset should actually list the ground-truth columns
     # ingestion IS allowed to touch, not be empty by omission.
-    assert "name_ghidra" in INGESTION_OWNED_COLUMNS
+    assert "name" in INGESTION_OWNED_COLUMNS
+    assert "name_ghidra" not in INGESTION_OWNED_COLUMNS
     assert "fan_in" in INGESTION_OWNED_COLUMNS

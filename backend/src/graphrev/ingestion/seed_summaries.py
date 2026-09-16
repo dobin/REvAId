@@ -28,7 +28,7 @@ async def seed_mock_summaries(session_factory: async_sessionmaker[AsyncSession])
         for name, (short, long_) in MOCK_SUMMARIES.items():
             result = await session.execute(
                 select(Function.id).where(
-                    Function.name_ghidra == name,
+                    Function.name == name,
                     Function.summary_status == "none",
                 )
             )

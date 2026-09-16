@@ -35,7 +35,7 @@ async def _make_function(
     fn = Function(
         binary_id=binary.id,
         address=address,
-        name_ghidra=name,
+        name=name,
         code_c=code_c,
         assembly=assembly,
         notes=notes,

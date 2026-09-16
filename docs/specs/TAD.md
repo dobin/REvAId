@@ -485,7 +485,7 @@ erDiagram
         int id PK
         int binary_id FK
         int address
-        string name_ghidra
+        string name
         string name_analyst
         json parameters
         string signature
@@ -569,7 +569,7 @@ CREATE TABLE functions (
 
     -- ground truth (ingestion-owned; overwritten on re-ingest)
     address                INTEGER NOT NULL,            -- AS7: int, hex is display-only
-    name_ghidra            TEXT    NOT NULL,
+    name                   TEXT    NOT NULL,
     parameters             TEXT    NOT NULL DEFAULT '[]', -- JSON [{ordinal,name,type}]
     signature              TEXT,
     assembly               TEXT,                        -- NULL for placeholder/import (B17)
@@ -611,7 +611,7 @@ CREATE TABLE functions (
     ) VIRTUAL
 );
 CREATE UNIQUE INDEX ux_functions_binary_address ON functions(binary_id, address);   -- B2
-CREATE INDEX ix_functions_binary_name          ON functions(binary_id, name_ghidra);
+CREATE INDEX ix_functions_binary_name          ON functions(binary_id, name);
 CREATE INDEX ix_functions_binary_analystname   ON functions(binary_id, name_analyst);
 CREATE INDEX ix_functions_status               ON functions(summary_status);        -- C5b sweep
 CREATE INDEX ix_functions_fanin                ON functions(binary_id, fan_in DESC);-- E1b entry points
@@ -683,7 +683,7 @@ CREATE TABLE app_meta (
   ```
 - Timestamps are ISO-8601 UTC strings (`§4.2` convention), stored as `TEXT` — human-readable in a SQLite browser, which matters for a locally-inspected artifact.
 - **Ingestion column ownership is explicit in code.** `INGESTION_OWNED_COLUMNS` is a frozenset in `repositories/functions.py`; the UPSERT's `set_` clause is generated from it. `A3` then becomes a unit test asserting that `summary_*`, `name_analyst`, `notes`, `notes_updated_at`, `utility_override` are absent from that set — the strongest available guard against the PRD's worst data-loss scenario.
-- **Search (`B11`, `E1a`, `AS10`):** M0 uses `LIKE '%q%' COLLATE NOCASE` over `name_ghidra`/`name_analyst`/`notes` with mandatory `LIMIT`/`OFFSET`. At 50k rows this is a ~5 ms scan. The documented M1 upgrade is an FTS5 external-content table with the `trigram` tokenizer (true infix matching) plus insert/update triggers — additive, no API change.
+- **Search (`B11`, `E1a`, `AS10`):** M0 uses `LIKE '%q%' COLLATE NOCASE` over `name`/`name_analyst`/`notes` with mandatory `LIMIT`/`OFFSET`. At 50k rows this is a ~5 ms scan. The documented M1 upgrade is an FTS5 external-content table with the `trigram` tokenizer (true infix matching) plus insert/update triggers — additive, no API change.
 
 ### 3.4 Shared TypeScript types (`frontend/src/api/types.ts`)
 
@@ -716,8 +716,8 @@ export interface FunctionParam { ordinal: number; name: string; type: string; }
 export interface FunctionDto {
   id: FunctionId; binaryId: BinaryId;
   address: number;               // render as hex in UI only (AS7)
-  displayName: string;           // name_analyst ?? name_ghidra  (B6)
-  nameGhidra: string;
+  displayName: string;           // name_analyst ?? name  (B6)
+  name: string;
   nameAnalyst: string | null;
   isRenamed: boolean;
   parameters: FunctionParam[];
@@ -905,7 +905,7 @@ Contract guarantees, all asserted by tests:
 Single-query implementation sketch (callee direction):
 
 ```sql
-SELECT f.id, f.address, f.name_ghidra, f.name_analyst, f.kind,
+SELECT f.id, f.address, f.name, f.name_analyst, f.kind,
        f.summary_short, f.summary_status, f.summary_low_confidence,
        f.fan_in, f.is_utility_effective, f.utility_override,
        (f.notes <> '')            AS has_notes,
@@ -916,7 +916,7 @@ LEFT JOIN view_nodes vn ON vn.function_id = f.id AND vn.view_id = :view_id
 WHERE e.caller_id = :fn_id
   AND e.kind = 'call'
   AND f.is_utility_effective = :group_flag
-  AND (:filter IS NULL OR f.name_ghidra LIKE :like
+  AND (:filter IS NULL OR f.name LIKE :like
        OR f.name_analyst LIKE :like OR f.summary_short LIKE :like)
 ORDER BY f.is_utility_effective ASC, <sort_expr>
 LIMIT :limit OFFSET :offset;

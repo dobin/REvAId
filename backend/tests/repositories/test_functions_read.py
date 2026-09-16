@@ -21,7 +21,7 @@ async def _make_function(
     *,
     binary_id: int,
     address: int,
-    name_ghidra: str = "fn",
+    name: str = "fn",
     name_llm: str | None = None,
     name_analyst: str | None = None,
     notes: str = "",
@@ -33,7 +33,7 @@ async def _make_function(
     fn = Function(
         binary_id=binary_id,
         address=address,
-        name_ghidra=name_ghidra,
+        name=name,
         name_llm=name_llm,
         name_analyst=name_analyst,
         notes=notes,
@@ -56,27 +56,27 @@ async def test_get_function_by_id_returns_none_when_missing(session: AsyncSessio
 @pytest.mark.asyncio
 async def test_get_function_by_id_returns_the_row(session: AsyncSession) -> None:
     binary, _ = await get_or_create_binary(session, name="acme.exe", version="1.0")
-    fn = await _make_function(session, binary_id=binary.id, address=0x1000, name_ghidra="main")
+    fn = await _make_function(session, binary_id=binary.id, address=0x1000, name="main")
     await session.commit()
     fetched = await get_function_by_id(session, fn.id)
     assert fetched is not None
-    assert fetched.name_ghidra == "main"
+    assert fetched.name == "main"
 
 
 @pytest.mark.asyncio
-async def test_search_functions_matches_name_ghidra_case_insensitively(
+async def test_search_functions_matches_name_case_insensitively(
     session: AsyncSession,
 ) -> None:
     binary, _ = await get_or_create_binary(session, name="acme.exe", version="1.0")
-    await _make_function(session, binary_id=binary.id, address=0x1000, name_ghidra="parse_config")
-    await _make_function(session, binary_id=binary.id, address=0x1010, name_ghidra="other_fn")
+    await _make_function(session, binary_id=binary.id, address=0x1000, name="parse_config")
+    await _make_function(session, binary_id=binary.id, address=0x1010, name="other_fn")
     await session.commit()
 
     rows, total = await search_functions(
         session, binary_id=binary.id, query="PARSE", limit=50, offset=0
     )
     assert total == 1
-    assert rows[0].name_ghidra == "parse_config"
+    assert rows[0].name == "parse_config"
 
 
 @pytest.mark.asyncio
@@ -86,30 +86,30 @@ async def test_search_functions_matches_name_analyst_and_notes(session: AsyncSes
         session,
         binary_id=binary.id,
         address=0x1000,
-        name_ghidra="FUN_00401000",
+        name="FUN_00401000",
         name_analyst="my_renamed_fn",
     )
     await _make_function(
         session,
         binary_id=binary.id,
         address=0x1010,
-        name_ghidra="FUN_00401010",
+        name="FUN_00401010",
         notes="contains a secret keyword",
     )
-    await _make_function(session, binary_id=binary.id, address=0x1020, name_ghidra="unrelated")
+    await _make_function(session, binary_id=binary.id, address=0x1020, name="unrelated")
     await session.commit()
 
     by_analyst, total1 = await search_functions(
         session, binary_id=binary.id, query="renamed", limit=50, offset=0
     )
     assert total1 == 1
-    assert by_analyst[0].name_ghidra == "FUN_00401000"
+    assert by_analyst[0].name == "FUN_00401000"
 
     by_notes, total2 = await search_functions(
         session, binary_id=binary.id, query="secret", limit=50, offset=0
     )
     assert total2 == 1
-    assert by_notes[0].name_ghidra == "FUN_00401010"
+    assert by_notes[0].name == "FUN_00401010"
 
 
 @pytest.mark.asyncio
@@ -119,17 +119,17 @@ async def test_search_functions_matches_name_llm(session: AsyncSession) -> None:
         session,
         binary_id=binary.id,
         address=0x1000,
-        name_ghidra="FUN_00401000",
+        name="FUN_00401000",
         name_llm="decrypt_buffer",
     )
-    await _make_function(session, binary_id=binary.id, address=0x1010, name_ghidra="unrelated")
+    await _make_function(session, binary_id=binary.id, address=0x1010, name="unrelated")
     await session.commit()
 
     rows, total = await search_functions(
         session, binary_id=binary.id, query="decrypt", limit=50, offset=0
     )
     assert total == 1
-    assert rows[0].name_ghidra == "FUN_00401000"
+    assert rows[0].name == "FUN_00401000"
 
 
 @pytest.mark.asyncio
@@ -139,7 +139,7 @@ async def test_search_functions_can_include_decompiled_c(session: AsyncSession) 
         session,
         binary_id=binary.id,
         address=0x1000,
-        name_ghidra="FUN_00401000",
+        name="FUN_00401000",
         code_c="if (packet_is_malicious(input)) { quarantine(input); }",
     )
     await session.commit()
@@ -158,7 +158,7 @@ async def test_search_functions_can_include_decompiled_c(session: AsyncSession) 
 
     assert default_rows == []
     assert total == 1
-    assert mcp_rows[0].name_ghidra == "FUN_00401000"
+    assert mcp_rows[0].name == "FUN_00401000"
 
 
 @pytest.mark.asyncio
@@ -166,21 +166,21 @@ async def test_search_functions_matches_address_decimal_and_hex(
     session: AsyncSession,
 ) -> None:
     binary, _ = await get_or_create_binary(session, name="acme.exe", version="1.0")
-    await _make_function(session, binary_id=binary.id, address=0x401000, name_ghidra="fn_a")
-    await _make_function(session, binary_id=binary.id, address=0x401010, name_ghidra="fn_b")
+    await _make_function(session, binary_id=binary.id, address=0x401000, name="fn_a")
+    await _make_function(session, binary_id=binary.id, address=0x401010, name="fn_b")
     await session.commit()
 
     by_decimal, total1 = await search_functions(
         session, binary_id=binary.id, query=str(0x401000), limit=50, offset=0
     )
     assert total1 == 1
-    assert by_decimal[0].name_ghidra == "fn_a"
+    assert by_decimal[0].name == "fn_a"
 
     by_hex, total2 = await search_functions(
         session, binary_id=binary.id, query="0x401010", limit=50, offset=0
     )
     assert total2 == 1
-    assert by_hex[0].name_ghidra == "fn_b"
+    assert by_hex[0].name == "fn_b"
 
 
 @pytest.mark.asyncio
@@ -188,7 +188,7 @@ async def test_search_functions_paginates_and_reports_total(session: AsyncSessio
     binary, _ = await get_or_create_binary(session, name="acme.exe", version="1.0")
     for i in range(5):
         await _make_function(
-            session, binary_id=binary.id, address=0x1000 + i, name_ghidra=f"util_fn_{i}"
+            session, binary_id=binary.id, address=0x1000 + i, name=f"util_fn_{i}"
         )
     await session.commit()
 
@@ -206,26 +206,26 @@ async def test_search_functions_paginates_and_reports_total(session: AsyncSessio
 async def test_search_functions_scoped_to_binary(session: AsyncSession) -> None:
     b1, _ = await get_or_create_binary(session, name="acme.exe", version="1.0")
     b2, _ = await get_or_create_binary(session, name="libparse.dll", version="1.0")
-    await _make_function(session, binary_id=b1.id, address=0x1000, name_ghidra="parse_a")
-    await _make_function(session, binary_id=b2.id, address=0x2000, name_ghidra="parse_b")
+    await _make_function(session, binary_id=b1.id, address=0x1000, name="parse_a")
+    await _make_function(session, binary_id=b2.id, address=0x2000, name="parse_b")
     await session.commit()
 
     rows, total = await search_functions(
         session, binary_id=b1.id, query="parse", limit=50, offset=0
     )
     assert total == 1
-    assert rows[0].name_ghidra == "parse_a"
+    assert rows[0].name == "parse_a"
 
 
 @pytest.mark.asyncio
 async def test_resolve_function_by_address_exact_match(session: AsyncSession) -> None:
     binary, _ = await get_or_create_binary(session, name="acme.exe", version="1.0")
-    await _make_function(session, binary_id=binary.id, address=0x1000, name_ghidra="fn_a")
+    await _make_function(session, binary_id=binary.id, address=0x1000, name="fn_a")
     await session.commit()
 
     resolved = await resolve_function_by_address(session, binary_id=binary.id, address=0x1000)
     assert resolved is not None
-    assert resolved.name_ghidra == "fn_a"
+    assert resolved.name == "fn_a"
 
 
 @pytest.mark.asyncio
@@ -233,13 +233,13 @@ async def test_resolve_function_by_address_mid_range_resolves_to_container(
     session: AsyncSession,
 ) -> None:
     binary, _ = await get_or_create_binary(session, name="acme.exe", version="1.0")
-    await _make_function(session, binary_id=binary.id, address=0x1000, name_ghidra="fn_a")
-    await _make_function(session, binary_id=binary.id, address=0x2000, name_ghidra="fn_b")
+    await _make_function(session, binary_id=binary.id, address=0x1000, name="fn_a")
+    await _make_function(session, binary_id=binary.id, address=0x2000, name="fn_b")
     await session.commit()
 
     resolved = await resolve_function_by_address(session, binary_id=binary.id, address=0x1050)
     assert resolved is not None
-    assert resolved.name_ghidra == "fn_a"
+    assert resolved.name == "fn_a"
 
 
 @pytest.mark.asyncio
@@ -247,7 +247,7 @@ async def test_resolve_function_by_address_before_all_functions_returns_none(
     session: AsyncSession,
 ) -> None:
     binary, _ = await get_or_create_binary(session, name="acme.exe", version="1.0")
-    await _make_function(session, binary_id=binary.id, address=0x1000, name_ghidra="fn_a")
+    await _make_function(session, binary_id=binary.id, address=0x1000, name="fn_a")
     await session.commit()
 
     resolved = await resolve_function_by_address(session, binary_id=binary.id, address=0x500)
@@ -263,7 +263,7 @@ async def test_list_entry_points_only_returns_flagged_rows_ordered_by_fan_out(
         session,
         binary_id=binary.id,
         address=0x1000,
-        name_ghidra="main",
+        name="main",
         fan_out=12,
         is_entry_point=True,
     )
@@ -271,7 +271,7 @@ async def test_list_entry_points_only_returns_flagged_rows_ordered_by_fan_out(
         session,
         binary_id=binary.id,
         address=0x1010,
-        name_ghidra="alt_entry",
+        name="alt_entry",
         fan_out=20,
         is_entry_point=True,
     )
@@ -279,14 +279,14 @@ async def test_list_entry_points_only_returns_flagged_rows_ordered_by_fan_out(
         session,
         binary_id=binary.id,
         address=0x1020,
-        name_ghidra="not_an_entry",
+        name="not_an_entry",
         fan_out=999,
         is_entry_point=False,
     )
     await session.commit()
 
     entry_points = await list_entry_points(session, binary_id=binary.id, limit=5)
-    assert [f.name_ghidra for f in entry_points] == ["alt_entry", "main"]
+    assert [f.name for f in entry_points] == ["alt_entry", "main"]
 
 
 @pytest.mark.asyncio
@@ -297,7 +297,7 @@ async def test_list_entry_points_respects_limit(session: AsyncSession) -> None:
             session,
             binary_id=binary.id,
             address=0x1000 + i,
-            name_ghidra=f"entry_{i}",
+            name=f"entry_{i}",
             fan_out=i,
             is_entry_point=True,
         )

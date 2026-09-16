@@ -38,7 +38,7 @@ function makeFunction(overrides: Partial<FunctionDto> = {}): FunctionDto {
     binaryId: 1,
     address: 0x1000,
     displayName: "FUN_00001000",
-    nameGhidra: "FUN_00001000",
+    name: "FUN_00001000",
     nameAnalyst: null,
     nameLlm: null,
     isRenamed: false,
@@ -131,7 +131,7 @@ describe("applySummaryEvent name patching (C13 auto-display)", () => {
     const fn = qc.getQueryData<FunctionDto>(["function", 17]);
     expect(fn?.nameLlm).toBe("parse_header");
     expect(fn?.displayName).toBe("parse_header");
-    expect(fn?.nameGhidra).toBe("FUN_00001000"); // never overwritten
+    expect(fn?.name).toBe("FUN_00001000"); // never overwritten
     expect(fn?.summary.status).toBe("ready");
   });
 

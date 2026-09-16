@@ -1,6 +1,6 @@
 /**
  * Sidebar function search (D9/I11 stopgap) — a single text field that
- * searches `name_ghidra`, `name_analyst`, and `address` (via
+ * searches `name`, `name_analyst`, and `address` (via
  * `GET /binaries/{id}/functions?q=`, B11/E1a). Picking a match focuses it
  * when it is already visible on the canvas; otherwise it places the function,
  * closing the gap where `PlaceEntryPointButton` only offered the binary's #1

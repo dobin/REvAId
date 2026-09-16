@@ -98,7 +98,7 @@ exporter implementation.
   "functions": [
     {
       "address": 4198400,        // entry point, integer (hex is a UI concern)
-      "name": "parse_config",    // Ghidra name (name_ghidra)
+      "name": "parse_config",    // Function name reported by Ghidra
       "parameters": [
         { "ordinal": 0, "name": "buf", "type": "char *" }
       ],

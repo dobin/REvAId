@@ -31,7 +31,7 @@ Every function tool requires `binary_name`. `binary_version` is optional and def
 
 - `function_id`: GraphRev database ID.
 - `address`: exact function start address as an integer. MCP clients may send decimal or JSON integer values; returned data also includes `addressHex` for display.
-- `name`: exact, case-insensitive match against `name_ghidra`, `name_llm`, or `name_analyst`.
+- `name`: exact, case-insensitive match against `name`, `name_llm`, or `name_analyst`.
 
 Names are not guaranteed to be unique. An ambiguous name returns candidate IDs and addresses; retry with `function_id` or `address`. IDs and addresses obtained from `find_functions` are therefore the preferred selectors.
 

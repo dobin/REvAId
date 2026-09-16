@@ -48,7 +48,7 @@ const mainFn: FunctionDto = {
   binaryId: 1,
   address: 0x401000,
   displayName: "main",
-  nameGhidra: "main",
+  name: "main",
   nameAnalyst: null,
     nameLlm: null,
   isRenamed: false,

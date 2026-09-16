@@ -36,15 +36,15 @@ async def build_summary_request(session: AsyncSession, *, function_id: int) -> S
 
     callee_rows = (
         await session.execute(
-            select(Function.name_analyst, Function.name_ghidra, Function.summary_short)
+            select(Function.name_analyst, Function.name, Function.summary_short)
             .join(Edge, Edge.callee_id == Function.id)
             .where(Edge.caller_id == function_id, Function.summary_short.is_not(None))
             .order_by(Function.id.asc())
         )
     ).all()
     callee_summaries = tuple(
-        (name_analyst or name_ghidra, summary_short)
-        for name_analyst, name_ghidra, summary_short in callee_rows
+        (name_analyst or name, summary_short)
+        for name_analyst, name, summary_short in callee_rows
         if summary_short is not None
     )
 
@@ -56,7 +56,7 @@ async def build_summary_request(session: AsyncSession, *, function_id: int) -> S
 
     return SummaryRequest(
         address=fn.address,
-        name=fn.name_ghidra,
+        name=fn.name,
         parameters=parameters,
         code_c=fn.code_c,
         assembly=fn.assembly,

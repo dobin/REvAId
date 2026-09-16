@@ -28,7 +28,7 @@ async def _make_function(
     fn = Function(
         binary_id=binary.id,
         address=address,
-        name_ghidra=name,
+        name=name,
         created_at=_now(),
         updated_at=_now(),
     )
@@ -45,7 +45,7 @@ async def test_binary_address_unique(session: AsyncSession) -> None:
         Function(
             binary_id=binary.id,
             address=0x1000,
-            name_ghidra="b",
+            name="b",
             created_at=_now(),
             updated_at=_now(),
         )

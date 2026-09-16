@@ -44,7 +44,7 @@ async def _make_function(session: AsyncSession, *, binary_id: int, address: int)
     fn = Function(
         binary_id=binary_id,
         address=address,
-        name_ghidra=f"fn_{address:x}",
+        name=f"fn_{address:x}",
         created_at=now,
         updated_at=now,
     )

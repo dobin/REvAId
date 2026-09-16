@@ -604,8 +604,8 @@ export interface components {
             address: number;
             /** Displayname */
             displayName: string;
-            /** Nameghidra */
-            nameGhidra: string;
+            /** Name */
+            name: string;
             /** Nameanalyst */
             nameAnalyst: string | null;
             /** Namellm */

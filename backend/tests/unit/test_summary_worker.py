@@ -68,7 +68,7 @@ async def _make_function(
     fn = Function(
         binary_id=binary.id,
         address=0x1000,
-        name_ghidra=name,
+        name=name,
         code_c="int do_thing(void) { return 1; }",
         summary_status="pending",
         created_at=now,
@@ -162,7 +162,7 @@ async def test_successful_summarize_persists_name_llm(
     await session.refresh(fn)
     assert fn.name_llm == "parse_header"
     # Neither stored name is overwritten.
-    assert fn.name_ghidra == "FUN_00001000"
+    assert fn.name == "FUN_00001000"
     assert fn.name_analyst is None
 
 

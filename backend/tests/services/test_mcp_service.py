@@ -17,7 +17,7 @@ async def _function(session: AsyncSession, *, binary_id: int, address: int, name
     fn = Function(
         binary_id=binary_id,
         address=address,
-        name_ghidra=name,
+        name=name,
         assembly=f"{address:x}: RET",
         code_c="return 0;",
         created_at=now,

@@ -211,7 +211,7 @@ async def open_functions(
                 status="duplicate" if duplicate else "resolved",
                 canonical_address=canonical_address,
                 function_id=function.id,
-                display_name=function.name_analyst or function.name_llm or function.name_ghidra,
+                display_name=function.name_analyst or function.name_llm or function.name,
                 message="Already resolved by an earlier address." if duplicate else None,
             )
         )

@@ -26,7 +26,7 @@ async def _make_function(
     fn = Function(
         binary_id=binary.id,
         address=0x1000,
-        name_ghidra=name,
+        name=name,
         code_c="int do_thing(void) { return 1; }",
         summary_status=summary_status,
         created_at=now,

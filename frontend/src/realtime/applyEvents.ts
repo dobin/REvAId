@@ -56,10 +56,10 @@ export function applySummaryEvent(qc: QueryClient, e: SummaryEvent): void {
           ...fn,
           // C13 auto-display: patch the proposed name and recompute the
           // display name with the same precedence the server applies
-          // (`name_analyst ?? name_llm ?? name_ghidra`) — E5a "one event,
+          // (`name_analyst ?? name_llm ?? name`) — E5a "one event,
           // all surfaces", no refetch, no reload.
           nameLlm: e.nameLlm ?? fn.nameLlm,
-          displayName: fn.nameAnalyst ?? e.nameLlm ?? fn.nameGhidra,
+          displayName: fn.nameAnalyst ?? e.nameLlm ?? fn.name,
           summary: {
             ...fn.summary,
             status: e.summaryStatus,

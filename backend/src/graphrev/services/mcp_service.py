@@ -148,7 +148,7 @@ async def set_mcp_function_info(
         binary_version=binary.version,
         address=updated.address,
         address_hex=f"0x{updated.address:X}",
-        display_name=updated.name_analyst or updated.name_llm or updated.name_ghidra,
+        display_name=updated.name_analyst or updated.name_llm or updated.name,
         name_llm=updated.name_llm,
         summary_short=updated.summary_short,
         summary_long=updated.summary_long,

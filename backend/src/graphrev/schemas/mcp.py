@@ -28,7 +28,7 @@ class McpFunctionSearchRowDto(ApiModel):
     address: int
     address_hex: str
     display_name: str
-    name_ghidra: str
+    name: str
     name_llm: str | None
     name_analyst: str | None
     kind: str
@@ -53,7 +53,7 @@ class McpRelatedFunctionDto(ApiModel):
     address: int
     address_hex: str
     display_name: str
-    name_ghidra: str
+    name: str
     name_llm: str | None
     kind: str
     signature: str | None
@@ -69,7 +69,7 @@ class McpFunctionDetailDto(ApiModel):
     address: int
     address_hex: str
     display_name: str
-    name_ghidra: str
+    name: str
     name_llm: str | None
     name_analyst: str | None
     parameters: list[FunctionParamDto]
@@ -106,8 +106,8 @@ def mcp_search_row_from_function(fn: Function) -> McpFunctionSearchRowDto:
         id=fn.id,
         address=fn.address,
         address_hex=f"0x{fn.address:X}",
-        display_name=fn.name_analyst or fn.name_llm or fn.name_ghidra,
-        name_ghidra=fn.name_ghidra,
+        display_name=fn.name_analyst or fn.name_llm or fn.name,
+        name=fn.name,
         name_llm=fn.name_llm,
         name_analyst=fn.name_analyst,
         kind=fn.kind,
@@ -124,8 +124,8 @@ def mcp_related_function_from_row(row: RelatedFunction) -> McpRelatedFunctionDto
         id=fn.id,
         address=fn.address,
         address_hex=f"0x{fn.address:X}",
-        display_name=fn.name_analyst or fn.name_llm or fn.name_ghidra,
-        name_ghidra=fn.name_ghidra,
+        display_name=fn.name_analyst or fn.name_llm or fn.name,
+        name=fn.name,
         name_llm=fn.name_llm,
         kind=fn.kind,
         signature=fn.signature,
@@ -151,7 +151,7 @@ def mcp_function_detail_from_row(
         address=base.address,
         address_hex=f"0x{base.address:X}",
         display_name=base.display_name,
-        name_ghidra=base.name_ghidra,
+        name=base.name,
         name_llm=base.name_llm,
         name_analyst=base.name_analyst,
         parameters=base.parameters,

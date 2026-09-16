@@ -26,8 +26,8 @@ async def _make_binary(session: AsyncSession, name: str = "acme.exe") -> Binary:
 @pytest.mark.asyncio
 async def test_upsert_edge_duplicate_pair_refreshes_non_null_order(session: AsyncSession) -> None:
     binary = await _make_binary(session)
-    a_id, _ = await upsert_function(session, binary_id=binary.id, address=0x1, name_ghidra="a")
-    b_id, _ = await upsert_function(session, binary_id=binary.id, address=0x2, name_ghidra="b")
+    a_id, _ = await upsert_function(session, binary_id=binary.id, address=0x1, name="a")
+    b_id, _ = await upsert_function(session, binary_id=binary.id, address=0x2, name="b")
     await session.commit()
 
     inserted1 = await upsert_edge(
@@ -50,8 +50,8 @@ async def test_upsert_edge_duplicate_pair_refreshes_non_null_order(session: Asyn
 @pytest.mark.asyncio
 async def test_upsert_edge_legacy_order_does_not_clear_known_order(session: AsyncSession) -> None:
     binary = await _make_binary(session)
-    a_id, _ = await upsert_function(session, binary_id=binary.id, address=0x1, name_ghidra="a")
-    b_id, _ = await upsert_function(session, binary_id=binary.id, address=0x2, name_ghidra="b")
+    a_id, _ = await upsert_function(session, binary_id=binary.id, address=0x1, name="a")
+    b_id, _ = await upsert_function(session, binary_id=binary.id, address=0x2, name="b")
     await upsert_edge(session, binary_id=binary.id, caller_id=a_id, callee_id=b_id, callee_order=3)
     await session.commit()
 
@@ -68,7 +68,7 @@ async def test_upsert_edge_legacy_order_does_not_clear_known_order(session: Asyn
 @pytest.mark.asyncio
 async def test_upsert_edge_allows_self_edge(session: AsyncSession) -> None:
     binary = await _make_binary(session)
-    a_id, _ = await upsert_function(session, binary_id=binary.id, address=0x1, name_ghidra="a")
+    a_id, _ = await upsert_function(session, binary_id=binary.id, address=0x1, name="a")
     await session.commit()
 
     inserted = await upsert_edge(session, binary_id=binary.id, caller_id=a_id, callee_id=a_id)
@@ -82,9 +82,9 @@ async def test_batch_upsert_edges_deduplicates_input_and_existing_rows(
     session: AsyncSession,
 ) -> None:
     binary = await _make_binary(session)
-    a_id, _ = await upsert_function(session, binary_id=binary.id, address=0x1, name_ghidra="a")
-    b_id, _ = await upsert_function(session, binary_id=binary.id, address=0x2, name_ghidra="b")
-    c_id, _ = await upsert_function(session, binary_id=binary.id, address=0x3, name_ghidra="c")
+    a_id, _ = await upsert_function(session, binary_id=binary.id, address=0x1, name="a")
+    b_id, _ = await upsert_function(session, binary_id=binary.id, address=0x2, name="b")
+    c_id, _ = await upsert_function(session, binary_id=binary.id, address=0x3, name="c")
     await session.commit()
 
     inserted, skipped = await upsert_edges_batch(
@@ -115,11 +115,11 @@ async def test_batch_upsert_edges_deduplicates_input_and_existing_rows(
 @pytest.mark.asyncio
 async def test_recompute_fan_in_fan_out_and_utility(session: AsyncSession) -> None:
     binary = await _make_binary(session)
-    hub_id, _ = await upsert_function(session, binary_id=binary.id, address=0x1, name_ghidra="hub")
+    hub_id, _ = await upsert_function(session, binary_id=binary.id, address=0x1, name="hub")
     caller_ids = []
     for i in range(3):
         cid, _ = await upsert_function(
-            session, binary_id=binary.id, address=0x100 + i, name_ghidra=f"caller{i}"
+            session, binary_id=binary.id, address=0x100 + i, name=f"caller{i}"
         )
         caller_ids.append(cid)
     await session.commit()
@@ -149,13 +149,13 @@ async def test_recompute_is_scoped_to_one_binary(session: AsyncSession) -> None:
     binary_b = await _make_binary(session, "libparse.dll")
 
     hub_a_id, _ = await upsert_function(
-        session, binary_id=binary_a.id, address=0x1, name_ghidra="hub_a"
+        session, binary_id=binary_a.id, address=0x1, name="hub_a"
     )
     hub_b_id, _ = await upsert_function(
-        session, binary_id=binary_b.id, address=0x1, name_ghidra="hub_b"
+        session, binary_id=binary_b.id, address=0x1, name="hub_b"
     )
     caller_a_id, _ = await upsert_function(
-        session, binary_id=binary_a.id, address=0x2, name_ghidra="caller_a"
+        session, binary_id=binary_a.id, address=0x2, name="caller_a"
     )
     await session.commit()
 

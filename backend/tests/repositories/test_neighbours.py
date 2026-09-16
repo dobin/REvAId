@@ -37,7 +37,7 @@ async def _make_function(
     fn = Function(
         binary_id=binary.id,
         address=address,
-        name_ghidra=name,
+        name=name,
         is_utility=is_utility,
         utility_override=utility_override,
         fan_in=fan_in,
@@ -104,7 +104,7 @@ async def test_callees_split_into_primary_and_utility_groups(session: AsyncSessi
     assert primary_page.total == 1
     assert primary_page.total_primary == 1
     assert primary_page.total_utility == 1
-    assert [r.function.name_ghidra for r in primary_page.rows] == ["helper"]
+    assert [r.function.name for r in primary_page.rows] == ["helper"]
 
     utility_page = await fetch_neighbour_page(
         session,
@@ -120,7 +120,7 @@ async def test_callees_split_into_primary_and_utility_groups(session: AsyncSessi
         caller_suppress_threshold=32,
     )
     assert utility_page.total == 1
-    assert [r.function.name_ghidra for r in utility_page.rows] == ["memcpy_like"]
+    assert [r.function.name for r in utility_page.rows] == ["memcpy_like"]
 
 
 @pytest.mark.asyncio
@@ -147,7 +147,7 @@ async def test_utility_override_moves_row_between_groups(session: AsyncSession) 
         filter_text=None,
         caller_suppress_threshold=32,
     )
-    assert [r.function.name_ghidra for r in primary_page.rows] == ["special_case"]
+    assert [r.function.name for r in primary_page.rows] == ["special_case"]
 
 
 @pytest.mark.asyncio
@@ -252,7 +252,7 @@ async def test_on_canvas_reflects_view_scoped_visible_view_node(session: AsyncSe
         filter_text=None,
         caller_suppress_threshold=32,
     )
-    on_canvas_by_name = {r.function.name_ghidra: r.on_canvas for r in page.rows}
+    on_canvas_by_name = {r.function.name: r.on_canvas for r in page.rows}
     assert on_canvas_by_name["placed_fn"] is True
     assert on_canvas_by_name["not_placed_fn"] is False
 
@@ -284,7 +284,7 @@ async def test_filter_matches_name_and_summary_short(session: AsyncSession) -> N
         filter_text="parse",
         caller_suppress_threshold=32,
     )
-    names = {r.function.name_ghidra for r in page.rows}
+    names = {r.function.name for r in page.rows}
     assert names == {"parse_config", "other_fn"}
     # Unfiltered group totals must not shift because of the filter text.
     assert page.total_primary == 3
@@ -357,7 +357,7 @@ async def test_sort_by_fan_in_descending(session: AsyncSession) -> None:
         filter_text=None,
         caller_suppress_threshold=32,
     )
-    assert [r.function.name_ghidra for r in page.rows] == ["high_fanin", "low_fanin"]
+    assert [r.function.name for r in page.rows] == ["high_fanin", "low_fanin"]
 
 
 @pytest.mark.asyncio
@@ -388,7 +388,7 @@ async def test_callee_call_order_sorts_known_orders_before_legacy_rows(
         filter_text=None,
         caller_suppress_threshold=32,
     )
-    assert [r.function.name_ghidra for r in page.rows] == ["first", "second", "legacy"]
+    assert [r.function.name for r in page.rows] == ["first", "second", "legacy"]
 
 
 @pytest.mark.asyncio
@@ -419,7 +419,7 @@ async def test_callee_call_order_preserves_relative_order_after_filter(
         filter_text="parse",
         caller_suppress_threshold=32,
     )
-    assert [r.function.name_ghidra for r in page.rows] == ["parse_early", "parse_late"]
+    assert [r.function.name for r in page.rows] == ["parse_early", "parse_late"]
 
 
 @pytest.mark.asyncio

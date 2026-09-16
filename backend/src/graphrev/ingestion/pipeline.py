@@ -66,7 +66,7 @@ def _batched[T](items: Iterator[T], size: int) -> Iterator[list[T]]:
 def _function_values(raw_fn: RawFunction) -> FunctionBatchValues:
     return {
         "address": raw_fn.address,
-        "name_ghidra": raw_fn.name,
+        "name": raw_fn.name,
         "parameters": [dict(p) for p in raw_fn.parameters],
         "signature": raw_fn.signature,
         "assembly": raw_fn.assembly,
@@ -210,7 +210,7 @@ async def _ingest_function_batch(
                         session,
                         binary_id=binary_id,
                         address=raw_fn.address,
-                        name_ghidra=raw_fn.name,
+                        name=raw_fn.name,
                         parameters=[dict(p) for p in raw_fn.parameters],
                         signature=raw_fn.signature,
                         assembly=raw_fn.assembly,
@@ -261,7 +261,7 @@ async def _ingest_edge_batch(
                 functions=[
                     FunctionBatchValues(
                         address=address,
-                        name_ghidra=placeholder_name(address, module),
+                        name=placeholder_name(address, module),
                         kind="placeholder",
                         placeholder_module=module,
                     )

@@ -66,7 +66,7 @@ async def test_neighbour_rows_use_llm_name_when_no_analyst_rename(
     client: AsyncClient, session: AsyncSession, ingested: None
 ) -> None:
     """C13 auto-display: a neighbour row's `displayName` follows the
-    `name_analyst ?? name_llm ?? name_ghidra` precedence, and `nameLlm` is
+    `name_analyst ?? name_llm ?? name` precedence, and `nameLlm` is
     exposed so the UI can badge the raw Ghidra name."""
     from sqlalchemy import update
 

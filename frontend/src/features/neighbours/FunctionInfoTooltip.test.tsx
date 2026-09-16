@@ -10,7 +10,7 @@ function makeFunction(overrides: Partial<FunctionDto["summary"]> = {}): Function
     binaryId: 1,
     address: 0x401000,
     displayName: "parse_header",
-    nameGhidra: "FUN_00401000",
+    name: "FUN_00401000",
     nameAnalyst: "parse_header",
     nameLlm: null,
     isRenamed: true,

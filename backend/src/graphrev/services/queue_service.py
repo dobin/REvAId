@@ -42,19 +42,19 @@ async def queue_event_payload_with_items(
     live "thinking" panel needs to know *which* functions are in flight —
     and only the worker knows the moment an item is popped or completed.
     Display names follow the same precedence as `get_queue_snapshot`
-    (`name_analyst ?? name_llm ?? name_ghidra`)."""
+    (`name_analyst ?? name_llm ?? name`)."""
     snapshot = queue.snapshot()
     ids = {item.function_id for item in snapshot.queued} | set(snapshot.inflight_function_ids)
     display_names: dict[int, str] = {}
     if ids:
         rows = await session.execute(
             select(
-                Function.id, Function.name_analyst, Function.name_llm, Function.name_ghidra
+                Function.id, Function.name_analyst, Function.name_llm, Function.name
             ).where(Function.id.in_(ids))
         )
         display_names = {
-            fn_id: name_analyst or name_llm or name_ghidra
-            for fn_id, name_analyst, name_llm, name_ghidra in rows
+            fn_id: name_analyst or name_llm or name
+            for fn_id, name_analyst, name_llm, name in rows
         }
     return {
         "inFlightCount": len(snapshot.inflight_function_ids),
@@ -86,12 +86,12 @@ async def get_queue_snapshot(session: AsyncSession, queue: SummaryQueue) -> Queu
     display_names: dict[int, str] = {}
     if ids:
         rows = await session.execute(
-            select(Function.id, Function.name_analyst, Function.name_ghidra).where(
+            select(Function.id, Function.name_analyst, Function.name).where(
                 Function.id.in_(ids)
             )
         )
         display_names = {
-            fn_id: name_analyst or name_ghidra for fn_id, name_analyst, name_ghidra in rows
+            fn_id: name_analyst or name for fn_id, name_analyst, name in rows
         }
 
     queued = [

@@ -48,7 +48,7 @@ async function fetchFunctionSearch(
 }
 
 /**
- * `GET /binaries/{id}/functions?q=...` (B11/E1a) — searches `name_ghidra`,
+ * `GET /binaries/{id}/functions?q=...` (B11/E1a) — searches `name`,
  * `name_analyst`, `notes`, and `address` for a substring match. Disabled
  * until both a binary is selected and the query is non-empty, so an empty
  * sidebar search box does not fetch the whole (unfiltered) function list.

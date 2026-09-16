@@ -39,7 +39,7 @@ class FunctionBatchValues(TypedDict, total=False):
     """Ingestion-owned inputs accepted by :func:`upsert_functions_batch`."""
 
     address: int
-    name_ghidra: str
+    name: str
     parameters: list[dict[str, object]]
     signature: str | None
     assembly: str | None
@@ -63,7 +63,7 @@ async def upsert_function(
     *,
     binary_id: int,
     address: int,
-    name_ghidra: str,
+    name: str,
     parameters: list[dict[str, object]] | None = None,
     signature: str | None = None,
     assembly: str | None = None,
@@ -98,7 +98,7 @@ async def upsert_function(
     values: dict[str, object] = {
         "binary_id": binary_id,
         "address": address,
-        "name_ghidra": name_ghidra,
+        "name": name,
         "parameters": json.dumps(parameters or []),
         "signature": signature,
         "assembly": assembly,
@@ -159,7 +159,7 @@ async def upsert_functions_batch(
         {
             "binary_id": binary_id,
             "address": int(row["address"]),
-            "name_ghidra": str(row["name_ghidra"]),
+            "name": str(row["name"]),
             "parameters": json.dumps(row.get("parameters", [])),
             "signature": row.get("signature"),
             "assembly": row.get("assembly"),
@@ -282,7 +282,7 @@ async def resolve_functions_by_name(
         .where(
             Function.binary_id == binary_id,
             or_(
-                Function.name_ghidra.collate("NOCASE") == name,
+                Function.name.collate("NOCASE") == name,
                 Function.name_llm.collate("NOCASE") == name,
                 Function.name_analyst.collate("NOCASE") == name,
             ),
@@ -363,7 +363,7 @@ async def search_functions(
     """Paginated, case-insensitive substring search over a binary's functions
     (B11/E1a).
 
-    Matches `name_ghidra`, `name_llm`, `name_analyst`, `notes`, or `address` via
+    Matches `name`, `name_llm`, `name_analyst`, `notes`, or `address` via
     ``LIKE '%q%' COLLATE NOCASE`` (TAD §3.3 design note — an FTS5 upgrade is
     an additive M1 item, TQ1). The address match is substring-based against
     both the decimal and hex (`0x`-stripped) renderings of `address`, so a
@@ -378,7 +378,7 @@ async def search_functions(
         if address_query.lower().startswith("0x"):
             address_query = address_query[2:]
         match_expressions = [
-            Function.name_ghidra.collate("NOCASE").like(like),
+            Function.name.collate("NOCASE").like(like),
             Function.name_llm.collate("NOCASE").like(like),
             Function.name_analyst.collate("NOCASE").like(like),
             Function.notes.collate("NOCASE").like(like),
@@ -395,7 +395,7 @@ async def search_functions(
     ).scalar_one()
 
     page_stmt = (
-        base_stmt.order_by(Function.name_ghidra.asc(), Function.id.asc())
+        base_stmt.order_by(Function.name.asc(), Function.id.asc())
         .limit(limit)
         .offset(offset)
     )

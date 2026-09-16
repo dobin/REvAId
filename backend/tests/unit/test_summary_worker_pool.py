@@ -58,7 +58,7 @@ async def _make_functions(session: AsyncSession, count: int) -> list[Function]:
         fn = Function(
             binary_id=binary.id,
             address=0x1000 + i,
-            name_ghidra=f"fn_{i}",
+            name=f"fn_{i}",
             code_c=f"int fn_{i}(void) {{ return {i}; }}",
             summary_status="pending",
             created_at=now,

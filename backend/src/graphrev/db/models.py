@@ -126,7 +126,7 @@ class Function(Base):
 
     # -- ground truth (ingestion-owned; overwritten on re-ingest) ----------
     address: Mapped[int] = mapped_column()  # AS7: int; hex is display-only
-    name_ghidra: Mapped[str] = mapped_column()
+    name: Mapped[str] = mapped_column()
     parameters: Mapped[str] = mapped_column(default="[]")  # JSON [{ordinal,name,type}]
     signature: Mapped[str | None] = mapped_column(default=None)
     assembly: Mapped[str | None] = mapped_column(default=None)  # NULL for placeholder/import (B17)
@@ -155,7 +155,7 @@ class Function(Base):
     summary_input_hash: Mapped[str | None] = mapped_column(default=None)  # C10
     #: C13 (auto-display variant): the LLM-proposed function name. LLM-owned
     #: like `summary_*` (never touched by ingestion, A3) but participates in
-    #: the *display* precedence `name_analyst ?? name_llm ?? name_ghidra` —
+    #: the *display* precedence `name_analyst ?? name_llm ?? name` —
     #: it never overwrites either stored name.
     name_llm: Mapped[str | None] = mapped_column(default=None)
 
@@ -202,7 +202,7 @@ class Function(Base):
             f"{_sql_in_list(UTILITY_OVERRIDE_VALUES)}",
             name="utility_override_valid",
         ),
-        Index("ix_functions_binary_name", "binary_id", "name_ghidra"),
+        Index("ix_functions_binary_name", "binary_id", "name"),
         Index("ix_functions_binary_analystname", "binary_id", "name_analyst"),
         Index("ix_functions_status", "summary_status"),  # C5b sweep
         Index("ix_functions_fanin", "binary_id", "fan_in"),  # E1b entry points
@@ -348,7 +348,7 @@ INGESTION_OWNED_COLUMNS: frozenset[str] = frozenset(
     {
         "binary_id",
         "address",
-        "name_ghidra",
+        "name",
         "parameters",
         "signature",
         "assembly",

@@ -23,7 +23,7 @@ async def test_is_utility_effective_follows_override(session: AsyncSession) -> N
     computed_true = Function(
         binary_id=binary.id,
         address=0x1,
-        name_ghidra="a",
+        name="a",
         is_utility=True,
         created_at=_now(),
         updated_at=_now(),
@@ -31,7 +31,7 @@ async def test_is_utility_effective_follows_override(session: AsyncSession) -> N
     computed_false = Function(
         binary_id=binary.id,
         address=0x2,
-        name_ghidra="b",
+        name="b",
         is_utility=False,
         created_at=_now(),
         updated_at=_now(),
@@ -39,7 +39,7 @@ async def test_is_utility_effective_follows_override(session: AsyncSession) -> N
     overridden_never = Function(
         binary_id=binary.id,
         address=0x3,
-        name_ghidra="c",
+        name="c",
         is_utility=True,
         utility_override="never",
         created_at=_now(),
@@ -48,7 +48,7 @@ async def test_is_utility_effective_follows_override(session: AsyncSession) -> N
     overridden_always = Function(
         binary_id=binary.id,
         address=0x4,
-        name_ghidra="d",
+        name="d",
         is_utility=False,
         utility_override="always",
         created_at=_now(),
@@ -77,7 +77,7 @@ async def test_is_utility_effective_usable_in_order_by(session: AsyncSession) ->
             Function(
                 binary_id=binary.id,
                 address=0x1,
-                name_ghidra="utility_fn",
+                name="utility_fn",
                 is_utility=True,
                 created_at=_now(),
                 updated_at=_now(),
@@ -85,7 +85,7 @@ async def test_is_utility_effective_usable_in_order_by(session: AsyncSession) ->
             Function(
                 binary_id=binary.id,
                 address=0x2,
-                name_ghidra="primary_fn",
+                name="primary_fn",
                 is_utility=False,
                 created_at=_now(),
                 updated_at=_now(),
@@ -97,8 +97,8 @@ async def test_is_utility_effective_usable_in_order_by(session: AsyncSession) ->
     rows = (
         (
             await session.execute(
-                select(Function.name_ghidra).order_by(
-                    Function.is_utility_effective.asc(), Function.name_ghidra
+                select(Function.name).order_by(
+                    Function.is_utility_effective.asc(), Function.name
                 )
             )
         )

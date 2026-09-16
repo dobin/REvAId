@@ -41,10 +41,10 @@ class NeighbourRow:
 
 
 #: Sort-key -> the SQL expression it orders by (D23). "name" sorts by the
-#: visible display name (`name_analyst ?? name_llm ?? name_ghidra`), matching
+#: visible display name (`name_analyst ?? name_llm ?? name`), matching
 #: `function_dto_from_row`'s `display_name` derivation.
 _SORT_EXPRESSIONS: dict[Literal["name", "address", "fanIn"], ColumnElement[object]] = {
-    "name": func.coalesce(Function.name_analyst, Function.name_llm, Function.name_ghidra),
+    "name": func.coalesce(Function.name_analyst, Function.name_llm, Function.name),
     "address": Function.address,  # type: ignore[dict-item]
     "fanIn": Function.fan_in,  # type: ignore[dict-item]
 }
@@ -129,7 +129,7 @@ async def fetch_neighbour_page(
         if address_text.lower().startswith("0x"):
             address_text = address_text[2:]
         filter_clause = or_(
-            Function.name_ghidra.collate("NOCASE").like(like),
+            Function.name.collate("NOCASE").like(like),
             Function.name_llm.collate("NOCASE").like(like),
             Function.name_analyst.collate("NOCASE").like(like),
             Function.summary_short.collate("NOCASE").like(like),

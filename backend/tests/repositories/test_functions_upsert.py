@@ -29,7 +29,7 @@ async def test_upsert_function_inserts_new_row(session: AsyncSession) -> None:
         session,
         binary_id=binary.id,
         address=0x1000,
-        name_ghidra="main",
+        name="main",
         code_c="int main() { return 0; }",
     )
     await session.commit()
@@ -37,7 +37,7 @@ async def test_upsert_function_inserts_new_row(session: AsyncSession) -> None:
     assert created is True
     fn = await session.get(Function, function_id)
     assert fn is not None
-    assert fn.name_ghidra == "main"
+    assert fn.name == "main"
     assert fn.code_c == "int main() { return 0; }"
 
 
@@ -45,11 +45,11 @@ async def test_upsert_function_inserts_new_row(session: AsyncSession) -> None:
 async def test_upsert_function_is_idempotent_on_second_call(session: AsyncSession) -> None:
     binary = await _make_binary(session)
     id1, created1 = await upsert_function(
-        session, binary_id=binary.id, address=0x1000, name_ghidra="main"
+        session, binary_id=binary.id, address=0x1000, name="main"
     )
     await session.commit()
     id2, created2 = await upsert_function(
-        session, binary_id=binary.id, address=0x1000, name_ghidra="main"
+        session, binary_id=binary.id, address=0x1000, name="main"
     )
     await session.commit()
 
@@ -62,10 +62,10 @@ async def test_upsert_function_is_idempotent_on_second_call(session: AsyncSessio
 async def test_reingest_preserves_llm_and_analyst_fields(session: AsyncSession) -> None:
     """The A3 behavioural guard: re-running ingestion must never clobber
     summary_*, name_analyst, notes, or utility_override — even when
-    ground-truth fields (name_ghidra, code_c, kind) genuinely change."""
+    ground-truth fields (name, code_c, kind) genuinely change."""
     binary = await _make_binary(session)
     function_id, _ = await upsert_function(
-        session, binary_id=binary.id, address=0x1000, name_ghidra="FUN_00001000"
+        session, binary_id=binary.id, address=0x1000, name="FUN_00001000"
     )
     await session.commit()
 
@@ -86,7 +86,7 @@ async def test_reingest_preserves_llm_and_analyst_fields(session: AsyncSession) 
         session,
         binary_id=binary.id,
         address=0x1000,
-        name_ghidra="parse_config_v2",
+        name="parse_config_v2",
         code_c="int parse_config_v2(char *path) { return 0; }",
         kind="normal",
     )
@@ -98,7 +98,7 @@ async def test_reingest_preserves_llm_and_analyst_fields(session: AsyncSession) 
     await session.refresh(fn)
     refreshed = fn
     # Ground truth updated.
-    assert refreshed.name_ghidra == "parse_config_v2"
+    assert refreshed.name == "parse_config_v2"
     assert refreshed.code_c == "int parse_config_v2(char *path) { return 0; }"
     # LLM- and analyst-owned fields untouched (A3).
     assert refreshed.summary_short == "Parses the on-disk configuration."
@@ -117,7 +117,7 @@ async def test_upsert_function_placeholder_kind_has_no_code(session: AsyncSessio
         session,
         binary_id=binary.id,
         address=0x10005000,
-        name_ghidra="libparse.dll!FUN_10005000",
+        name="libparse.dll!FUN_10005000",
         kind="placeholder",
         placeholder_module="libparse.dll",
     )
@@ -138,8 +138,8 @@ async def test_batch_upsert_counts_and_preserves_protected_fields(session: Async
         session,
         binary_id=binary.id,
         functions=[
-            {"address": 0x1000, "name_ghidra": "first"},
-            {"address": 0x1010, "name_ghidra": "second"},
+            {"address": 0x1000, "name": "first"},
+            {"address": 0x1010, "name": "second"},
         ],
     )
     await session.commit()
@@ -157,8 +157,8 @@ async def test_batch_upsert_counts_and_preserves_protected_fields(session: Async
         session,
         binary_id=binary.id,
         functions=[
-            {"address": 0x1000, "name_ghidra": "renamed", "code_c": "void renamed(void) {}"},
-            {"address": 0x1020, "name_ghidra": "third"},
+            {"address": 0x1000, "name": "renamed", "code_c": "void renamed(void) {}"},
+            {"address": 0x1020, "name": "third"},
         ],
     )
     await session.commit()
@@ -167,7 +167,7 @@ async def test_batch_upsert_counts_and_preserves_protected_fields(session: Async
     assert second_ids[0x1000] == first_ids[0x1000]
 
     await session.refresh(protected)
-    assert protected.name_ghidra == "renamed"
+    assert protected.name == "renamed"
     assert protected.code_c == "void renamed(void) {}"
     assert protected.name_analyst == "analyst_name"
     assert protected.notes == "keep this"
@@ -183,7 +183,7 @@ async def test_placeholder_upgraded_in_place_by_later_ingestion(session: AsyncSe
         session,
         binary_id=binary.id,
         address=0x10005000,
-        name_ghidra="libparse.dll!FUN_10005000",
+        name="libparse.dll!FUN_10005000",
         kind="placeholder",
         placeholder_module="libparse.dll",
     )
@@ -195,7 +195,7 @@ async def test_placeholder_upgraded_in_place_by_later_ingestion(session: AsyncSe
         session,
         binary_id=binary.id,
         address=0x10005000,
-        name_ghidra="parse_section",
+        name="parse_section",
         code_c="int parse_section(void) { return 1; }",
         kind="normal",
         placeholder_module=None,
@@ -207,6 +207,6 @@ async def test_placeholder_upgraded_in_place_by_later_ingestion(session: AsyncSe
 
     await session.refresh(placeholder)
     assert placeholder.kind == "normal"
-    assert placeholder.name_ghidra == "parse_section"
+    assert placeholder.name == "parse_section"
     assert placeholder.code_c == "int parse_section(void) { return 1; }"
     assert placeholder.placeholder_module is None

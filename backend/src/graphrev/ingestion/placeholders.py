@@ -62,7 +62,7 @@ async def ensure_placeholder_function(
         session,
         binary_id=binary_id,
         address=address,
-        name_ghidra=placeholder_name(address, module),
+        name=placeholder_name(address, module),
         kind="placeholder",
         placeholder_module=module,
     )

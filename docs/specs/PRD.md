@@ -176,7 +176,7 @@ Prioritized with **MoSCoW**: **M** = Must (v0/v1 ships without it = failure), **
 
 ```
 binaries    (id, name, version, created_at, last_view_id)
-functions   (id, binary_id, address, name_ghidra, name_analyst, parameters,
+functions   (id, binary_id, address, name, name_analyst, parameters,
              assembly, code_c,
              summary_short, summary_long, summary_status, summary_model,
              summary_generated_at, summary_input_hash,
@@ -216,13 +216,13 @@ view_nodes  (id, view_id, function_id, visible, collapsed, color, pos_x, pos_y, 
 | B4b | **Edge provenance:** a canvas node records how it got there — `origin_function_id` (the node it was fanned out from, `NULL` for a root or an unlinked frame), `origin_kind` (`root` / `fanout` / `fanin` / `callstack`), and `origin_implied` (true for a callstack chain link with no backing `edges` row, rendered dashed). `origin_kind` also fixes the derived edge's **orientation**: `fanout` (a fanned-out callee) points origin→node so the new node lays out to the *right*; `fanin` (a fanned-out caller) points node→origin so it lays out to the *left*. This is the *sole* source of canvas edges (D8b, Q21). | **M** |
 | B5 | Summary metadata: `summary_status` (`none` / `pending` / `ready` / `error`), `summary_model`, `summary_generated_at`, `summary_input_hash`. | **M** |
 | B5a | **Fan-in and utility classification** stored on `functions`: `fan_in` (distinct caller count, computed at ingestion), `is_utility` (derived), `utility_override` (nullable, analyst-set, survives re-ingestion like notes and names). | **M** |
-| B6 | **Analyst name** (`name_analyst`, nullable) per function. When set it is the display name everywhere; `name_ghidra` is never overwritten and remains visible in the detail panel. | **M** |
+| B6 | **Analyst name** (`name_analyst`, nullable) per function. When set it is the display name everywhere; `name` is never overwritten and remains visible in the detail panel. | **M** |
 | B7 | **Analyst notes** (`notes`, single plain-text field) per function; shared across all views of that binary; visually distinct from LLM output. One textarea, one string — not a log. | **M** |
 | B8 | Views CRUD: create, rename, duplicate, delete. Deleting a view never deletes functions, summaries, names, or notes. | **M** |
 | B9 | A default view is auto-created on first open of a binary so the user is never forced through a view-management step. | **M** |
 | B10 | **View camera + root state:** a view persists its root function, pan offset, and zoom level, so reopening restores the exact framing the analyst left, not just node coordinates. | **M** |
 | B10a | **`root_function_id` is the last-focused function** (Q22), not the origin of exploration: it is updated whenever the analyst selects a card, fans one out, or focuses one via `◎`. After a callstack import it is set to the **last frame in the imported chain**. Its only jobs are camera-restore context and the "you are here" hint; nothing in the graph model depends on it, and it may be `NULL` for an empty view. | **M** |
-| B11 | Search matches both `name_ghidra` and `name_analyst`; notes are searchable too. | **S** |
+| B11 | Search matches both `name` and `name_analyst`; notes are searchable too. | **S** |
 | B12 | Migrations are versioned (Alembic or equivalent). | **S** |
 | B13 | Analyst name and notes are fed into the summarization prompt as extra context. | **S** |
 | B14 | Export/import of `name_analyst` (e.g. sync back to a Ghidra project). Not needed now — renames stay internal to GraphRev. | **W** (v1) |
@@ -322,7 +322,7 @@ summarize(function: {address, name, parameters, code_c, assembly,
 | ID | Req | Pri |
 | --- | --- | --- |
 | E1 | FastAPI service: list binaries; delete a binary; views CRUD; search functions (paginated); get function by id/address; get a function's neighbour tables; patch view-node state; patch view state; patch analyst name/notes; request/cancel/regenerate summary; read queue state; suggested entry points; resolve an address list; read config constants. | **M** |
-| E1a | **Search is paginated and indexed** (AS10): substring match over `name_ghidra` and `name_analyst` with an explicit limit and offset; never an unbounded result set. | **M** |
+| E1a | **Search is paginated and indexed** (AS10): substring match over `name` and `name_analyst` with an explicit limit and offset; never an unbounded result set. | **M** |
 | E1b | **Suggested-entry-points endpoint:** up to 5 candidates for the empty-canvas state — known entry names (`main`, `WinMain`, `DllMain`, the binary entry point) plus highest-fan-in functions (§4.3). | **M** |
 | E1c | **Queue-state endpoint** backing the `◌ 3 of 12` chip: in-flight and queued function ids with counts, plus a cancel-pending action (C8). | **M** |
 | E1d | **Config endpoint** exposing the F1a constants to the frontend as one payload, so no threshold is duplicated in client code. | **M** |

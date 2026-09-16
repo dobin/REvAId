@@ -204,7 +204,7 @@ async def test_reingest_preserves_analyst_and_llm_fields_end_to_end(
     async with session_factory() as session:
         refreshed = await session.get(Function, function_id)
         assert refreshed is not None
-        assert refreshed.name_ghidra == "parse_config_v2"
+        assert refreshed.name == "parse_config_v2"
         assert refreshed.summary_short == "Parses the on-disk configuration."
         assert refreshed.summary_status == "ready"
         assert refreshed.name_analyst == "parse_config"
@@ -230,7 +230,7 @@ async def test_unresolved_edge_creates_placeholder_then_upgrades_in_place(
             await session.execute(select(Function).where(Function.address == 0x50000000))
         ).scalar_one()
         assert placeholder.kind == "placeholder"
-        assert placeholder.name_ghidra == "libparse.dll!FUN_50000000"
+        assert placeholder.name == "libparse.dll!FUN_50000000"
         assert placeholder.placeholder_module == "libparse.dll"
         placeholder_id = placeholder.id
 
@@ -246,7 +246,7 @@ async def test_unresolved_edge_creates_placeholder_then_upgrades_in_place(
         upgraded = await session.get(Function, placeholder_id)
         assert upgraded is not None
         assert upgraded.kind == "normal"
-        assert upgraded.name_ghidra == "parse_section"
+        assert upgraded.name == "parse_section"
         assert upgraded.placeholder_module is None
 
 
@@ -276,7 +276,7 @@ async def test_per_function_failure_does_not_abort_the_run(
             await session.execute(select(Function).where(Function.address == 0x1000))
         ).scalar_one_or_none()
         assert good is not None
-        assert good.name_ghidra == "good_fn_1"
+        assert good.name == "good_fn_1"
 
 
 @pytest.mark.asyncio

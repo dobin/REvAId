@@ -26,7 +26,8 @@ async def test_get_function_returns_full_dto_shape(client: AsyncClient, ingested
 
     assert body["id"] == function_id
     assert body["displayName"] == "main"
-    assert body["nameGhidra"] == "main"
+    assert body["name"] == "main"
+    assert "nameGhidra" not in body
     assert body["nameAnalyst"] is None
     assert body["isRenamed"] is False
     assert isinstance(body["parameters"], list)
@@ -58,7 +59,7 @@ async def test_display_name_precedence_analyst_beats_llm_beats_ghidra(
     client: AsyncClient, session: AsyncSession, ingested: None
 ) -> None:
     """C13 auto-display: `displayName` is `name_analyst ?? name_llm ??
-    name_ghidra`, and neither stored name is overwritten. Verified through
+    name`, and neither stored name is overwritten. Verified through
     the public API on one function across all three states."""
     from sqlalchemy import update
 
@@ -82,7 +83,7 @@ async def test_display_name_precedence_analyst_beats_llm_beats_ghidra(
     body = await _refreshed()
     assert body["displayName"] == "program_bootstrap"
     assert body["nameLlm"] == "program_bootstrap"
-    assert body["nameGhidra"] == "main"  # never overwritten
+    assert body["name"] == "main"  # never overwritten
     assert body["isRenamed"] is False  # analyst rename is still what counts
 
     # State 3: analyst renames -> analyst beats the LLM proposal.

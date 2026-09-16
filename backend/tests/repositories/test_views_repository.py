@@ -142,7 +142,7 @@ async def test_set_root_function_id_allows_none(session: AsyncSession) -> None:
     view = await _make_view(session, binary_id=binary.id, name="Default")
     now = utc_now_iso()
     fn = Function(
-        binary_id=binary.id, address=0x1000, name_ghidra="fn_1000", created_at=now, updated_at=now
+        binary_id=binary.id, address=0x1000, name="fn_1000", created_at=now, updated_at=now
     )
     session.add(fn)
     await session.flush()
@@ -175,7 +175,7 @@ async def test_duplicate_view_copies_layout_only(session: AsyncSession) -> None:
     view = await _make_view(session, binary_id=binary.id, name="Default")
     now = utc_now_iso()
     fn = Function(
-        binary_id=binary.id, address=0x1000, name_ghidra="fn_1000", created_at=now, updated_at=now
+        binary_id=binary.id, address=0x1000, name="fn_1000", created_at=now, updated_at=now
     )
     session.add(fn)
     await session.flush()
