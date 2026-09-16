@@ -4,6 +4,7 @@ import { ConfigProvider } from "@/config/ConfigProvider";
 import type { BinaryId } from "@/api/types";
 import { useBinariesQuery } from "@/api/queries/binaries";
 import { useWorkspaceView } from "@/hooks/useWorkspaceView";
+import { parseOpenFunctionsSearch } from "@/lib/openFunctions";
 import { Toolbar } from "@/features/toolbar/Toolbar";
 import { Sidebar } from "@/features/sidebar/Sidebar";
 import { AutoPlaceEntryPoint } from "@/features/sidebar/PlaceEntryPointButton";
@@ -23,6 +24,7 @@ import { SseProvider } from "@/realtime/SseProvider";
 function BinaryWorkspace({ binaryName }: { binaryName: string }) {
   const actionsRegistry = useCreateCanvasActionsRegistry();
   const navigate = useNavigate();
+  const location = useLocation();
   const { data: binaries, isPending, isError } = useBinariesQuery();
   const [runtimeBase, setRuntimeBase] = useState<number | null>(null);
 
@@ -32,6 +34,13 @@ function BinaryWorkspace({ binaryName }: { binaryName: string }) {
   // the binary's first view; public mode resolves/creates this browser's
   // own anonymous view and never falls back to a shared one.
   const { viewId: selectedViewId, isResolving, selectView } = useWorkspaceView(selectedBinaryId);
+  let openFunctionsRequest = null;
+  let openFunctionsError: string | null = null;
+  try {
+    openFunctionsRequest = parseOpenFunctionsSearch(location.search);
+  } catch (error) {
+    openFunctionsError = error instanceof Error ? error.message : "Invalid open_functions value.";
+  }
 
   // Reset the runtime base when navigating to a different binary.
   useEffect(() => {
@@ -88,6 +97,9 @@ function BinaryWorkspace({ binaryName }: { binaryName: string }) {
             viewId={selectedViewId}
             onSelectView={selectView}
             onImported={handleImported}
+            openFunctionsRequest={openFunctionsRequest}
+            openFunctionsError={openFunctionsError}
+            openFunctionsKey={location.search}
           />
           <main style={{ flex: 1, minWidth: 0 }}>
             <CanvasView selectedBinaryId={selectedBinaryId} viewId={selectedViewId} actionsRegistry={actionsRegistry} />

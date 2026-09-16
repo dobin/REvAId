@@ -6,7 +6,14 @@
  */
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/api/client";
-import type { ViewDto, ViewId, ViewNodesPatchRequest, ViewNodesPatchResponse } from "@/api/types";
+import type {
+  OpenFunctionsRequest,
+  OpenFunctionsResponseDto,
+  ViewDto,
+  ViewId,
+  ViewNodesPatchRequest,
+  ViewNodesPatchResponse,
+} from "@/api/types";
 
 async function patchViewNodes(
   viewId: ViewId,
@@ -25,6 +32,26 @@ export function usePatchViewNodesMutation(viewId: ViewId) {
       );
       // Invalidate neighbours queries for this view so that `onCanvas` flags
       // reflect the updated node list without requiring a page reload.
+      void queryClient.invalidateQueries({ queryKey: ["neighbours"] });
+      void queryClient.invalidateQueries({ queryKey: ["neighbours-infinite"] });
+    },
+  });
+}
+
+export function useOpenFunctionsMutation(viewId: ViewId) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (request: OpenFunctionsRequest) =>
+      apiClient.post<OpenFunctionsResponseDto>(
+        `/views/${String(viewId)}/open-functions`,
+        request,
+      ),
+    onSuccess: (response) => {
+      queryClient.setQueryData<ViewDto>(["view", viewId], (view) =>
+        view
+          ? { ...view, nodes: response.nodes, rootFunctionId: response.rootFunctionId }
+          : view,
+      );
       void queryClient.invalidateQueries({ queryKey: ["neighbours"] });
       void queryClient.invalidateQueries({ queryKey: ["neighbours-infinite"] });
     },

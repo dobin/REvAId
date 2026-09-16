@@ -61,6 +61,38 @@ async def list_callees(session: AsyncSession, *, function_id: int) -> list[Relat
     return [RelatedFunction(function=fn, callee_order=order, kind=kind) for fn, order, kind in rows]
 
 
+async def find_canvas_origin(
+    session: AsyncSession, *, function_id: int, candidate_ids: set[int]
+) -> tuple[int, str] | None:
+    """Pick deterministic provenance for a newly placed function.
+
+    Prefer an already-placed caller (normal right-growing ``fanout``), then
+    an already-placed callee (left-growing ``fanin``). No result means the
+    caller should create an independent root node.
+    """
+    if not candidate_ids:
+        return None
+
+    caller_id = await session.scalar(
+        select(Edge.caller_id)
+        .where(Edge.callee_id == function_id, Edge.caller_id.in_(candidate_ids))
+        .order_by(Edge.caller_id)
+        .limit(1)
+    )
+    if caller_id is not None:
+        return int(caller_id), "fanout"
+
+    callee_id = await session.scalar(
+        select(Edge.callee_id)
+        .where(Edge.caller_id == function_id, Edge.callee_id.in_(candidate_ids))
+        .order_by(Edge.callee_id)
+        .limit(1)
+    )
+    if callee_id is not None:
+        return int(callee_id), "fanin"
+    return None
+
+
 async def upsert_edge(
     session: AsyncSession,
     *,

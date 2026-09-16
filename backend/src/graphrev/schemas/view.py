@@ -8,6 +8,8 @@ the create/patch/batch-node-patch request DTOs -- is I6 scope.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import Field
 
 from graphrev.db.enums import OriginKind
@@ -147,6 +149,32 @@ class ViewNodesPatchResponseDto(ApiModel):
     reconcile (TAD §4.3 #12)."""
 
     nodes: list[ViewNodeDto]
+
+
+class OpenFunctionsRequestDto(ApiModel):
+    """Runtime addresses to resolve and add to one view."""
+
+    addresses: list[str] = Field(min_length=1)
+    dll_base: str
+
+
+class OpenFunctionResultDto(ApiModel):
+    """Ordered outcome for one supplied runtime address."""
+
+    input_address: str
+    status: Literal["resolved", "duplicate", "invalid", "unresolved"]
+    canonical_address: int | None = None
+    function_id: int | None = None
+    display_name: str | None = None
+    message: str | None = None
+
+
+class OpenFunctionsResponseDto(ApiModel):
+    """Bulk-open report plus the complete reconciled view-node state."""
+
+    results: list[OpenFunctionResultDto]
+    nodes: list[ViewNodeDto]
+    root_function_id: int | None
 
 
 class SetLastViewRequestDto(ApiModel):

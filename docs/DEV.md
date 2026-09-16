@@ -160,3 +160,25 @@ queue-pause behaviour. Which adapter produced each summary is recorded in
 `functions.summary_adapter` and exposed on the API, but not surfaced in the
 UI yet.
 
+
+### Open multiple runtime addresses
+
+The **Open functions** action accepts a DLL load base and a comma-, space-,
+or newline-separated list of runtime addresses. REvAId translates each value
+to the address space recorded during analysis:
+
+`analysis address = runtime address - DLL load base + recorded analysis image base`
+
+The same action can run automatically from a shareable URL. Use the
+`open_functions` query parameter with URL-encoded JSON containing string
+addresses (strings avoid JavaScript integer precision loss):
+
+```text
+/binary.exe/?open_functions=%7B%22addresses%22%3A%5B%220x180001000%22%2C%220x180002340%22%5D%2C%22dllBase%22%3A%220x180000000%22%7D
+```
+
+The binary must have an analysis image base recorded by the Ghidra export.
+Resolved functions are added to the current view and connected through known
+call edges where possible. Invalid or unresolved addresses are reported
+without preventing valid entries from opening. Fragment (`#open_functions`)
+URLs are not supported.

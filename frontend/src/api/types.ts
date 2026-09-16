@@ -260,6 +260,28 @@ export interface ViewNodesPatchResponse {
   nodes: ViewNodeDto[];
 }
 
+export interface OpenFunctionsRequest {
+  addresses: string[];
+  dllBase: string;
+}
+
+export type OpenFunctionStatus = "resolved" | "duplicate" | "invalid" | "unresolved";
+
+export interface OpenFunctionResultDto {
+  inputAddress: string;
+  status: OpenFunctionStatus;
+  canonicalAddress: number | null;
+  functionId: FunctionId | null;
+  displayName: string | null;
+  message: string | null;
+}
+
+export interface OpenFunctionsResponseDto {
+  results: OpenFunctionResultDto[];
+  nodes: ViewNodeDto[];
+  rootFunctionId: FunctionId | null;
+}
+
 /** `POST /binaries/{id}/last-view` request body (B16, I6). */
 export interface SetLastViewRequest {
   viewId: ViewId;

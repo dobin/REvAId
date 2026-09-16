@@ -256,6 +256,23 @@ async def get_function_by_address(
     return result.scalar_one_or_none()
 
 
+async def get_function_address_bounds(
+    session: AsyncSession, *, binary_id: int
+) -> tuple[int, int] | None:
+    """Return the inclusive first/last known function starts for a binary."""
+    row = (
+        await session.execute(
+            select(func.min(Function.address), func.max(Function.address)).where(
+                Function.binary_id == binary_id,
+                Function.kind != "placeholder",
+            )
+        )
+    ).one()
+    if row[0] is None or row[1] is None:
+        return None
+    return int(row[0]), int(row[1])
+
+
 async def resolve_functions_by_name(
     session: AsyncSession, *, binary_id: int, name: str
 ) -> list[Function]:

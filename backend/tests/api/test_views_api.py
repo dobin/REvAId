@@ -10,7 +10,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from graphrev.core.config import get_settings
-from graphrev.db.models import Function
+from graphrev.db.models import Binary, Function
+from graphrev.repositories.edges import find_canvas_origin
 
 
 async def _get_binary_id(client: AsyncClient, name: str) -> int:
@@ -412,6 +413,170 @@ async def test_patch_view_nodes_is_idempotent(client: AsyncClient, ingested: Non
     first = await client.patch(f"/api/v1/views/{view_id}/nodes", json=payload)
     second = await client.patch(f"/api/v1/views/{view_id}/nodes", json=payload)
     assert first.json() == second.json()
+
+
+@pytest.mark.asyncio
+async def test_open_functions_translates_places_and_reports_partial_success(
+    client: AsyncClient, session: AsyncSession, ingested: None
+) -> None:
+    binary_id = await _get_binary_id(client, "acme.exe")
+    view_id = await _get_default_view_id(client, binary_id)
+    binary = await session.get(Binary, binary_id)
+    assert binary is not None
+    binary.analysis_image_base = 0x400000
+    await session.commit()
+
+    response = await client.post(
+        f"/api/v1/views/{view_id}/open-functions",
+        json={
+            "dllBase": "0x180000000",
+            "addresses": ["0x180001000", "0x180001000", "bad", "0x17ffffff0"],
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [result["status"] for result in body["results"]] == [
+        "resolved",
+        "duplicate",
+        "invalid",
+        "unresolved",
+    ]
+    resolved = body["results"][0]
+    assert resolved["canonicalAddress"] == 0x401000
+    assert body["rootFunctionId"] == resolved["functionId"]
+    assert [node["functionId"] for node in body["nodes"]] == [resolved["functionId"]]
+
+
+@pytest.mark.asyncio
+async def test_open_functions_auto_connects_known_calls_and_is_idempotent(
+    client: AsyncClient, session: AsyncSession, ingested: None
+) -> None:
+    binary_id = await _get_binary_id(client, "acme.exe")
+    view_id = await _get_default_view_id(client, binary_id)
+    binary = await session.get(Binary, binary_id)
+    assert binary is not None
+    binary.analysis_image_base = 0x400000
+    await session.commit()
+
+    payload = {
+        "dllBase": "0x180000000",
+        "addresses": ["0x180001020", "0x1800011c0", "0x1800011e0"],
+    }
+    first = await client.post(f"/api/v1/views/{view_id}/open-functions", json=payload)
+    second = await client.post(f"/api/v1/views/{view_id}/open-functions", json=payload)
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    first_body = first.json()
+    second_body = second.json()
+    assert second_body["nodes"] == first_body["nodes"]
+    first_id = first_body["results"][0]["functionId"]
+    second_node = next(
+        node
+        for node in first_body["nodes"]
+        if node["functionId"] == first_body["results"][1]["functionId"]
+    )
+    assert second_node["originFunctionId"] == first_id
+    assert second_node["originKind"] == "fanout"
+    third_node = next(
+        node
+        for node in first_body["nodes"]
+        if node["functionId"] == first_body["results"][2]["functionId"]
+    )
+    assert third_node["originFunctionId"] == second_node["functionId"]
+    assert third_node["originKind"] == "fanout"
+
+
+@pytest.mark.asyncio
+async def test_open_functions_repairs_disconnected_existing_roots(
+    client: AsyncClient, session: AsyncSession, ingested: None
+) -> None:
+    binary_id = await _get_binary_id(client, "acme.exe")
+    view_id = await _get_default_view_id(client, binary_id)
+    binary = await session.get(Binary, binary_id)
+    assert binary is not None
+    binary.analysis_image_base = 0x400000
+    await session.commit()
+    functions = (await client.get(f"/api/v1/binaries/{binary_id}/functions")).json()["rows"]
+    by_address = {function["address"]: function["id"] for function in functions}
+    placed = await client.patch(
+        f"/api/v1/views/{view_id}/nodes",
+        json={
+            "upsert": [
+                {"functionId": by_address[0x401000], "originKind": "root"},
+                {"functionId": by_address[0x401100], "originKind": "root"},
+            ]
+        },
+    )
+    assert placed.status_code == 200
+    placed_nodes = {node["functionId"]: node for node in placed.json()["nodes"]}
+    assert set(placed_nodes) == {by_address[0x401000], by_address[0x401100]}
+    assert await find_canvas_origin(
+        session,
+        function_id=by_address[0x401100],
+        candidate_ids={by_address[0x401000]},
+    ) == (by_address[0x401000], "fanout")
+
+    response = await client.post(
+        f"/api/v1/views/{view_id}/open-functions",
+        json={"dllBase": "0x400000", "addresses": ["0x401000", "0x401100"]},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["results"][0]["functionId"] == by_address[0x401000]
+    assert response.json()["results"][1]["functionId"] == by_address[0x401100]
+    nodes = {node["functionId"]: node for node in response.json()["nodes"]}
+    assert nodes[by_address[0x401100]]["originFunctionId"] == by_address[0x401000]
+    assert nodes[by_address[0x401100]]["originKind"] == "fanout"
+
+
+@pytest.mark.asyncio
+async def test_open_functions_reports_mistyped_base_instead_of_resolving_last_function(
+    client: AsyncClient, session: AsyncSession, ingested: None
+) -> None:
+    binary_id = await _get_binary_id(client, "acme.exe")
+    view_id = await _get_default_view_id(client, binary_id)
+    binary = await session.get(Binary, binary_id)
+    assert binary is not None
+    binary.analysis_image_base = 0x400000
+    await session.commit()
+
+    response = await client.post(
+        f"/api/v1/views/{view_id}/open-functions",
+        json={"dllBase": "0x40000", "addresses": ["0x401000", "0x401100"]},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["nodes"] == []
+    assert [result["status"] for result in response.json()["results"]] == [
+        "unresolved",
+        "unresolved",
+    ]
+    results = response.json()["results"]
+    assert all("check the DLL load base" in result["message"] for result in results)
+
+
+@pytest.mark.asyncio
+async def test_open_functions_rejects_bad_base_and_missing_view(
+    client: AsyncClient, ingested: None
+) -> None:
+    binary_id = await _get_binary_id(client, "acme.exe")
+    view_id = await _get_default_view_id(client, binary_id)
+
+    bad_base = await client.post(
+        f"/api/v1/views/{view_id}/open-functions",
+        json={"dllBase": "nope", "addresses": ["0x180001000"]},
+    )
+    missing_view = await client.post(
+        "/api/v1/views/99999/open-functions",
+        json={"dllBase": "0", "addresses": ["0x401000"]},
+    )
+
+    assert bad_base.status_code == 422
+    assert bad_base.json()["error"]["code"] == "VALIDATION_ERROR"
+    assert missing_view.status_code == 404
+    assert missing_view.json()["error"]["code"] == "VIEW_NOT_FOUND"
 
 
 # ---------------------------------------------------------------------------

@@ -2,10 +2,11 @@
  * Sidebar (TAD §2.3) — hosts `PlaceEntryPointButton` (I6 stopgap) and
  * `OnCanvasList` (I6) above the `GlyphLegend`.
  */
-import type { BinaryId, ViewId } from "@/api/types";
+import type { BinaryId, OpenFunctionsRequest, ViewId } from "@/api/types";
 import { FunctionSearchInput } from "./FunctionSearchInput";
 import { ImportBinaryButton } from "./ImportBinaryButton";
 import { LlmConnectionStatus } from "./LlmConnectionStatus";
+import { OpenFunctionsDialog } from "./OpenFunctionsDialog";
 import { PlaceEntryPointButton } from "./PlaceEntryPointButton";
 import { QueuePanel } from "./QueuePanel";
 import { RebalanceButton } from "./RebalanceButton";
@@ -53,6 +54,9 @@ export function Sidebar({
   viewId,
   onSelectView,
   onImported,
+  openFunctionsRequest,
+  openFunctionsError,
+  openFunctionsKey,
 }: {
   binaryName: string | null;
   binaryId: BinaryId | null;
@@ -62,6 +66,9 @@ export function Sidebar({
   viewId: ViewId | null;
   onSelectView: (viewId: ViewId) => void;
   onImported: (binaryId: BinaryId) => void;
+  openFunctionsRequest?: OpenFunctionsRequest | null;
+  openFunctionsError?: string | null;
+  openFunctionsKey?: string;
 }) {
   return (
     <aside
@@ -113,6 +120,14 @@ export function Sidebar({
           <ImportBinaryButton onImported={onImported} />
       {viewId !== null ? (
         <>
+          <OpenFunctionsDialog
+            key={binaryId}
+            viewId={viewId}
+            binaryLoadBase={runtimeBase ?? analysisImageBase}
+            automaticRequest={openFunctionsRequest}
+            automaticError={openFunctionsError}
+            automaticKey={openFunctionsKey}
+          />
           {binaryId !== null && (
             <PlaceEntryPointButton binaryId={binaryId} viewId={viewId} />
           )}
