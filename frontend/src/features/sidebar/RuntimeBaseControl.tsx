@@ -20,17 +20,20 @@ export function RuntimeBaseControl({
   runtimeBase: number | null;
   onRuntimeBaseChange: (value: number | null) => void;
 }) {
-  const [text, setText] = useState(runtimeBase === null ? "" : toHex(runtimeBase));
+  const [text, setText] = useState(
+    runtimeBase === null
+      ? analysisImageBase === null
+        ? ""
+        : toHex(analysisImageBase)
+      : toHex(runtimeBase),
+  );
   const parsed = parseAddressNumber(text);
   const invalid = text.trim().length > 0 && parsed === null;
 
   return (
     <div style={{ marginTop: "0.75rem" }}>
-      <p style={{ fontSize: "0.75rem", color: "#6b7280", margin: "0 0 0.375rem" }}>
-        Default image base: {analysisImageBase === null ? "not recorded" : toHex(analysisImageBase)}
-      </p>
       <label style={{ display: "flex", alignItems: "center", gap: "0.375rem", fontSize: "0.75rem", color: "#6b7280" }}>
-        Your image base:
+        Image base:
         <input
           type="text"
           aria-label="Runtime load base"

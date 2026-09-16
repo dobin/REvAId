@@ -43,7 +43,10 @@ export function PlaceEntryPointButton({
   binaryId: BinaryId;
   viewId: ViewId;
 }) {
+  const view = useViewQuery(viewId);
   const { topEntryPoint, placeEntryPoint, isPending } = usePlaceEntryPoint(binaryId, viewId);
+
+  if (!view.data || view.data.nodes.length > 0) return null;
 
   return (
     <button

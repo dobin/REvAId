@@ -87,7 +87,11 @@ describe("entry-point placement", () => {
 
   it("places the entry point when requested manually", async () => {
     const patchSpy = vi.spyOn(apiClient, "patch").mockResolvedValue({ nodes: [] });
-    vi.spyOn(apiClient, "get").mockResolvedValue(entryPoints);
+    vi.spyOn(apiClient, "get").mockImplementation((url: string) => {
+      if (url === "/views/5") return Promise.resolve(emptyView);
+      if (url === "/binaries/1/entry-points") return Promise.resolve(entryPoints);
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
 
     renderWithClient(<PlaceEntryPointButton binaryId={1} viewId={5} />);
     fireEvent.click(await screen.findByRole("button", { name: /place entry point/i }));
@@ -97,5 +101,18 @@ describe("entry-point placement", () => {
         upsert: [{ functionId: 42, visible: true, originKind: "root" }],
       });
     });
+  });
+
+  it("hides manual entry-point placement when the canvas has nodes", async () => {
+    const getSpy = vi.spyOn(apiClient, "get").mockImplementation((url: string) => {
+      if (url === "/views/5") return Promise.resolve(featuredView);
+      if (url === "/binaries/1/entry-points") return Promise.resolve(entryPoints);
+      return Promise.reject(new Error(`Unexpected request: ${url}`));
+    });
+
+    renderWithClient(<PlaceEntryPointButton binaryId={1} viewId={5} />);
+
+    await waitFor(() => expect(getSpy).toHaveBeenCalledTimes(2));
+    expect(screen.queryByRole("button", { name: /place entry point/i })).not.toBeInTheDocument();
   });
 });

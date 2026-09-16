@@ -24,10 +24,14 @@ const DEBOUNCE_MS = 250;
 
 const inputStyle: React.CSSProperties = {
   width: "100%",
-  fontSize: "0.8125rem",
-  padding: "0.25rem 0.5rem",
+  fontSize: "0.875rem",
+  fontWeight: 500,
+  padding: "0.4375rem 0.625rem",
   borderRadius: "0.375rem",
-  border: "1px solid #d1d5db",
+  border: "2px solid #60a5fa",
+  backgroundColor: "#eff6ff",
+  boxShadow: "0 0 0 3px rgba(96, 165, 250, 0.15)",
+  outline: "none",
   boxSizing: "border-box",
 };
 

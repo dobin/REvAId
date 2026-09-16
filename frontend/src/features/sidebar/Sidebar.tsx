@@ -3,6 +3,7 @@
  * `OnCanvasList` (I6) above the `GlyphLegend`.
  */
 import type { BinaryId, OpenFunctionsRequest, ViewId } from "@/api/types";
+import { useConfig } from "@/config/ConfigProvider";
 import { FunctionSearchInput } from "./FunctionSearchInput";
 import { ImportBinaryButton } from "./ImportBinaryButton";
 import { LlmConnectionStatus } from "./LlmConnectionStatus";
@@ -70,6 +71,8 @@ export function Sidebar({
   openFunctionsError?: string | null;
   openFunctionsKey?: string;
 }) {
+  const { publicMode } = useConfig();
+
   return (
     <aside
       style={{
@@ -110,30 +113,30 @@ export function Sidebar({
           />
         </SidebarSection>
       )}
-      {binaryId !== null && binaryName !== null && (
+      {!publicMode && binaryId !== null && binaryName !== null && (
         <SidebarSection title="View">
           <ViewPicker binaryId={binaryId} value={viewId} onChange={onSelectView} />
         </SidebarSection>
       )}
 
       <SidebarSection title="Actions">
-          <ImportBinaryButton onImported={onImported} />
+      {!publicMode && <ImportBinaryButton onImported={onImported} />}
       {viewId !== null ? (
         <>
           <OpenFunctionsDialog
             key={binaryId}
             viewId={viewId}
             binaryLoadBase={runtimeBase ?? analysisImageBase}
-            automaticRequest={openFunctionsRequest}
-            automaticError={openFunctionsError}
-            automaticKey={openFunctionsKey}
+            {...(openFunctionsRequest !== undefined && { automaticRequest: openFunctionsRequest })}
+            {...(openFunctionsError !== undefined && { automaticError: openFunctionsError })}
+            {...(openFunctionsKey !== undefined && { automaticKey: openFunctionsKey })}
           />
           {binaryId !== null && (
             <PlaceEntryPointButton binaryId={binaryId} viewId={viewId} />
           )}
           <RebalanceButton viewId={viewId} />
           {binaryId !== null && <ResetCanvasButton binaryId={binaryId} viewId={viewId} />}
-          {binaryId !== null && <ResetSummariesButton binaryId={binaryId} />}
+          {!publicMode && binaryId !== null && <ResetSummariesButton binaryId={binaryId} />}
         </>
       ) : null}
       </SidebarSection>
