@@ -79,9 +79,11 @@ has sequential view ids leaves those old ids guessable.
 `functions.is_featured` is an operator-owned marker for functions that should
 appear in every **new** view. This is especially useful in public mode: a new
 anonymous `My view` starts with the curated functions instead of an empty
-canvas. Private-mode view creation uses the same template. Featured functions
-become independent root nodes and the normal ELK layout arranges them; the
-lowest-address featured function anchors the initial camera.
+canvas. Private-mode view creation uses the same template. Known call edges
+among featured functions are converted into deterministic canvas provenance,
+so the normal ELK layout arranges call stacks as connected components. A
+function remains an independent root only when no featured call path connects
+it; the lowest-address featured function anchors the initial camera.
 
 The template is copied only when a view is created. Changing the marker does
 not mutate existing views, and removing a featured node from one view remains

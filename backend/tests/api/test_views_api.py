@@ -81,7 +81,7 @@ async def test_create_view_and_get_view_round_trip(client: AsyncClient, ingested
 
 
 @pytest.mark.asyncio
-async def test_create_view_seeds_featured_functions_in_address_order(
+async def test_create_view_seeds_featured_functions_with_known_call_provenance(
     client: AsyncClient, session: AsyncSession, ingested: None
 ) -> None:
     binary_id = await _get_binary_id(client, "acme.exe")
@@ -89,17 +89,19 @@ async def test_create_view_seeds_featured_functions_in_address_order(
         (
             await session.execute(
                 select(Function)
-                .where(Function.binary_id == binary_id)
-                .order_by(Function.address.desc())
-                .limit(2)
+                .where(
+                    Function.binary_id == binary_id,
+                    Function.address.in_((0x401020, 0x4011C0, 0x4011E0)),
+                )
+                .order_by(Function.address)
             )
         ).scalars()
     )
-    assert len(functions) == 2
+    assert len(functions) == 3
     for function in functions:
         function.is_featured = True
     await session.commit()
-    expected_ids = [function.id for function in sorted(functions, key=lambda row: row.address)]
+    expected_ids = [function.id for function in functions]
 
     response = await client.post(
         f"/api/v1/binaries/{binary_id}/views", json={"name": "featured template"}
@@ -109,22 +111,14 @@ async def test_create_view_seeds_featured_functions_in_address_order(
     body = response.json()
     assert body["rootFunctionId"] == expected_ids[0]
     assert [node["functionId"] for node in body["nodes"]] == expected_ids
-    assert all(
-        node
-        == {
-            "functionId": node["functionId"],
-            "visible": True,
-            "collapsed": False,
-            "color": None,
-            "posX": 0.0,
-            "posY": 0.0,
-            "pinned": False,
-            "originFunctionId": None,
-            "originKind": "root",
-            "originImplied": False,
-        }
-        for node in body["nodes"]
-    )
+    nodes = {node["functionId"]: node for node in body["nodes"]}
+    assert nodes[expected_ids[0]]["originFunctionId"] is None
+    assert nodes[expected_ids[0]]["originKind"] == "root"
+    assert nodes[expected_ids[1]]["originFunctionId"] == expected_ids[0]
+    assert nodes[expected_ids[1]]["originKind"] == "fanout"
+    assert nodes[expected_ids[2]]["originFunctionId"] == expected_ids[1]
+    assert nodes[expected_ids[2]]["originKind"] == "fanout"
+    assert all(node["visible"] is True and node["pinned"] is False for node in body["nodes"])
 
 
 @pytest.mark.asyncio
