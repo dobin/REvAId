@@ -167,7 +167,6 @@ export function OpenFunctionsDialog({
         </ul>
       ) : null}
       <div style={{ display: "flex", justifyContent: "flex-end", gap: "0.5rem" }}>
-        <button type="button" onClick={() => { setOpen(false); }}>Close</button>
         <button type="button" onClick={submit} disabled={mutation.isPending || viewId === null}>
           {mutation.isPending ? "Opening…" : "Open functions"}
         </button>
