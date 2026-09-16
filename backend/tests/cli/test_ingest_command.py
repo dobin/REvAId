@@ -19,8 +19,15 @@ BACKEND_DIR = Path(__file__).resolve().parents[1]
 
 def _run_cli(*args: str, db_path: str) -> subprocess.CompletedProcess[str]:
     # Disposable test DB: skip fsyncs (the ingest's ~1k statements over the
-    # async driver dominate CLI-test wall time).
-    env = {**os.environ, "GRAPHREV_DB_PATH": db_path, "GRAPHREV_SQLITE_SYNCHRONOUS": "OFF"}
+    # async driver dominate CLI-test wall time). Pin private mode as well:
+    # importing LiteLLM can repopulate GRAPHREV_* variables from a developer's
+    # .env after the parent test fixture performed its environment cleanup.
+    env = {
+        **os.environ,
+        "GRAPHREV_DB_PATH": db_path,
+        "GRAPHREV_PUBLIC_MODE": "false",
+        "GRAPHREV_SQLITE_SYNCHRONOUS": "OFF",
+    }
     return subprocess.run(
         [sys.executable, "-m", "graphrev.cli.__main__", *args],
         cwd=BACKEND_DIR,
