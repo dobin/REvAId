@@ -50,7 +50,7 @@ export function NeighbourRow({
       style={{
         display: "grid",
         gridTemplateColumns: "4.5rem 1fr auto",
-        gap: "0.5rem",
+        columnGap: "0.75rem",
         alignItems: "center",
         padding: "0.25rem 0",
         borderBottom: "1px solid #f3f4f6",
