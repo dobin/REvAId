@@ -1,6 +1,9 @@
 bak/
 mynotes.md
 
+# TypeScript incremental build cache
+*.tsbuildinfo
+
 # --- Python / backend ---
 __pycache__/
 *.py[cod]
