@@ -14,6 +14,8 @@ Purpose:
 * Manually verify the results of your super duper next generation AI reversing analysis (ai-reversing verification)
 * Dont be dependent on PDB
 
+Live at [REvAId.r00ted.ch](https://revaid.r00ted.ch)
+
 This is 100% vibe coded. See `IDEA.md`, `PRD.md`, `TAD.md`.
 
 ## Screenshots
