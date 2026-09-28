@@ -44,6 +44,59 @@ const functionDto: FunctionDto = {
   hasIndirectCalls: false,
 };
 
+function neighbourPage(
+  direction: "callers" | "callees",
+  displayName: string,
+  group: "primary" | "utility" = "primary",
+) {
+  return {
+    functionId: 1,
+    direction,
+    group,
+    rows: displayName ? [{
+      id: direction === "callers" ? 2 : 3,
+      address: 0x401100,
+      displayName,
+      nameLlm: null,
+      isRenamed: false,
+      summaryShort: null,
+      summaryStatus: "none",
+      summaryLowConfidence: false,
+      kind: "normal",
+      onCanvas: false,
+      isUtility: false,
+      utilitySource: "computed",
+      fanIn: 0,
+      isSelf: false,
+      hasNotes: false,
+      canFanOut: true,
+    }] : [],
+    total: displayName ? 1 : 0,
+    totalPrimary: group === "primary" ? 1 : 0,
+    totalUtility: group === "utility" ? 1 : 0,
+    limit: 500,
+    offset: 0,
+    callersSuppressed: false,
+    mayBeIncomplete: false,
+  };
+}
+
+function mockWorkspaceFetch() {
+  vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.includes("/neighbours?")) {
+      const direction = url.includes("direction=callers") ? "callers" : "callees";
+      const group = url.includes("group=utility") ? "utility" : "primary";
+      return Promise.resolve(new Response(JSON.stringify(neighbourPage(
+        direction,
+        group === "primary" ? (direction === "callers" ? "caller_fn" : "callee_fn") : "",
+        group,
+      )), { status: 200 }));
+    }
+    return Promise.resolve(new Response(JSON.stringify(functionDto), { status: 200 }));
+  }));
+}
+
 describe("DetailPanel", () => {
   afterEach(() => {
     act(() => {
@@ -56,14 +109,11 @@ describe("DetailPanel", () => {
     act(() => {
       useAppStore.getState().selectFunction(1);
     });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() => Promise.resolve(new Response(JSON.stringify(functionDto), { status: 200 }))),
-    );
+    mockWorkspaceFetch();
 
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <DetailPanel />
+        <DetailPanel viewId={1} />
       </QueryClientProvider>,
     );
 
@@ -74,24 +124,27 @@ describe("DetailPanel", () => {
       screen.getByText((_, element) => element?.tagName === "CODE" && element.textContent === functionDto.assembly),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Function detail")).toHaveStyle({ width: "42rem" });
+    expect(await screen.findByText("caller_fn")).toBeInTheDocument();
+    expect(await screen.findByText("callee_fn")).toBeInTheDocument();
   });
 
   it("explains when the function has no decompilation or assembly", async () => {
     act(() => {
       useAppStore.getState().selectFunction(1);
     });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() =>
-        Promise.resolve(
-          new Response(JSON.stringify({ ...functionDto, codeC: null, assembly: null }), { status: 200 }),
-        ),
-      ),
-    );
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/neighbours?")) {
+        const direction = url.includes("direction=callers") ? "callers" : "callees";
+        const group = url.includes("group=utility") ? "utility" : "primary";
+        return Promise.resolve(new Response(JSON.stringify(neighbourPage(direction, "", group)), { status: 200 }));
+      }
+      return Promise.resolve(new Response(JSON.stringify({ ...functionDto, codeC: null, assembly: null }), { status: 200 }));
+    }));
 
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <DetailPanel />
+        <DetailPanel viewId={1} />
       </QueryClientProvider>,
     );
 
@@ -105,14 +158,11 @@ describe("DetailPanel", () => {
     act(() => {
       useAppStore.getState().selectFunction(1);
     });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(() => Promise.resolve(new Response(JSON.stringify(functionDto), { status: 200 }))),
-    );
+    mockWorkspaceFetch();
 
     render(
       <QueryClientProvider client={new QueryClient()}>
-        <DetailPanel />
+        <DetailPanel viewId={1} />
       </QueryClientProvider>,
     );
 

@@ -111,7 +111,7 @@ function BinaryWorkspace({ binaryName }: { binaryName: string }) {
               viewId={selectedViewId}
             />
           )}
-          <DetailPanel />
+          <DetailPanel viewId={selectedViewId} />
         </div>
       </CanvasActionsRegistryProvider>
     </div>

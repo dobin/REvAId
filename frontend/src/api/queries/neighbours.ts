@@ -9,7 +9,7 @@ import type { FunctionId, NeighbourPageDto, ViewId } from "@/api/types";
 
 export interface NeighbourQueryParams {
   functionId: FunctionId;
-  viewId: ViewId;
+  viewId?: ViewId;
   direction: "callees" | "callers";
   group?: "primary" | "utility";
   limit?: number;
@@ -17,11 +17,12 @@ export interface NeighbourQueryParams {
   sort?: "callOrder" | "name" | "address" | "fanIn";
   order?: "asc" | "desc";
   filter?: string;
+  enabled?: boolean;
 }
 
 async function fetchNeighbours(params: NeighbourQueryParams): Promise<NeighbourPageDto> {
   const query = new URLSearchParams();
-  query.set("viewId", String(params.viewId));
+  if (params.viewId !== undefined) query.set("viewId", String(params.viewId));
   query.set("direction", params.direction);
   if (params.group) query.set("group", params.group);
   if (params.limit !== undefined) query.set("limit", String(params.limit));
@@ -76,7 +77,7 @@ export function useInfiniteNeighboursQuery(params: NeighbourQueryParams) {
       queryKey: [
         "neighbours-infinite",
         params.functionId,
-        params.viewId,
+        params.viewId ?? null,
         params.direction,
         params.group ?? "primary",
         params.limit,
@@ -86,6 +87,7 @@ export function useInfiniteNeighboursQuery(params: NeighbourQueryParams) {
       ],
       initialPageParam: 0,
       queryFn: ({ pageParam }) => fetchNeighbours({ ...params, offset: pageParam }),
+      enabled: params.enabled ?? true,
       getNextPageParam: (lastPage) => {
         const nextOffset = lastPage.offset + lastPage.rows.length;
         return nextOffset < lastPage.total ? nextOffset : undefined;

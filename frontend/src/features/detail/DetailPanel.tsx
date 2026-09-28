@@ -4,7 +4,10 @@
  * currently selected function. Ground-truth code is intentionally shown here
  * rather than on a canvas card, where it would make the graph unreadable.
  */
+import { useEffect } from "react";
 import { useFunctionQuery } from "@/api/queries/functions";
+import { useInfiniteNeighboursQuery } from "@/api/queries/neighbours";
+import type { FunctionId, ViewId } from "@/api/types";
 import { toHex } from "@/lib/hex";
 import { useAppStore } from "@/store";
 
@@ -43,7 +46,68 @@ function CodeSection({ title, code, unavailableMessage }: {
   );
 }
 
-export function DetailPanel() {
+function NeighbourList({
+  functionId,
+  viewId,
+  direction,
+}: {
+  functionId: FunctionId;
+  viewId: ViewId | null;
+  direction: "callees" | "callers";
+}) {
+  const enabled = viewId !== null;
+  const queryParams = {
+    functionId,
+    viewId: viewId ?? 0,
+    direction,
+    group: "primary" as const,
+    enabled,
+  };
+  const primary = useInfiniteNeighboursQuery(queryParams);
+  const utility = useInfiniteNeighboursQuery({ ...queryParams, group: "utility" });
+
+  useEffect(() => {
+    if (primary.hasNextPage && !primary.isFetchingNextPage) void primary.fetchNextPage();
+  }, [primary.hasNextPage, primary.isFetchingNextPage, primary.fetchNextPage]);
+  useEffect(() => {
+    if (utility.hasNextPage && !utility.isFetchingNextPage) void utility.fetchNextPage();
+  }, [utility.hasNextPage, utility.isFetchingNextPage, utility.fetchNextPage]);
+
+  const label = direction === "callees" ? "Callees" : "Callers";
+  const primaryFirstPage = primary.data?.pages[0];
+  const utilityFirstPage = utility.data?.pages[0];
+  const rows = [
+    ...(primary.data?.pages.flatMap((page) => page.rows) ?? []),
+    ...(utility.data?.pages.flatMap((page) => page.rows) ?? []),
+  ];
+
+  return (
+    <section style={{ marginTop: "1rem" }}>
+      <h3 style={{ fontSize: "0.875rem", margin: "0 0 0.25rem" }}>{label}</h3>
+      {!enabled ? (
+        <p style={{ color: "#6b7280", fontSize: "0.8125rem" }}>No view available.</p>
+      ) : primary.isPending || utility.isPending ? (
+        <p>Loading {label.toLowerCase()}…</p>
+      ) : primary.isError || utility.isError ? (
+        <p>Could not load {label.toLowerCase()}.</p>
+      ) : primaryFirstPage?.callersSuppressed || utilityFirstPage?.callersSuppressed ? (
+        <p style={{ color: "#6b7280", fontSize: "0.8125rem" }}>
+          Caller list suppressed ({primaryFirstPage?.total ?? utilityFirstPage?.total}).
+        </p>
+      ) : rows.length === 0 ? (
+        <p style={{ color: "#6b7280", fontSize: "0.8125rem" }}>None</p>
+      ) : (
+        <ul style={{ fontSize: "0.8125rem", margin: 0, paddingLeft: "1.25rem" }}>
+          {rows.map((row) => (
+            <li key={row.id} className="gr-ground-truth">{row.displayName}</li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+export function DetailPanel({ viewId }: { viewId: ViewId | null }) {
   const selectedFunctionId = useAppStore((s) => s.selectedFunctionId);
   const clearSelection = useAppStore((s) => s.clearSelection);
   const { data: fn, isPending, isError } = useFunctionQuery(selectedFunctionId);
@@ -115,6 +179,8 @@ export function DetailPanel() {
             code={fn.assembly}
             unavailableMessage="Assembly unavailable for this function."
           />
+          <NeighbourList functionId={fn.id} viewId={viewId} direction="callers" />
+          <NeighbourList functionId={fn.id} viewId={viewId} direction="callees" />
         </div>
       )}
     </aside>
