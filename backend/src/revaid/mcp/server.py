@@ -75,17 +75,19 @@ async def get_function(
     binary_name: str,
     binary_version: str = "",
     function_id: int | None = None,
-    address: int | None = None,
+    address: int | str | None = None,
     name: str | None = None,
     include_assembly: bool = False,
     include_decompile: bool = True,
 ) -> McpFunctionDetailDto:
     """Return decompiled C, metadata, callers, and callees for one function.
 
-    Specify exactly one selector: function_id, exact start address (decimal), or
-    an exact stored name. Ambiguous names must be retried with id or address.
+    Specify exactly one selector: function_id, exact start address (integer,
+    decimal string, or 0x-prefixed hex string), or an exact stored name.
+    Ambiguous names must be retried with id or address.
     Set include_assembly to true to include disassembly (asm) in the result.
     Set include_decompile to false to omit decompiled C from the result.
+    Prefer the decompiled C for most use cases; it is more compact and easier to parse than the assembly.
     """
     try:
         async with _sessions()() as session:
@@ -108,7 +110,7 @@ async def set_function_info(
     binary_name: str,
     binary_version: str = "",
     function_id: int | None = None,
-    address: int | None = None,
+    address: int | str | None = None,
     name: str | None = None,
     name_llm: str | None = None,
     summary_short: str | None = None,

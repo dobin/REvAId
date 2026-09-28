@@ -83,7 +83,7 @@ async def get_mcp_function(
     binary_name: str,
     binary_version: str,
     function_id: int | None = None,
-    address: int | None = None,
+    address: int | str | None = None,
     name: str | None = None,
     include_assembly: bool = False,
     include_decompile: bool = True,
@@ -115,7 +115,7 @@ async def set_mcp_function_info(
     binary_name: str,
     binary_version: str,
     function_id: int | None = None,
-    address: int | None = None,
+    address: int | str | None = None,
     name: str | None = None,
     name_llm: str | None = None,
     summary_short: str | None = None,
@@ -184,7 +184,7 @@ async def _resolve_function(
     *,
     binary: Binary,
     function_id: int | None,
-    address: int | None,
+    address: int | str | None,
     name: str | None,
 ) -> Function:
     selectors = sum(value is not None for value in (function_id, address, name))
@@ -194,13 +194,31 @@ async def _resolve_function(
             "Specify exactly one of function_id, address, or name.",
         )
 
+    parsed_address: int | None = None
+    if isinstance(address, int):
+        parsed_address = address
+    elif address is not None:
+        address_text = address.strip()
+        try:
+            parsed_address = int(
+                address_text,
+                16 if address_text.lower().startswith("0x") else 10,
+            )
+        except ValueError as exc:
+            raise AppError(
+                ErrorCode.VALIDATION_ERROR,
+                "address must be an integer, decimal string, or 0x-prefixed hex string.",
+            ) from exc
+
     fn: Function | None
     if function_id is not None:
         fn = await get_function_by_id(session, function_id)
         if fn is not None and fn.binary_id != binary.id:
             fn = None
-    elif address is not None:
-        fn = await get_function_by_address(session, binary_id=binary.id, address=address)
+    elif parsed_address is not None:
+        fn = await get_function_by_address(
+            session, binary_id=binary.id, address=parsed_address
+        )
     else:
         matches = await resolve_functions_by_name(session, binary_id=binary.id, name=name or "")
         if len(matches) > 1:

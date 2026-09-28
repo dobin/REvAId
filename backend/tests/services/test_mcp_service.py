@@ -90,6 +90,38 @@ async def test_get_function_includes_callers_and_ordered_callees(
 
 
 @pytest.mark.asyncio
+async def test_get_function_accepts_hex_address_string(session: AsyncSession) -> None:
+    binary, _ = await get_or_create_binary(session, name="agent.exe", version="1")
+    fn = await _function(session, binary_id=binary.id, address=0x401000, name="main")
+    await session.commit()
+
+    detail = await get_mcp_function(
+        session,
+        binary_name=binary.name,
+        binary_version=binary.version,
+        address="0x00401000",
+    )
+
+    assert detail.id == fn.id
+    assert detail.address == 0x401000
+
+
+@pytest.mark.asyncio
+async def test_get_function_rejects_invalid_address_string(session: AsyncSession) -> None:
+    binary, _ = await get_or_create_binary(session, name="agent.exe", version="1")
+
+    with pytest.raises(AppError) as raised:
+        await get_mcp_function(
+            session,
+            binary_name=binary.name,
+            binary_version=binary.version,
+            address="not-an-address",
+        )
+
+    assert raised.value.code == ErrorCode.VALIDATION_ERROR
+
+
+@pytest.mark.asyncio
 async def test_set_function_info_updates_only_supplied_llm_fields(
     session: AsyncSession,
 ) -> None:
@@ -113,6 +145,25 @@ async def test_set_function_info_updates_only_supplied_llm_fields(
     assert fn.summary_short == "Parses an incoming packet."
     assert fn.summary_long == "existing details"
     assert fn.summary_status == "ready"
+
+
+@pytest.mark.asyncio
+async def test_set_function_info_accepts_hex_address_string(session: AsyncSession) -> None:
+    binary, _ = await get_or_create_binary(session, name="agent.exe", version="")
+    fn = await _function(session, binary_id=binary.id, address=0x401000, name="FUN_401000")
+    await session.commit()
+
+    result = await set_mcp_function_info(
+        session,
+        binary_name=binary.name,
+        binary_version=binary.version,
+        address="0x401000",
+        name_llm="main",
+    )
+
+    await session.refresh(fn)
+    assert result.id == fn.id
+    assert fn.name_llm == "main"
 
 
 @pytest.mark.asyncio
