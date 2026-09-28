@@ -78,6 +78,15 @@ async def test_get_function_includes_callers_and_ordered_callees(
     )
     assert detail_with_assembly.assembly == "2000: RET"
 
+    detail_without_decompile = await get_mcp_function(
+        session,
+        binary_name="agent.exe",
+        binary_version="1",
+        address=target.address,
+        include_decompile=False,
+    )
+    assert detail_without_decompile.code_c is None
+
 
 @pytest.mark.asyncio
 async def test_set_function_info_updates_only_supplied_llm_fields(
