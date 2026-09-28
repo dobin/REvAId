@@ -142,6 +142,7 @@ def mcp_function_detail_from_row(
     binary_version: str,
     callers: list[RelatedFunction],
     callees: list[RelatedFunction],
+    include_assembly: bool = False,
 ) -> McpFunctionDetailDto:
     base = function_dto_from_row(fn)
     return McpFunctionDetailDto(
@@ -156,7 +157,7 @@ def mcp_function_detail_from_row(
         name_analyst=base.name_analyst,
         parameters=base.parameters,
         signature=base.signature,
-        assembly=base.assembly,
+        assembly=base.assembly if include_assembly else None,
         code_c=base.code_c,
         kind=base.kind,
         placeholder_module=base.placeholder_module,

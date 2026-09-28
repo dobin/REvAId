@@ -63,11 +63,20 @@ async def test_get_function_includes_callers_and_ordered_callees(
         address=target.address,
     )
 
-    assert detail.assembly == "2000: RET"
+    assert detail.assembly is None
     assert detail.code_c == "return 0;"
     assert [fn.display_name for fn in detail.callers] == ["caller"]
     assert [fn.display_name for fn in detail.callees] == ["first", "second"]
     assert [fn.callee_order for fn in detail.callees] == [0, 1]
+
+    detail_with_assembly = await get_mcp_function(
+        session,
+        binary_name="agent.exe",
+        binary_version="1",
+        address=target.address,
+        include_assembly=True,
+    )
+    assert detail_with_assembly.assembly == "2000: RET"
 
 
 @pytest.mark.asyncio

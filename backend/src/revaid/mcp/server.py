@@ -77,11 +77,13 @@ async def get_function(
     function_id: int | None = None,
     address: int | None = None,
     name: str | None = None,
+    include_assembly: bool = False,
 ) -> McpFunctionDetailDto:
-    """Return disassembly, decompiled C, metadata, callers, and callees for one function.
+    """Return decompiled C, metadata, callers, and callees for one function.
 
     Specify exactly one selector: function_id, exact start address (decimal), or
     an exact stored name. Ambiguous names must be retried with id or address.
+    Set include_assembly to true to include disassembly (asm) in the result.
     """
     try:
         async with _sessions()() as session:
@@ -92,6 +94,7 @@ async def get_function(
                 function_id=function_id,
                 address=address,
                 name=name,
+                include_assembly=include_assembly,
             )
     except AppError as exc:
         raise _tool_error(exc) from exc

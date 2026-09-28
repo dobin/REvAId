@@ -84,6 +84,7 @@ async def get_mcp_function(
     function_id: int | None = None,
     address: int | None = None,
     name: str | None = None,
+    include_assembly: bool = False,
 ) -> McpFunctionDetailDto:
     binary = await _require_binary(session, binary_name, binary_version)
     fn = await _resolve_function(
@@ -101,6 +102,7 @@ async def get_mcp_function(
         binary_version=binary.version,
         callers=callers,
         callees=callees,
+        include_assembly=include_assembly,
     )
 
 
