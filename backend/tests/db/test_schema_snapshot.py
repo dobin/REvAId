@@ -18,7 +18,8 @@ from alembic.runtime.migration import MigrationContext
 from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import AsyncEngine
 
-from graphrev.db.models import Base
+from revaid.db.models import Base
+from revaid_ui.db.models import ViewerBase
 
 EXPECTED_TABLES = {
     "alembic_version",
@@ -27,8 +28,6 @@ EXPECTED_TABLES = {
     "functions",
     "llm_worker_statuses",
     "edges",
-    "views",
-    "view_nodes",
 }
 
 
@@ -95,13 +94,74 @@ async def test_binaries_columns_match_model(engine: AsyncEngine, migrated_db: Pa
 
 
 @pytest.mark.asyncio
+async def test_analysis_database_excludes_viewer_state(
+    engine: AsyncEngine, migrated_db: Path
+) -> None:
+    async with engine.connect() as conn:
+        tables = await conn.run_sync(lambda sync_conn: inspect(sync_conn).get_table_names())
+    assert "binary_ui_state" not in tables
+    assert "views" not in tables
+    assert "view_nodes" not in tables
+
+
+@pytest.mark.asyncio
+async def test_viewer_database_has_no_external_foreign_keys(
+    viewer_engine: AsyncEngine, viewer_migrated_db: Path
+) -> None:
+    assert set(ViewerBase.metadata.tables) == {"binary_ui_state", "views", "view_nodes"}
+    async with viewer_engine.connect() as conn:
+        state_fks = await conn.run_sync(
+            lambda sync_conn: inspect(sync_conn).get_foreign_keys("binary_ui_state")
+        )
+        view_fks = await conn.run_sync(
+            lambda sync_conn: inspect(sync_conn).get_foreign_keys("views")
+        )
+        node_fks = await conn.run_sync(
+            lambda sync_conn: inspect(sync_conn).get_foreign_keys("view_nodes")
+        )
+    assert state_fks == []
+    assert view_fks == []
+    assert len(node_fks) == 1
+    assert node_fks[0]["constrained_columns"] == ["view_id"]
+    assert node_fks[0]["referred_table"] == "views"
+
+
+@pytest.mark.asyncio
+async def test_viewer_autogenerate_diff_is_empty(
+    viewer_engine: AsyncEngine, viewer_migrated_db: Path
+) -> None:
+    async with viewer_engine.connect() as conn:
+
+        def _diff(sync_conn: object) -> list[object]:
+            context = MigrationContext.configure(sync_conn)  # type: ignore[arg-type]
+            return compare_metadata(context, ViewerBase.metadata)
+
+        diff = await conn.run_sync(_diff)
+
+    assert diff == [], f"Viewer model/migration drift detected: {diff!r}"
+
+
+@pytest.mark.asyncio
+async def test_analysis_autogenerate_diff_is_empty(engine: AsyncEngine, migrated_db: Path) -> None:
+    async with engine.connect() as conn:
+
+        def _diff(sync_conn: object) -> list[object]:
+            context = MigrationContext.configure(sync_conn)  # type: ignore[arg-type]
+            return compare_metadata(context, Base.metadata)
+
+        diff = await conn.run_sync(_diff)
+
+    assert diff == [], f"Analysis model/migration drift detected: {diff!r}"
+
+
+@pytest.mark.asyncio
 async def test_indexes_present(engine: AsyncEngine, migrated_db: Path) -> None:
     async with engine.connect() as conn:
 
         def _index_names(sync_conn: object) -> set[str]:
             insp = inspect(sync_conn)
             names: set[str] = set()
-            for table in ("binaries", "functions", "edges", "views", "view_nodes"):
+            for table in ("binaries", "functions", "edges"):
                 names |= {ix["name"] for ix in insp.get_indexes(table)}  # type: ignore[arg-type]
             return names
 
@@ -117,9 +177,6 @@ async def test_indexes_present(engine: AsyncEngine, migrated_db: Path) -> None:
         "ix_edges_caller",
         "ix_edges_callee",
         "ix_edges_caller_callee_order",
-        "ix_views_binary",
-        "ix_view_nodes_view",
-        "ix_view_nodes_origin",
     }
     assert expected <= index_names
 

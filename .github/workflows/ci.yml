@@ -36,7 +36,7 @@ jobs:
         run: uv run lint-imports
 
       - name: pytest
-        run: uv run pytest --cov=graphrev --cov-report=term-missing
+        run: uv run pytest --cov=revaid --cov=revaid_ui --cov=revaid_contracts --cov-report=term-missing
 
   frontend:
     name: Frontend (eslint, tsc, vitest, build)

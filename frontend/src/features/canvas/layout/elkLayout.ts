@@ -41,10 +41,10 @@ export type LayoutPositions = Record<string, { x: number; y: number }>;
 
 /** ELK's `elk.layered.spacing.nodeNodeBetweenLayers` — horizontal gap between
  * successive layers (TAD §2.5, layout direction RIGHT: a callee sits to the
- * right of its caller, not below it). No PRD basis (see docs/adr/0003). */
+ * right of its caller, not below it). */
 const LAYER_SPACING_PX = 80;
 /** ELK's `elk.spacing.nodeNode` — gap between siblings within one layer
- * (TAD §2.5). No PRD basis (see docs/adr/0003). */
+ * (TAD §2.5). */
 const NODE_SPACING_PX = 48;
 
 const elk = new ELK();

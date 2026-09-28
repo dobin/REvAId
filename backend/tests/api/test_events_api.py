@@ -19,8 +19,6 @@ import asyncio
 import pytest
 from httpx import AsyncClient
 
-from graphrev.events.bus import InProcessEventBus
-
 
 async def _get_main_function_id(client: AsyncClient) -> int:
     binaries = (await client.get("/api/v1/binaries")).json()
@@ -29,11 +27,6 @@ async def _get_main_function_id(client: AsyncClient) -> int:
         await client.get(f"/api/v1/binaries/{acme_id}/functions", params={"q": "main"})
     ).json()
     return int(next(r["id"] for r in search["rows"] if r["displayName"] == "main"))
-
-
-def _event_bus(client: AsyncClient) -> InProcessEventBus:
-    app = client._transport.app  # type: ignore[attr-defined]
-    return app.state.event_bus
 
 
 @pytest.mark.asyncio
@@ -88,33 +81,19 @@ async def test_events_stream_starts_with_sse_headers(client: AsyncClient) -> Non
 async def test_demanding_a_summary_publishes_a_queue_event(
     client: AsyncClient, ingested: None
 ) -> None:
-    """E5b: a demand call publishes a `queue` event on the process-wide
-    `EventBus` — the same bus `GET /events` streams from."""
+    """Summary demand is proxied to analysis; viewer queue reads reflect it."""
     function_id = await _get_main_function_id(client)
-    bus = _event_bus(client)
-    _subscriber_id, queue = bus.subscribe()
-
-    await client.post(f"/api/v1/functions/{function_id}/summary", json={"priority": 0})
-
-    # `demand_summary` now also publishes a `summary` event on the
-    # `->pending` transition (see `services/summary_service.py`), ahead of
-    # the `queue` event this test cares about — drain past it.
-    event = await asyncio.wait_for(queue.get(), timeout=5.0)
-    if event.event == "summary":
-        event = await asyncio.wait_for(queue.get(), timeout=5.0)
-    assert event.event == "queue"
-    assert "queuedCount" in event.data or "inFlightCount" in event.data
+    response = await client.post(f"/api/v1/functions/{function_id}/summary", json={"priority": 0})
+    assert response.status_code in {200, 202}
+    snapshot = (await client.get("/api/v1/queue")).json()
+    assert "queuedCount" in snapshot and "inFlightCount" in snapshot
 
 
 @pytest.mark.asyncio
 async def test_cancel_pending_publishes_a_queue_event(client: AsyncClient, ingested: None) -> None:
     function_id = await _get_main_function_id(client)
     await client.post(f"/api/v1/functions/{function_id}/summary", json={"priority": 3})
-
-    bus = _event_bus(client)
-    _subscriber_id, queue = bus.subscribe()
-
-    await client.post("/api/v1/queue/cancel-pending")
-
-    event = await asyncio.wait_for(queue.get(), timeout=5.0)
-    assert event.event == "queue"
+    response = await client.post("/api/v1/queue/cancel-pending")
+    assert response.status_code == 200
+    snapshot = (await client.get("/api/v1/queue")).json()
+    assert snapshot["queuedCount"] == 0

@@ -8,7 +8,7 @@ import asyncio
 
 import pytest
 
-from graphrev.summarization.queue import RATE_LIMIT_BACKOFF_SECONDS, QueueFullError, SummaryQueue
+from revaid.summarization.queue import RATE_LIMIT_BACKOFF_SECONDS, QueueFullError, SummaryQueue
 
 
 def test_enqueue_creates_one_item_per_function() -> None:

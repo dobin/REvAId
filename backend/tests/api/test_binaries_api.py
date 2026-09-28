@@ -11,8 +11,13 @@ from pathlib import Path
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from graphrev.core.config import Settings, get_settings
+from revaid.core.config import Settings, get_settings
+from revaid.db.models import Binary
+from revaid_ui.db.models import BinaryUiState, View
+from revaid_ui.repositories import views as viewer_views_repository
+from revaid_ui.repositories.views import list_views_by_binary
 
 
 @pytest.mark.asyncio
@@ -40,8 +45,12 @@ async def test_list_binaries_empty_when_nothing_ingested(client: AsyncClient) ->
 
 
 @pytest.mark.asyncio
-async def test_list_binaries_redacts_last_view_id_in_public_mode(
-    client: AsyncClient, ingested: None, monkeypatch: pytest.MonkeyPatch
+async def test_list_binaries_composes_last_view_and_redacts_in_public_mode(
+    client: AsyncClient,
+    session: AsyncSession,
+    viewer_session: AsyncSession,
+    ingested: None,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     binaries = (await client.get("/api/v1/binaries")).json()
     acme_id = next(b["id"] for b in binaries if b["name"] == "acme.exe")
@@ -50,6 +59,8 @@ async def test_list_binaries_redacts_last_view_id_in_public_mode(
 
     # Persist a last-view pointer in private mode first.
     await client.post(f"/api/v1/binaries/{acme_id}/last-view", json={"viewId": view_id})
+    state = await viewer_session.get(BinaryUiState, acme_id)
+    assert state is not None and state.last_view_id == view_id
     body = (await client.get("/api/v1/binaries")).json()
     assert next(b for b in body if b["name"] == "acme.exe")["lastViewId"] == view_id
 
@@ -178,16 +189,81 @@ async def test_delete_binary_requires_confirmation(client: AsyncClient, ingested
 
 @pytest.mark.asyncio
 async def test_delete_binary_succeeds_with_correct_confirmation(
-    client: AsyncClient, ingested: None
+    client: AsyncClient, viewer_session: AsyncSession, ingested: None
 ) -> None:
     binaries = (await client.get("/api/v1/binaries")).json()
-    acme_id = next(b["id"] for b in binaries if b["name"] == "acme.exe")
+    acme = next(b for b in binaries if b["name"] == "acme.exe")
+    acme_id = acme["id"]
+    views = (await client.get(f"/api/v1/binaries/{acme_id}/views")).json()
+    view_id = views[0]["id"]
+    await client.post(f"/api/v1/binaries/{acme_id}/last-view", json={"viewId": view_id})
 
     response = await client.delete(f"/api/v1/binaries/{acme_id}", params={"confirm": "acme.exe"})
     assert response.status_code == 204
+    assert await viewer_session.get(BinaryUiState, acme_id) is None
+    assert await list_views_by_binary(viewer_session, binary_id=acme_id) == []
 
-    remaining = (await client.get("/api/v1/binaries")).json()
-    assert acme_id not in {b["id"] for b in remaining}
+
+@pytest.mark.asyncio
+async def test_retry_binary_delete_cleans_viewer_state_after_analysis_already_deleted(
+    client: AsyncClient, session: AsyncSession, viewer_session: AsyncSession, ingested: None
+) -> None:
+    binaries = (await client.get("/api/v1/binaries")).json()
+    acme = next(binary for binary in binaries if binary["name"] == "acme.exe")
+    binary_id = acme["id"]
+    views = (await client.get(f"/api/v1/binaries/{binary_id}/views")).json()
+    orphan_view = views[0]["id"]
+
+    binary = await session.get(Binary, binary_id)
+    assert binary is not None
+    await session.delete(binary)
+    await session.commit()
+
+    response = await client.delete(f"/api/v1/binaries/{binary_id}", params={"confirm": "acme.exe"})
+    assert response.status_code == 404
+    assert await viewer_session.get(BinaryUiState, binary_id) is None
+    assert await viewer_session.get(View, orphan_view) is None
+
+
+@pytest.mark.asyncio
+async def test_binary_delete_retry_repairs_viewer_after_cleanup_failure(
+    client: AsyncClient,
+    session: AsyncSession,
+    viewer_session: AsyncSession,
+    ingested: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binaries = (await client.get("/api/v1/binaries")).json()
+    acme = next(binary for binary in binaries if binary["name"] == "acme.exe")
+    binary_id = acme["id"]
+    views = (await client.get(f"/api/v1/binaries/{binary_id}/views")).json()
+    view_id = views[0]["id"]
+    await client.post(f"/api/v1/binaries/{binary_id}/last-view", json={"viewId": view_id})
+
+    delete_views = viewer_views_repository.delete_views_by_binary
+    failed_once = False
+
+    async def fail_first_view_cleanup(*args, **kwargs) -> int:
+        nonlocal failed_once
+        if not failed_once:
+            failed_once = True
+            raise OSError("simulated viewer database outage")
+        return await delete_views(*args, **kwargs)
+
+    monkeypatch.setattr(
+        viewer_views_repository,
+        "delete_views_by_binary",
+        fail_first_view_cleanup,
+    )
+    response = await client.delete(f"/api/v1/binaries/{binary_id}", params={"confirm": "acme.exe"})
+    assert response.status_code == 500
+
+    # The analysis commit is durable; repeating the request still cleans viewer state.
+    response = await client.delete(f"/api/v1/binaries/{binary_id}", params={"confirm": "acme.exe"})
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "BINARY_NOT_FOUND"
+    assert await viewer_session.get(BinaryUiState, binary_id) is None
+    assert await viewer_session.get(View, view_id) is None
 
 
 @pytest.mark.asyncio
@@ -297,7 +373,7 @@ async def test_public_import_randomizes_name_and_refuses_overwrite(
 ) -> None:
     settings.public_mode = True
     monkeypatch.setattr(
-        "graphrev.services.binary_service.public_binary_name",
+        "revaid.services.binary_service.public_binary_name",
         lambda name: f"abcd_{name}",
     )
 
@@ -323,7 +399,7 @@ async def test_public_import_allows_same_hash_under_distinct_random_names(
     settings.public_mode = True
     names = iter(("abcd_imported.exe", "wxyz_imported.exe"))
     monkeypatch.setattr(
-        "graphrev.services.binary_service.public_binary_name",
+        "revaid.services.binary_service.public_binary_name",
         lambda _name: next(names),
     )
 
@@ -363,7 +439,7 @@ async def test_import_binary_reports_parse_failure_and_logs_it(
     def record_event(_logger: object, event: str, **fields: object) -> None:
         events.append((event, fields))
 
-    monkeypatch.setattr("graphrev.ingestion.import_jobs.log_event", record_event)
+    monkeypatch.setattr("revaid.ingestion.import_jobs.log_event", record_event)
     response = await client.post(
         "/api/v1/binaries/import",
         content=b'{"schemaVersion":',
@@ -434,9 +510,7 @@ async def test_decompile_binary_rejects_wrong_content_type(client: AsyncClient) 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("name", ["sample copy.exe", "sample!.exe", "../sample.exe", "résumé.exe"])
-async def test_decompile_binary_rejects_unsafe_filename(
-    client: AsyncClient, name: str
-) -> None:
+async def test_decompile_binary_rejects_unsafe_filename(client: AsyncClient, name: str) -> None:
     response = await client.post(
         "/api/v1/binaries/decompile",
         params={"name": name},
@@ -500,10 +574,7 @@ async def test_decompile_binary_computes_hash_and_rejects_same_content(
     export["binary"].pop("sha256")
     executable = tmp_path / "fake-kuna"
     executable.write_text(
-        "#!/bin/sh\n"
-        "cat > \"$4\" <<'JSON'\n"
-        f"{json.dumps(export)}\n"
-        "JSON\n",
+        f"#!/bin/sh\ncat > \"$4\" <<'JSON'\n{json.dumps(export)}\nJSON\n",
         encoding="utf-8",
     )
     executable.chmod(0o755)

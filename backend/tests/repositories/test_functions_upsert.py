@@ -6,9 +6,9 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from graphrev.core.clock import utc_now_iso
-from graphrev.db.models import Binary, Function
-from graphrev.repositories.functions import (
+from revaid.core.clock import utc_now_iso
+from revaid.db.models import Binary, Function
+from revaid.repositories.functions import (
     upsert_function,
     upsert_functions_batch,
 )
@@ -44,13 +44,9 @@ async def test_upsert_function_inserts_new_row(session: AsyncSession) -> None:
 @pytest.mark.asyncio
 async def test_upsert_function_is_idempotent_on_second_call(session: AsyncSession) -> None:
     binary = await _make_binary(session)
-    id1, created1 = await upsert_function(
-        session, binary_id=binary.id, address=0x1000, name="main"
-    )
+    id1, created1 = await upsert_function(session, binary_id=binary.id, address=0x1000, name="main")
     await session.commit()
-    id2, created2 = await upsert_function(
-        session, binary_id=binary.id, address=0x1000, name="main"
-    )
+    id2, created2 = await upsert_function(session, binary_id=binary.id, address=0x1000, name="main")
     await session.commit()
 
     assert id1 == id2

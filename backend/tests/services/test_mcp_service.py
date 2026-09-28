@@ -5,11 +5,11 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from graphrev.core.clock import utc_now_iso
-from graphrev.core.errors import AppError, ErrorCode
-from graphrev.db.models import Edge, Function
-from graphrev.repositories.binaries import get_or_create_binary
-from graphrev.services.mcp_service import get_mcp_function, set_mcp_function_info
+from revaid.core.clock import utc_now_iso
+from revaid.core.errors import AppError, ErrorCode
+from revaid.db.models import Edge, Function
+from revaid.repositories.binaries import get_or_create_binary
+from revaid.services.mcp_service import get_mcp_function, set_mcp_function_info
 
 
 async def _function(session: AsyncSession, *, binary_id: int, address: int, name: str) -> Function:

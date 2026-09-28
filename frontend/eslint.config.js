@@ -10,6 +10,7 @@ export default tseslint.config(
       "src/api/generated.ts",
       "coverage",
       "playwright-report",
+      "e2e",
       "vitest.config.ts",
     ],
   },

@@ -17,11 +17,12 @@ dev:
     #!/usr/bin/env bash
     set -euo pipefail
     trap 'kill 0' EXIT
-    just api &
+    just analysis &
+    just viewer &
     just web &
     wait
 
-# Build the SPA and serve it alongside the API without development reloads.
+# Build the SPA and serve it alongside the split backends without reloads.
 # Pass Caddy's public hostname so Vite accepts its forwarded Host header.
 prod domain="":
     #!/usr/bin/env bash
@@ -29,7 +30,8 @@ prod domain="":
     trap 'kill 0' EXIT
     export GRAPHREV_WEB_DOMAIN="{{ domain }}"
     just web-build
-    just api-prod &
+    just analysis-prod &
+    just viewer-prod &
     just web-prod &
     wait
 
@@ -61,11 +63,22 @@ web-build-force:
     cd frontend && npm run build
 
 api-prod:
-    cd backend && uv run uvicorn graphrev.main:app \
-        --host "${GRAPHREV_HOST:-127.0.0.1}" \
-        --port "${GRAPHREV_PORT:-8000}" \
-        --proxy-headers \
-        --forwarded-allow-ips "${GRAPHREV_FORWARDED_ALLOW_IPS:-127.0.0.1}"
+    cd backend && uv run uvicorn revaid.main:app \
+        --host "${GRAPHREV_ANALYSIS_HOST:-127.0.0.1}" \
+        --port "${GRAPHREV_ANALYSIS_PORT:-8000}" \
+        --workers 1
+
+analysis:
+    cd backend && uv run uvicorn revaid.main:app --reload --host 127.0.0.1 --port 8000
+
+analysis-prod:
+    cd backend && uv run uvicorn revaid.main:app --host "${GRAPHREV_ANALYSIS_HOST:-127.0.0.1}" --port "${GRAPHREV_ANALYSIS_PORT:-8000}" --workers 1
+
+viewer:
+    cd backend && uv run uvicorn revaid_ui.main:app --reload --host 127.0.0.1 --port 8002
+
+viewer-prod:
+    cd backend && uv run uvicorn revaid_ui.main:app --host "${GRAPHREV_VIEWER_HOST:-127.0.0.1}" --port "${GRAPHREV_VIEWER_PORT:-8002}" --workers 1
 
 web-prod:
     cd frontend && npm run preview -- \
@@ -73,10 +86,16 @@ web-prod:
         --port "${GRAPHREV_WEB_PORT:-4173}"
 
 api:
-    cd backend && uv run uvicorn graphrev.main:app --reload --host 127.0.0.1 --port 8000
+    cd backend && uv run uvicorn revaid.main:app --reload --host 127.0.0.1 --port 8000
+
+dev-split:
+    just dev
 
 mcp:
     cd backend && uv run graphrev-mcp
+
+viewer-stats:
+    cd backend && uv run revaid-ui-db
 
 web:
     cd frontend && npm run dev
@@ -88,12 +107,28 @@ ingest *args:
 
 migrate:
     cd backend && uv run alembic upgrade head
+    cd backend && uv run alembic -c viewer_alembic.ini upgrade head
+
+migrate-analysis:
+    cd backend && uv run alembic upgrade head
+
+migrate-viewer:
+    cd backend && uv run alembic -c viewer_alembic.ini upgrade head
+
+db-reset-analysis:
+    rm -f backend/graphrev.db backend/graphrev.db-wal backend/graphrev.db-shm
+    just migrate-analysis
+
+db-reset-viewer:
+    rm -f backend/graphrev-viewer.db backend/graphrev-viewer.db-wal backend/graphrev-viewer.db-shm
+    just migrate-viewer
 
 revision name:
     cd backend && uv run alembic revision --autogenerate -m "{{ name }}"
 
 db-reset:
     rm -f backend/graphrev.db backend/graphrev.db-wal backend/graphrev.db-shm
+    rm -f backend/graphrev-viewer.db backend/graphrev-viewer.db-wal backend/graphrev-viewer.db-shm
     just migrate
 
 # --- quality gates -----------------------------------------------------------

@@ -6,9 +6,11 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from graphrev.core.clock import utc_now_iso
-from graphrev.db.models import Binary, Edge, Function, View, ViewNode
-from graphrev.repositories.neighbours import fetch_neighbour_page
+from revaid.core.clock import utc_now_iso
+from revaid.db.models import Binary, Edge, Function
+from revaid.repositories.neighbours import fetch_neighbour_page
+from revaid_ui.db.models import View, ViewNode
+from revaid_ui.repositories.view_nodes import list_visible_function_ids
 
 
 def _now() -> str:
@@ -80,7 +82,6 @@ async def _add_edge(
 @pytest.mark.asyncio
 async def test_callees_split_into_primary_and_utility_groups(session: AsyncSession) -> None:
     binary = await _make_binary(session)
-    view = await _make_view(session, binary)
     root = await _make_function(session, binary, 0x1000, "root")
     primary = await _make_function(session, binary, 0x1010, "helper", is_utility=False)
     utility = await _make_function(session, binary, 0x1020, "memcpy_like", is_utility=True)
@@ -91,7 +92,6 @@ async def test_callees_split_into_primary_and_utility_groups(session: AsyncSessi
     primary_page = await fetch_neighbour_page(
         session,
         function_id=root.id,
-        view_id=view.id,
         direction="callees",
         group="primary",
         limit=16,
@@ -109,7 +109,6 @@ async def test_callees_split_into_primary_and_utility_groups(session: AsyncSessi
     utility_page = await fetch_neighbour_page(
         session,
         function_id=root.id,
-        view_id=view.id,
         direction="callees",
         group="utility",
         limit=16,
@@ -126,7 +125,6 @@ async def test_callees_split_into_primary_and_utility_groups(session: AsyncSessi
 @pytest.mark.asyncio
 async def test_utility_override_moves_row_between_groups(session: AsyncSession) -> None:
     binary = await _make_binary(session)
-    view = await _make_view(session, binary)
     root = await _make_function(session, binary, 0x1000, "root")
     fn = await _make_function(
         session, binary, 0x1010, "special_case", is_utility=True, utility_override="never"
@@ -137,7 +135,6 @@ async def test_utility_override_moves_row_between_groups(session: AsyncSession) 
     primary_page = await fetch_neighbour_page(
         session,
         function_id=root.id,
-        view_id=view.id,
         direction="callees",
         group="primary",
         limit=16,
@@ -155,7 +152,6 @@ async def test_caller_table_suppressed_beyond_threshold_never_fetches_rows(
     session: AsyncSession,
 ) -> None:
     binary = await _make_binary(session)
-    view = await _make_view(session, binary)
     target = await _make_function(session, binary, 0x2000, "hub")
     for i in range(35):
         caller = await _make_function(session, binary, 0x3000 + i, f"caller_{i}")
@@ -165,7 +161,6 @@ async def test_caller_table_suppressed_beyond_threshold_never_fetches_rows(
     page = await fetch_neighbour_page(
         session,
         function_id=target.id,
-        view_id=view.id,
         direction="callers",
         group="primary",
         limit=16,
@@ -183,7 +178,6 @@ async def test_caller_table_suppressed_beyond_threshold_never_fetches_rows(
 @pytest.mark.asyncio
 async def test_caller_table_not_suppressed_below_threshold(session: AsyncSession) -> None:
     binary = await _make_binary(session)
-    view = await _make_view(session, binary)
     target = await _make_function(session, binary, 0x2000, "hub")
     for i in range(5):
         caller = await _make_function(session, binary, 0x3000 + i, f"caller_{i}")
@@ -193,7 +187,6 @@ async def test_caller_table_not_suppressed_below_threshold(session: AsyncSession
     page = await fetch_neighbour_page(
         session,
         function_id=target.id,
-        view_id=view.id,
         direction="callers",
         group="primary",
         limit=16,
@@ -209,16 +202,18 @@ async def test_caller_table_not_suppressed_below_threshold(session: AsyncSession
 
 
 @pytest.mark.asyncio
-async def test_on_canvas_reflects_view_scoped_visible_view_node(session: AsyncSession) -> None:
+async def test_view_repository_returns_view_scoped_visible_function_ids(
+    session: AsyncSession, viewer_session: AsyncSession
+) -> None:
     binary = await _make_binary(session)
-    view = await _make_view(session, binary)
-    other_view = await _make_view(session, binary)
+    view = await _make_view(viewer_session, binary)
+    other_view = await _make_view(viewer_session, binary)
     root = await _make_function(session, binary, 0x1000, "root")
     placed = await _make_function(session, binary, 0x1010, "placed_fn")
     not_placed = await _make_function(session, binary, 0x1020, "not_placed_fn")
     await _add_edge(session, binary, root, placed)
     await _add_edge(session, binary, root, not_placed)
-    session.add(
+    viewer_session.add(
         ViewNode(
             view_id=view.id,
             function_id=placed.id,
@@ -228,7 +223,7 @@ async def test_on_canvas_reflects_view_scoped_visible_view_node(session: AsyncSe
         )
     )
     # A placement in a *different* view must not leak into this view's page.
-    session.add(
+    viewer_session.add(
         ViewNode(
             view_id=other_view.id,
             function_id=not_placed.id,
@@ -238,11 +233,11 @@ async def test_on_canvas_reflects_view_scoped_visible_view_node(session: AsyncSe
         )
     )
     await session.commit()
+    await viewer_session.commit()
 
-    page = await fetch_neighbour_page(
+    await fetch_neighbour_page(
         session,
         function_id=root.id,
-        view_id=view.id,
         direction="callees",
         group="primary",
         limit=16,
@@ -252,15 +247,15 @@ async def test_on_canvas_reflects_view_scoped_visible_view_node(session: AsyncSe
         filter_text=None,
         caller_suppress_threshold=32,
     )
-    on_canvas_by_name = {r.function.name: r.on_canvas for r in page.rows}
-    assert on_canvas_by_name["placed_fn"] is True
-    assert on_canvas_by_name["not_placed_fn"] is False
+    visible_ids = await list_visible_function_ids(
+        viewer_session, view_id=view.id, function_ids=[placed.id, not_placed.id]
+    )
+    assert visible_ids == {placed.id}
 
 
 @pytest.mark.asyncio
 async def test_filter_matches_name_and_summary_short(session: AsyncSession) -> None:
     binary = await _make_binary(session)
-    view = await _make_view(session, binary)
     root = await _make_function(session, binary, 0x1000, "root")
     matching_name = await _make_function(session, binary, 0x1010, "parse_config")
     matching_summary = await _make_function(
@@ -274,7 +269,6 @@ async def test_filter_matches_name_and_summary_short(session: AsyncSession) -> N
     page = await fetch_neighbour_page(
         session,
         function_id=root.id,
-        view_id=view.id,
         direction="callees",
         group="primary",
         limit=16,
@@ -294,7 +288,6 @@ async def test_filter_matches_name_and_summary_short(session: AsyncSession) -> N
 @pytest.mark.asyncio
 async def test_filter_matches_display_name_and_hex_address(session: AsyncSession) -> None:
     binary = await _make_binary(session)
-    view = await _make_view(session, binary)
     root = await _make_function(session, binary, 0x1000, "root")
     llm_named = await _make_function(
         session, binary, 0x401230, "FUN_00401230", name_llm="parse_packet"
@@ -305,7 +298,6 @@ async def test_filter_matches_display_name_and_hex_address(session: AsyncSession
     by_name = await fetch_neighbour_page(
         session,
         function_id=root.id,
-        view_id=view.id,
         direction="callees",
         group="primary",
         limit=16,
@@ -320,7 +312,6 @@ async def test_filter_matches_display_name_and_hex_address(session: AsyncSession
     by_address = await fetch_neighbour_page(
         session,
         function_id=root.id,
-        view_id=view.id,
         direction="callees",
         group="primary",
         limit=16,
@@ -336,7 +327,6 @@ async def test_filter_matches_display_name_and_hex_address(session: AsyncSession
 @pytest.mark.asyncio
 async def test_sort_by_fan_in_descending(session: AsyncSession) -> None:
     binary = await _make_binary(session)
-    view = await _make_view(session, binary)
     root = await _make_function(session, binary, 0x1000, "root")
     low = await _make_function(session, binary, 0x1010, "low_fanin", fan_in=1)
     high = await _make_function(session, binary, 0x1020, "high_fanin", fan_in=99)
@@ -347,7 +337,6 @@ async def test_sort_by_fan_in_descending(session: AsyncSession) -> None:
     page = await fetch_neighbour_page(
         session,
         function_id=root.id,
-        view_id=view.id,
         direction="callees",
         group="primary",
         limit=16,
@@ -365,7 +354,6 @@ async def test_callee_call_order_sorts_known_orders_before_legacy_rows(
     session: AsyncSession,
 ) -> None:
     binary = await _make_binary(session)
-    view = await _make_view(session, binary)
     root = await _make_function(session, binary, 0x1000, "root")
     first = await _make_function(session, binary, 0x1010, "first")
     second = await _make_function(session, binary, 0x1020, "second")
@@ -378,7 +366,6 @@ async def test_callee_call_order_sorts_known_orders_before_legacy_rows(
     page = await fetch_neighbour_page(
         session,
         function_id=root.id,
-        view_id=view.id,
         direction="callees",
         group="primary",
         limit=16,
@@ -396,7 +383,6 @@ async def test_callee_call_order_preserves_relative_order_after_filter(
     session: AsyncSession,
 ) -> None:
     binary = await _make_binary(session)
-    view = await _make_view(session, binary)
     root = await _make_function(session, binary, 0x1000, "root")
     early = await _make_function(session, binary, 0x1010, "parse_early")
     ignored = await _make_function(session, binary, 0x1020, "ignored")
@@ -409,7 +395,6 @@ async def test_callee_call_order_preserves_relative_order_after_filter(
     page = await fetch_neighbour_page(
         session,
         function_id=root.id,
-        view_id=view.id,
         direction="callees",
         group="primary",
         limit=16,
@@ -426,7 +411,6 @@ async def test_callee_call_order_preserves_relative_order_after_filter(
 async def test_get_does_not_mutate_summary_status(session: AsyncSession) -> None:
     """C2c/Q23: the neighbour read must never enqueue/mutate summary state."""
     binary = await _make_binary(session)
-    view = await _make_view(session, binary)
     root = await _make_function(session, binary, 0x1000, "root")
     callee = await _make_function(session, binary, 0x1010, "callee")
     await _add_edge(session, binary, root, callee)
@@ -439,7 +423,6 @@ async def test_get_does_not_mutate_summary_status(session: AsyncSession) -> None
     await fetch_neighbour_page(
         session,
         function_id=root.id,
-        view_id=view.id,
         direction="callees",
         group="primary",
         limit=16,

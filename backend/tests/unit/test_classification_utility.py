@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from graphrev.classification.utility import is_utility
+from revaid.classification.utility import is_utility
 
 
 def test_fan_in_equal_to_threshold_is_not_utility() -> None:

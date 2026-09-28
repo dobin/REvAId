@@ -1,6 +1,6 @@
 /**
  * Toolbar summary-queue chip (`◌ 3 of 12`) + cancel-pending popover
- * (TAD §4.2 endpoints 20-21, docs/specs/PLAN-I7-I8-I9-I13.md §4.2). Its
+ * (TAD §4.2 endpoints 20-21). Its
  * `GET /queue` cache entry is kept live by `SseProvider` patching in place
  * on every `queue` SSE event (E5b) — this component itself is a plain
  * consumer, no polling logic of its own beyond `useQueueQuery`'s fallback

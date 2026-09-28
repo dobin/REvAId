@@ -6,14 +6,16 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from graphrev.core.clock import utc_now_iso
-from graphrev.db.models import Edge, Function, View, ViewNode
-from graphrev.repositories.binaries import (
+from revaid.core.clock import utc_now_iso
+from revaid.db.models import Edge, Function
+from revaid.repositories.binaries import (
     delete_binary,
     get_binary_by_id,
     get_or_create_binary,
     list_binaries,
 )
+from revaid_ui.db.models import BinaryUiState, View, ViewNode
+from revaid_ui.repositories.views import get_last_view_ids, set_last_view_id
 
 
 @pytest.mark.asyncio
@@ -82,14 +84,26 @@ async def test_get_or_create_binary_distinguishes_by_version(session: AsyncSessi
 
 
 @pytest.mark.asyncio
-async def test_get_or_create_binary_never_touches_last_view_id(session: AsyncSession) -> None:
+async def test_last_view_state_is_stored_separately_from_analysis_binary(
+    session: AsyncSession,
+    viewer_session: AsyncSession,
+) -> None:
     binary, _ = await get_or_create_binary(session, name="acme.exe", version="1.0")
-    await session.commit()
-    assert binary.last_view_id is None
+    view = View(
+        binary_id=binary.id,
+        name="Default",
+        created_at=utc_now_iso(),
+        updated_at=utc_now_iso(),
+    )
+    viewer_session.add(view)
+    await viewer_session.commit()
 
+    await set_last_view_id(viewer_session, binary_id=binary.id, view_id=view.id)
+    await viewer_session.commit()
     binary2, _ = await get_or_create_binary(session, name="acme.exe", version="1.0")
     await session.commit()
-    assert binary2.last_view_id is None
+    assert binary2.id == binary.id
+    assert await get_last_view_ids(viewer_session, binary_ids=[binary.id]) == {binary.id: view.id}
 
 
 async def _make_function(session: AsyncSession, *, binary_id: int, address: int) -> Function:
@@ -147,18 +161,20 @@ async def test_get_binary_by_id_returns_the_row(session: AsyncSession) -> None:
 
 
 @pytest.mark.asyncio
-async def test_delete_binary_cascades_functions_edges_views_and_view_nodes(
+async def test_delete_binary_cascades_only_analysis_facts(
     session: AsyncSession,
+    viewer_session: AsyncSession,
 ) -> None:
     binary, _ = await get_or_create_binary(session, name="acme.exe", version="1.0")
     fn1 = await _make_function(session, binary_id=binary.id, address=0x1000)
     fn2 = await _make_function(session, binary_id=binary.id, address=0x1010)
     session.add(Edge(binary_id=binary.id, caller_id=fn1.id, callee_id=fn2.id))
     now = utc_now_iso()
+    await session.commit()
     view = View(binary_id=binary.id, name="Default", created_at=now, updated_at=now)
-    session.add(view)
-    await session.flush()
-    session.add(
+    viewer_session.add(view)
+    await viewer_session.flush()
+    viewer_session.add(
         ViewNode(
             view_id=view.id,
             function_id=fn1.id,
@@ -166,7 +182,8 @@ async def test_delete_binary_cascades_functions_edges_views_and_view_nodes(
             updated_at=now,
         )
     )
-    await session.commit()
+    viewer_session.add(BinaryUiState(binary_id=binary.id, last_view_id=view.id, updated_at=now))
+    await viewer_session.commit()
     binary_id = binary.id
 
     await delete_binary(session, binary)
@@ -177,5 +194,5 @@ async def test_delete_binary_cascades_functions_edges_views_and_view_nodes(
         await session.execute(select(Function).where(Function.binary_id == binary_id))
     ).first() is None
     assert (await session.execute(select(Edge).where(Edge.binary_id == binary_id))).first() is None
-    assert (await session.execute(select(View).where(View.binary_id == binary_id))).first() is None
-    assert (await session.execute(select(ViewNode))).first() is None
+    assert (await viewer_session.execute(select(View).where(View.binary_id == binary_id))).first()
+    assert (await viewer_session.execute(select(ViewNode))).first()

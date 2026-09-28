@@ -31,10 +31,10 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 
-from graphrev.adapters.ghidra.mock import MockGhidraAdapter
-from graphrev.core.config import Settings, get_settings
-from graphrev.db.engine import create_engine, create_session_factory, dispose_engine
-from graphrev.ingestion.pipeline import run_ingestion
+from revaid.adapters.ghidra.mock import MockGhidraAdapter
+from revaid.core.config import Settings, get_settings
+from revaid.db.engine import create_engine, create_session_factory, dispose_engine
+from revaid.ingestion.pipeline import run_ingestion
 
 SEED = 1337
 

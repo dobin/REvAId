@@ -5,10 +5,10 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from graphrev.core.clock import utc_now_iso
-from graphrev.db.models import Function
-from graphrev.repositories.binaries import get_or_create_binary
-from graphrev.repositories.functions import (
+from revaid.core.clock import utc_now_iso
+from revaid.db.models import Function
+from revaid.repositories.binaries import get_or_create_binary
+from revaid.repositories.functions import (
     get_function_by_id,
     list_entry_points,
     resolve_function_by_address,
@@ -187,9 +187,7 @@ async def test_search_functions_matches_address_decimal_and_hex(
 async def test_search_functions_paginates_and_reports_total(session: AsyncSession) -> None:
     binary, _ = await get_or_create_binary(session, name="acme.exe", version="1.0")
     for i in range(5):
-        await _make_function(
-            session, binary_id=binary.id, address=0x1000 + i, name=f"util_fn_{i}"
-        )
+        await _make_function(session, binary_id=binary.id, address=0x1000 + i, name=f"util_fn_{i}")
     await session.commit()
 
     page1, total = await search_functions(

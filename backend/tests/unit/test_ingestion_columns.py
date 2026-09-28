@@ -5,7 +5,7 @@ analyst-owned columns on re-ingest.
 
 from __future__ import annotations
 
-from graphrev.db.models import INGESTION_OWNED_COLUMNS
+from revaid.db.models import INGESTION_OWNED_COLUMNS
 
 FORBIDDEN_COLUMNS = frozenset(
     {

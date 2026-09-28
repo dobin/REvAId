@@ -393,6 +393,8 @@ export interface HealthDto {
   status: string;
   dbOk: boolean;
   migrationRevision: string | null;
+  viewerDbOk: boolean;
+  viewerMigrationRevision: string | null;
   ghidraAdapter: string;
   llmAdapter: string;
   // AM5: adapter reachability, so the UI can tell "no summaries because

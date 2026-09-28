@@ -6,10 +6,10 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from graphrev.core.clock import utc_now_iso
-from graphrev.db.models import Binary, Edge, Function
-from graphrev.repositories.edges import EdgeUpsertValues, upsert_edge, upsert_edges_batch
-from graphrev.repositories.functions import (
+from revaid.core.clock import utc_now_iso
+from revaid.db.models import Binary, Edge, Function
+from revaid.repositories.edges import EdgeUpsertValues, upsert_edge, upsert_edges_batch
+from revaid.repositories.functions import (
     recompute_fan_in_fan_out_and_utility,
     upsert_function,
 )
@@ -148,12 +148,8 @@ async def test_recompute_is_scoped_to_one_binary(session: AsyncSession) -> None:
     binary_a = await _make_binary(session, "acme.exe")
     binary_b = await _make_binary(session, "libparse.dll")
 
-    hub_a_id, _ = await upsert_function(
-        session, binary_id=binary_a.id, address=0x1, name="hub_a"
-    )
-    hub_b_id, _ = await upsert_function(
-        session, binary_id=binary_b.id, address=0x1, name="hub_b"
-    )
+    hub_a_id, _ = await upsert_function(session, binary_id=binary_a.id, address=0x1, name="hub_a")
+    hub_b_id, _ = await upsert_function(session, binary_id=binary_b.id, address=0x1, name="hub_b")
     caller_a_id, _ = await upsert_function(
         session, binary_id=binary_a.id, address=0x2, name="caller_a"
     )

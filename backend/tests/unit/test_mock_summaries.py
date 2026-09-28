@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from graphrev.adapters.mock_summaries import MOCK_SUMMARIES, fallback_summary
+from revaid.adapters.mock_summaries import MOCK_SUMMARIES, fallback_summary
 
 
 def test_corpus_has_the_fifteen_hand_written_entries() -> None:

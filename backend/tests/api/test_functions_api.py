@@ -63,7 +63,7 @@ async def test_display_name_precedence_analyst_beats_llm_beats_ghidra(
     the public API on one function across all three states."""
     from sqlalchemy import update
 
-    from graphrev.db.models import Function
+    from revaid.db.models import Function
 
     function_id = await _get_main_function_id(client)
 

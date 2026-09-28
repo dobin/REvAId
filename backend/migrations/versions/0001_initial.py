@@ -1,9 +1,10 @@
 """initial
 
-Authoritative schema per TAD §3.3: binaries, functions, edges, views,
-view_nodes, plus the app_meta bookkeeping table (F1b). This migration is the
+Historical initial schema per TAD §3.3: analysis tables and the original
+canvas tables (later moved to the viewer database by subsequent revisions).
+This migration is the
 *only* way a GraphRev database is created — there is no metadata.create_all
-path, even in dev/tests (docs/adr/0002-alembic-in-v0.md), a deliberate
+path, even in dev/tests, a deliberate
 deviation from PRD §5.2's "migrations ... out of scope" for v0.
 
 Revision ID: 0001
@@ -19,7 +20,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 from alembic import op
 
-from graphrev.core.config import get_settings
+from revaid.core.config import get_settings
 
 # revision identifiers, used by Alembic.
 revision: str = "0001"

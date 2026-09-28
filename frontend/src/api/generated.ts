@@ -744,6 +744,10 @@ export interface components {
             dbOk: boolean;
             /** Migrationrevision */
             migrationRevision: string | null;
+            /** Viewerdbok */
+            viewerDbOk: boolean;
+            /** Viewermigrationrevision */
+            viewerMigrationRevision: string | null;
             /** Ghidraadapter */
             ghidraAdapter: string;
             /** Llmadapter */

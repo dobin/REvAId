@@ -16,7 +16,7 @@ from typing import Any
 import httpx
 import pytest
 
-from graphrev.adapters.llm.base import (
+from revaid.adapters.llm.base import (
     AuthError,
     GhidraProgramMismatchError,
     PermanentProviderError,
@@ -24,8 +24,8 @@ from graphrev.adapters.llm.base import (
     SummaryRequest,
     TransientProviderError,
 )
-from graphrev.adapters.llm.opencode_adapter import OpenCodeAdapter
-from graphrev.core.config import Settings
+from revaid.adapters.llm.opencode_adapter import OpenCodeAdapter
+from revaid.core.config import Settings
 
 
 def _settings(**overrides: Any) -> Settings:

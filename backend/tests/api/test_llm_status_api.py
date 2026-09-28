@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from httpx import AsyncClient
 
-from graphrev.repositories.llm_status import record_worker_outcome
+from revaid.repositories.llm_status import record_worker_outcome
 
 
 @pytest.mark.asyncio
@@ -27,7 +27,7 @@ async def test_passive_status_reports_no_current_configuration_outcome(
 async def test_passive_status_returns_matching_durable_worker_outcome(
     client: AsyncClient,
 ) -> None:
-    app = client._transport.app  # type: ignore[attr-defined]
+    app = client._transport.analysis_app  # type: ignore[attr-defined]
     async with app.state.session_factory() as session:
         await record_worker_outcome(
             session,

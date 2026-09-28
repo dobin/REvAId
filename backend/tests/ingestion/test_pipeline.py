@@ -9,16 +9,16 @@ import pytest
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from graphrev.adapters.ghidra.base import (
+from revaid.adapters.ghidra.base import (
     RawBinary,
     RawBinaryRef,
     RawEdge,
     RawFunction,
 )
-from graphrev.adapters.ghidra.mock import MockGhidraAdapter
-from graphrev.core.config import Settings
-from graphrev.db.models import Function, View
-from graphrev.ingestion.pipeline import run_ingestion
+from revaid.adapters.ghidra.mock import MockGhidraAdapter
+from revaid.core.config import Settings
+from revaid.db.models import Function
+from revaid.ingestion.pipeline import run_ingestion
 
 
 class _FakeAdapter:
@@ -152,25 +152,18 @@ async def test_ingestion_is_idempotent_across_two_runs(
 
 
 @pytest.mark.asyncio
-async def test_ingestion_creates_default_view_per_binary(
-    session_factory: async_sessionmaker[AsyncSession], settings: Settings
+async def test_ingestion_does_not_create_viewer_state(
+    session_factory: async_sessionmaker[AsyncSession],
+    viewer_session_factory: async_sessionmaker[AsyncSession],
+    settings: Settings,
 ) -> None:
-    """B9: every ingested binary gets exactly one default view. Uses a tiny
-    two-binary fake — the assertion is per-binary, not per-function-count."""
+    """Analysis ingestion never writes viewer-owned default views."""
     adapter = _two_binary_adapter()
     await run_ingestion(session_factory, adapter, settings)
 
-    async with session_factory() as session:
-        for name in ("acme.exe", "libparse.dll"):
-            binary_id = (
-                await session.execute(text("SELECT id FROM binaries WHERE name = :n"), {"n": name})
-            ).scalar_one()
-            views = (
-                (await session.execute(select(View).where(View.binary_id == binary_id)))
-                .scalars()
-                .all()
-            )
-            assert len(views) == 1
+    async with viewer_session_factory() as session:
+        count = (await session.execute(text("SELECT COUNT(*) FROM views"))).scalar_one()
+    assert count == 0
 
 
 @pytest.mark.asyncio

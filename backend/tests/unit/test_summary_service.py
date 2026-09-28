@@ -8,12 +8,12 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from graphrev.core.clock import utc_now_iso
-from graphrev.core.errors import AppError, ErrorCode
-from graphrev.db.models import Binary, Function
-from graphrev.events.bus import InProcessEventBus
-from graphrev.services import summary_service
-from graphrev.summarization.queue import SummaryQueue
+from revaid.core.clock import utc_now_iso
+from revaid.core.errors import AppError, ErrorCode
+from revaid.db.models import Binary, Function
+from revaid.events.bus import InProcessEventBus
+from revaid.services import summary_service
+from revaid.summarization.queue import SummaryQueue
 
 
 async def _make_function(

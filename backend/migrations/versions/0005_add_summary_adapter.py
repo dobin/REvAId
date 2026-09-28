@@ -1,7 +1,7 @@
 """add_summary_adapter
 
-I13 / AM4 (docs/specs/PLAN-I7-I8-I9-I13.md §6.1): record which LLM adapter
-produced each summary, via a nullable `functions.summary_adapter TEXT`
+Record which LLM adapter produced each summary, via a nullable
+`functions.summary_adapter TEXT`
 column. Deliberately **no CHECK constraint** — a plain `ADD COLUMN` is safe
 on `functions` despite its VIRTUAL generated column (`is_utility_effective`),
 whereas a new CHECK would force a batch table rebuild SQLite refuses on this

@@ -8,11 +8,11 @@ import asyncio
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from graphrev.adapters.llm.base import LlmHealth, SummaryRequest, SummaryResult
-from graphrev.core.clock import utc_now_iso
-from graphrev.db.models import Binary, Function
-from graphrev.summarization.queue import SummaryQueue
-from graphrev.summarization.worker import SummaryWorkerPool
+from revaid.adapters.llm.base import LlmHealth, SummaryRequest, SummaryResult
+from revaid.core.clock import utc_now_iso
+from revaid.db.models import Binary, Function
+from revaid.summarization.queue import SummaryQueue
+from revaid.summarization.worker import SummaryWorkerPool
 
 
 class _ConcurrencyTrackingAdapter:

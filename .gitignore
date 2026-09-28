@@ -1,5 +1,6 @@
 bak/
 mynotes.md
+.graphrev-imports/
 
 # TypeScript incremental build cache
 *.tsbuildinfo

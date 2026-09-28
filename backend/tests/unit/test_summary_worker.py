@@ -8,7 +8,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from graphrev.adapters.llm.base import (
+from revaid.adapters.llm.base import (
     AuthError,
     LlmHealth,
     RateLimitError,
@@ -16,11 +16,11 @@ from graphrev.adapters.llm.base import (
     SummaryResult,
     TransientProviderError,
 )
-from graphrev.core.clock import utc_now_iso
-from graphrev.db.models import Binary, Function, LlmWorkerStatus
-from graphrev.summarization import worker as worker_module
-from graphrev.summarization.queue import SummaryQueue
-from graphrev.summarization.worker import run_one_item
+from revaid.core.clock import utc_now_iso
+from revaid.db.models import Binary, Function, LlmWorkerStatus
+from revaid.summarization import worker as worker_module
+from revaid.summarization.queue import SummaryQueue
+from revaid.summarization.worker import run_one_item
 
 
 @pytest.fixture(autouse=True)
@@ -222,7 +222,7 @@ async def test_pinned_error_code_is_persisted(
     item = queue.enqueue(fn.id, priority=0)
     await queue.pop()
 
-    from graphrev.adapters.llm.base import GhidraProgramMismatchError
+    from revaid.adapters.llm.base import GhidraProgramMismatchError
 
     adapter = _StubAdapter(
         [GhidraProgramMismatchError("agent summarised other.exe, wanted demo.exe")]

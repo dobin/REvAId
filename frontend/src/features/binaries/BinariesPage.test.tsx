@@ -27,6 +27,8 @@ const health: HealthDto = {
   status: "ok",
   dbOk: true,
   migrationRevision: "0010",
+  viewerDbOk: true,
+  viewerMigrationRevision: "viewer_0001",
   ghidraAdapter: "kuna",
   llmAdapter: "litellm",
   llmHealth: { reachable: true, detail: null },

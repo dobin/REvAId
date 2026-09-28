@@ -16,7 +16,7 @@ Purpose:
 
 Live at [REvAId.r00ted.ch](https://revaid.r00ted.ch)
 
-This is 100% vibe coded. See `IDEA.md`, `PRD.md`, `TAD.md`.
+This is 100% vibe coded. See the maintained developer notes in `docs/DEV.md`.
 
 ## Screenshots
 
@@ -57,14 +57,39 @@ There are two AI providers available:
 
 ```sh
 just setup    # uv sync (backend) + npm install (frontend)
-just migrate  # alembic upgrade head — the ONLY way the DB schema is created
-just dev      # runs the API (uvicorn, :8000) and the SPA (Vite, :5173) together
-just prod     # production build on loopback (:8000 API, :4173 SPA) for a reverse proxy
+just migrate  # migrate both the analysis and viewer databases
+just dev      # analysis (:8000), viewer (:8002), and SPA (:5173)
+just prod     # production-mode analysis, viewer, and SPA services
 ```
 
-Then open http://127.0.0.1:5173 — you should see a small panel showing live
-`/health` and `/config` data, proving the frontend, backend, and database are
-wired together end to end.
+Open http://127.0.0.1:5173. The frontend sends browser API requests to the
+viewer backend at `http://127.0.0.1:8002`; the viewer talks to the analysis
+backend at `http://127.0.0.1:8000` through its internal API.
+
+The two ASGI applications live in separate source packages: the analysis
+backend is `backend/src/revaid` (`revaid.main:app`), and the viewer backend is
+`backend/src/revaid_ui` (`revaid_ui.main:app`). They share lower-level domain
+and persistence contracts only through `backend/src/revaid_contracts`; the
+viewer obtains analysis facts through the authenticated internal HTTP API.
+Each service has its own models, repositories, services, routes and startup
+lifecycle. Start either independently with `just analysis` or `just viewer`.
+For production, use `just prod domain=graphrev.example.com`; it builds the SPA
+and starts both backends plus the static SPA preview.
+
+The React app talks only to the **viewer backend** in split mode. The viewer backend calls the **analysis
+backend** through an authenticated, fixed internal API. Upload bodies are streamed
+through the viewer backend with the same configured byte limits and staged/queued only by the analysis backend; job polling
+and cancellation are also forwarded to the analysis backend. Raw-binary decompilation therefore requires
+the analysis backend's configured local decompiler and staging directory. The viewer backend periodically emits
+a `reconcile` SSE invalidation because a cross-process event relay is not implemented yet;
+this causes clients to refetch, but does not forward the analysis backend's per-summary/queue events.
+Run exactly one Uvicorn worker for each analysis-backend process: import-job, summary-worker, and event
+state are process-local. To run the analysis backend without
+the optional UI, install the backend, apply only its schema, and start
+`uv run uvicorn revaid.main:app`; it does not require npm, a browser, or a
+viewer database. Start the viewer backend separately with
+`uv run uvicorn revaid_ui.main:app` and configure
+`GRAPHREV_ANALYSIS_INTERNAL_URL` plus the shared internal token.
 
 ### Agent access via MCP
 
@@ -94,11 +119,12 @@ addresses after searching because names can be ambiguous.
 ### Caddy / production
 
 The recommended deployment uses one public origin and lets Caddy route API
-requests separately. `just prod` binds both services to loopback by default:
+requests to the viewer backend, which calls the analysis backend on loopback. `just prod` binds services to
+loopback by default:
 
 ```caddyfile
 graphrev.example.com {
-	reverse_proxy /api/* 127.0.0.1:8000
+	reverse_proxy /api/* 127.0.0.1:8002
 	reverse_proxy 127.0.0.1:4173
 }
 ```
@@ -131,9 +157,13 @@ Then in REvAId, click "import binary", and select that JSON file.
 
 | Command | What it does |
 | --- | --- |
-| `just dev` | Run API + web concurrently (F3) |
-| `just api` / `just web` | Run just one side |
-| `just migrate` | Apply pending Alembic migrations |
+| `just dev` | Run analysis backend + viewer backend + frontend separately |
+| `just dev-split` | Alias for `just dev` |
+| `just viewer-stats` | Print viewer database row counts only |
+| `just analysis` / `just viewer` / `just web` | Run one split service |
+| `just migrate` | Apply both database histories |
+| `just migrate-analysis` / `just migrate-viewer` | Apply one service's database history |
+| `just db-reset-analysis` / `just db-reset-viewer` | Recreate one database without touching the other |
 | `just revision name="add x"` | Autogenerate a new migration from `db/models.py` |
 | `just db-reset` | Delete the local SQLite file and re-migrate from scratch |
 | `just test` | Run backend (pytest) and frontend (vitest) test suites |
@@ -156,6 +186,15 @@ Set `GRAPHREV_LLM_ADAPTER=litellm` to enable the LLM analysis.
 | `GRAPHREV_LLM_MODEL` | litellm router string, e.g. `anthropic/claude-sonnet-4-5`, `openai/gpt-4o`, `ollama/llama3` |
 | `GRAPHREV_LLM_API_KEY` | Provider API key (put it in `backend/.env`, not the shell) |
 | `GRAPHREV_LLM_API_BASE` | Base URL for self-hosted/proxied endpoints (Ollama, vLLM, an LLM gateway); leave unset for hosted providers |
+
+### Backend-Specific Environment Settings
+
+`GRAPHREV_DB_PATH` selects the analysis database (default `./graphrev.db`).
+`GRAPHREV_VIEWER_DB_PATH` selects the viewer database (default
+`./graphrev-viewer.db`). A standalone install may use `just migrate-analysis`
+without creating or opening the viewer database. `GRAPHREV_ANALYSIS_INTERNAL_URL` and
+`GRAPHREV_ANALYSIS_INTERNAL_TOKEN` configure the viewer backend's fixed connection to the analysis backend;
+set the same high-entropy token on the analysis and viewer backend processes.
 
 Examples:
 

@@ -1,0 +1,190 @@
+"""Binary use cases (E1): list, typed-confirm delete, entry-point suggestions,
+and Ghidra JSON-export import (I12)."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+from pathlib import Path
+
+from pydantic import ValidationError
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+from revaid.adapters.ghidra import create_file_adapter
+from revaid.core.config import Settings
+from revaid.core.ids import public_binary_name
+from revaid.ingestion.pipeline import run_ingestion
+from revaid.repositories.binaries import (
+    delete_binary,
+    get_binary_by_id,
+    get_binary_by_name_version,
+    list_binaries,
+)
+from revaid.repositories.functions import list_entry_points
+from revaid.schemas.binary import BinarySummaryDto, binary_summary_from_row
+from revaid.schemas.ingest import (
+    SUPPORTED_EXPORT_SCHEMA_VERSIONS,
+    GhidraExportDocument,
+    ImportResultDto,
+)
+from revaid.schemas.search import EntryPointDto, EntryPointsDto, entry_point_dto_from_function
+from revaid_contracts.http_errors import AppError, ErrorCode
+
+#: E1b: "≤ 5 empty-canvas suggestions" — enforced server-side regardless of
+#: whatever a caller might request, since there is no query parameter for it
+#: in the TAD endpoint index.
+_MAX_ENTRY_POINTS = 5
+
+
+async def load_ghidra_export_file(path: Path) -> GhidraExportDocument:
+    """Load one staged export without retaining HTTP request bytes.
+
+    This is deliberately a compatibility bridge for the first streaming-upload
+    slice. The following chunked-parser slice will replace this full-document
+    decode; keeping it here makes that remaining memory limitation explicit
+    and confines it to the background worker rather than the request handler.
+    """
+
+    def _load() -> GhidraExportDocument:
+        with path.open(encoding="utf-8") as export_file:
+            payload = json.load(export_file)
+        return GhidraExportDocument.model_validate(payload)
+
+    try:
+        return await asyncio.to_thread(_load)
+    except (OSError, json.JSONDecodeError, ValidationError) as exc:
+        raise AppError(
+            ErrorCode.VALIDATION_ERROR,
+            "The staged export is not a valid GraphRev Ghidra JSON document.",
+            details={"reason": str(exc)},
+        ) from exc
+
+
+async def list_analysis_binaries_dto(session: AsyncSession) -> list[BinarySummaryDto]:
+    """Analysis-only binary listing; viewer preferences are intentionally absent."""
+    rows = await list_binaries(session)
+    return [binary_summary_from_row(row) for row in rows]
+
+
+async def delete_analysis_binary_with_confirmation(
+    session: AsyncSession, *, binary_id: int, confirm: str
+) -> None:
+    """Delete analysis-owned binary facts only; viewer cleanup is handled by the facade."""
+    binary = await get_binary_by_id(session, binary_id)
+    if binary is None:
+        raise AppError(
+            ErrorCode.BINARY_NOT_FOUND,
+            f"No binary {binary_id}.",
+            details={"binaryId": binary_id},
+        )
+    if confirm != binary.name:
+        raise AppError(
+            ErrorCode.CONFIRMATION_MISMATCH,
+            "Confirmation text does not match the binary name.",
+            details={"binaryId": binary_id, "expected": binary.name},
+        )
+    await delete_binary(session, binary)
+    await session.commit()
+
+
+async def get_entry_points(session: AsyncSession, binary_id: int) -> EntryPointsDto:
+    """E1b: up to 5 entry-point suggestions for an empty canvas."""
+    binary = await get_binary_by_id(session, binary_id)
+    if binary is None:
+        raise AppError(
+            ErrorCode.BINARY_NOT_FOUND,
+            f"No binary {binary_id}.",
+            details={"binaryId": binary_id},
+        )
+    functions = await list_entry_points(session, binary_id=binary_id, limit=_MAX_ENTRY_POINTS)
+    entry_points: list[EntryPointDto] = [entry_point_dto_from_function(fn) for fn in functions]
+    return EntryPointsDto(entry_points=entry_points)
+
+
+async def import_ghidra_export(
+    session_factory: async_sessionmaker[AsyncSession],
+    settings: Settings,
+    document: GhidraExportDocument,
+) -> ImportResultDto:
+    """Ingest a Ghidra JSON export as a binary (I12).
+
+    Private-mode imports reject duplicates by SHA-256 when available, falling
+    back to `(name, version)` for legacy hashless exports. Public mode gives
+    each import a randomised name and permits repeated content, while still
+    refusing the unlikely random-name collision. Raises `VALIDATION_ERROR`
+    for an unsupported schema version or if the pipeline reports failure.
+
+    Takes the session *factory* rather than a request session because
+    `run_ingestion` owns its own `unit_of_work` transactions (one per binary).
+    """
+    if document.schema_version not in SUPPORTED_EXPORT_SCHEMA_VERSIONS:
+        raise AppError(
+            ErrorCode.VALIDATION_ERROR,
+            f"Unsupported export schemaVersion {document.schema_version}; "
+            f"this build supports {sorted(SUPPORTED_EXPORT_SCHEMA_VERSIONS)}.",
+            details={
+                "schemaVersion": document.schema_version,
+                "supported": sorted(SUPPORTED_EXPORT_SCHEMA_VERSIONS),
+            },
+        )
+
+    if settings.public_mode:
+        document = document.model_copy(
+            update={
+                "binary": document.binary.model_copy(
+                    update={"name": public_binary_name(document.binary.name)}
+                )
+            }
+        )
+        async with session_factory() as session:
+            existing = await get_binary_by_name_version(
+                session,
+                name=document.binary.name,
+                version=document.binary.version,
+            )
+        if existing is not None:
+            raise AppError(
+                ErrorCode.BINARY_ALREADY_EXISTS,
+                "Public mode does not allow overwriting an existing binary.",
+                details={"name": document.binary.name, "version": document.binary.version},
+            )
+
+    adapter = create_file_adapter(document)
+    reports = await run_ingestion(
+        session_factory,
+        adapter,
+        settings,
+        binary_filter=document.binary.name,
+        reject_duplicates=not settings.public_mode,
+    )
+
+    # `run_ingestion` yields one report; `binary_filter` restricts it to the
+    # single binary this document carries.
+    report = reports[0]
+    if report.binary_failed:
+        raise AppError(
+            ErrorCode.VALIDATION_ERROR,
+            f"Ingestion of '{document.binary.name}' failed.",
+            details={"failures": report.failures},
+        )
+
+    async with session_factory() as session:
+        binary = await get_binary_by_name_version(
+            session, name=document.binary.name, version=document.binary.version
+        )
+    if binary is None:  # pragma: no cover - defensive; ingestion just created it
+        raise AppError(
+            ErrorCode.INTERNAL_ERROR,
+            f"Imported binary '{document.binary.name}' not found after ingestion.",
+        )
+
+    return ImportResultDto(
+        binary_id=binary.id,
+        name=binary.name,
+        version=binary.version,
+        functions_inserted=report.functions_inserted,
+        functions_updated=report.functions_updated,
+        edges_inserted=report.edges_inserted,
+        placeholders_created=report.placeholders_created,
+        failures=report.failures,
+    )

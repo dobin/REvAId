@@ -14,8 +14,8 @@ from typing import Any
 import litellm
 import pytest
 
-from graphrev.adapters.llm import litellm_adapter as litellm_adapter_module
-from graphrev.adapters.llm.base import (
+from revaid.adapters.llm import litellm_adapter as litellm_adapter_module
+from revaid.adapters.llm.base import (
     AuthError,
     ContextTooLargeError,
     PermanentProviderError,
@@ -23,8 +23,8 @@ from graphrev.adapters.llm.base import (
     SummaryRequest,
     TransientProviderError,
 )
-from graphrev.adapters.llm.litellm_adapter import LiteLlmAdapter
-from graphrev.core.config import Settings
+from revaid.adapters.llm.litellm_adapter import LiteLlmAdapter
+from revaid.core.config import Settings
 
 
 def _settings(**overrides: Any) -> Settings:
@@ -216,9 +216,7 @@ async def test_summarize_requests_json_mode(
 async def test_opencode_go_request_identifies_graphrev_and_session(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    adapter = LiteLlmAdapter(
-        settings=_settings(llm_api_base="https://opencode.ai/zen/go/v1")
-    )
+    adapter = LiteLlmAdapter(settings=_settings(llm_api_base="https://opencode.ai/zen/go/v1"))
     calls = _install_completion_kwargs(monkeypatch, lambda **kw: _ok_response(_VALID_JSON))
 
     await adapter.summarize(_req(session_id="stable-conversation-id"))
@@ -233,18 +231,16 @@ async def test_opencode_go_request_identifies_graphrev_and_session(
 async def test_opencode_go_session_is_stable_across_json_retries(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    adapter = LiteLlmAdapter(
-        settings=_settings(llm_api_base="https://opencode.ai/zen/go/v1")
-    )
+    adapter = LiteLlmAdapter(settings=_settings(llm_api_base="https://opencode.ai/zen/go/v1"))
     responses = [_ok_response("not JSON"), _ok_response(_VALID_JSON)]
     calls = _install_completion_kwargs(monkeypatch, lambda **kw: responses.pop(0))
 
     await adapter.summarize(_req(session_id="stable-conversation-id"))
 
     assert len(calls) == 2
-    assert {
-        call["extra_headers"]["x-opencode-session"] for call in calls
-    } == {"stable-conversation-id"}
+    assert {call["extra_headers"]["x-opencode-session"] for call in calls} == {
+        "stable-conversation-id"
+    }
 
 
 @pytest.mark.asyncio
@@ -483,9 +479,7 @@ async def test_health_reports_reachable_on_success(
 async def test_opencode_go_health_sends_required_identity_headers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    adapter = LiteLlmAdapter(
-        settings=_settings(llm_api_base="https://opencode.ai/zen/go/v1")
-    )
+    adapter = LiteLlmAdapter(settings=_settings(llm_api_base="https://opencode.ai/zen/go/v1"))
     calls = _install_completion_kwargs(monkeypatch, lambda **kw: _ok_response(_VALID_JSON))
 
     health = await adapter.health()

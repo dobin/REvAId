@@ -9,9 +9,9 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from graphrev.core.config import get_settings
-from graphrev.db.models import Binary, Function
-from graphrev.repositories.edges import find_canvas_origin
+from revaid.core.config import get_settings
+from revaid.db.models import Binary, Function
+from revaid_ui.db.models import BinaryUiState
 
 
 async def _get_binary_id(client: AsyncClient, name: str) -> int:
@@ -52,6 +52,60 @@ async def test_list_views_returns_default_view_seeded_by_ingestion(
     assert "id" in view
     assert "createdAt" in view
     assert "updatedAt" in view
+
+
+@pytest.mark.asyncio
+async def test_list_views_lazily_creates_default_for_analysis_binary(
+    client: AsyncClient, session: AsyncSession
+) -> None:
+    """Viewer initialization remains available even when analysis was
+    ingested headlessly with no UI state creation."""
+    binary = Binary(name="headless.exe", version="", created_at="now", updated_at="now")
+    session.add(binary)
+    await session.commit()
+
+    response = await client.get(f"/api/v1/binaries/{binary.id}/views")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    assert body[0]["name"] == "Default"
+    assert body[0]["binaryId"] == binary.id
+
+
+@pytest.mark.asyncio
+async def test_analysis_internal_api_requires_bearer_credential(client: AsyncClient) -> None:
+    response = await client.get("/internal/v1/binaries/1")
+    assert response.status_code == 401
+
+    token = get_settings().analysis_internal_token
+    response = await client.get(
+        "/internal/v1/binaries/1", headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_internal_address_resolution_preserves_duplicate_and_containing_hits(
+    client: AsyncClient, ingested: None
+) -> None:
+    binary_id = await _get_binary_id(client, "acme.exe")
+    token = get_settings().analysis_internal_token
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = await client.post(
+        f"/internal/v1/binaries/{binary_id}/functions/resolve",
+        headers=headers,
+        json={"addresses": [0x401010, 0x401000, 0x401010]},
+    )
+
+    assert response.status_code == 200
+    rows = response.json()["results"]
+    assert [row["address"] for row in rows] == [0x401010, 0x401000, 0x401010]
+    assert rows[0]["function"] is None
+    assert rows[0]["containing_function"]["address"] == 0x401000
+    assert rows[1]["function"]["display_name"] == "main"
+    assert rows[2]["containing_function"]["id"] == rows[0]["containing_function"]["id"]
 
 
 @pytest.mark.asyncio
@@ -153,13 +207,13 @@ async def test_patch_view_name_root_and_camera(client: AsyncClient, ingested: No
 async def test_patch_view_waits_for_an_active_import_writer(
     client: AsyncClient, ingested: None
 ) -> None:
-    """A view PATCH must queue behind ingestion, not fail with SQLITE_BUSY."""
-    from graphrev.db.uow import write_lock
+    """A viewer write session holds the viewer lock for its complete request."""
+    from revaid.db.uow import viewer_write_lock
 
     binary_id = await _get_binary_id(client, "acme.exe")
     view_id = await _get_default_view_id(client, binary_id)
 
-    async with write_lock():
+    async with viewer_write_lock():
         patch_task = asyncio.create_task(
             client.patch(f"/api/v1/views/{view_id}", json={"name": "queued update"})
         )
@@ -204,7 +258,7 @@ async def test_delete_only_view_is_forbidden(client: AsyncClient, ingested: None
 
 @pytest.mark.asyncio
 async def test_delete_view_succeeds_when_binary_has_another_view(
-    client: AsyncClient, ingested: None
+    client: AsyncClient, viewer_session: AsyncSession, ingested: None
 ) -> None:
     binary_id = await _get_binary_id(client, "acme.exe")
     default_view_id = await _get_default_view_id(client, binary_id)
@@ -213,12 +267,15 @@ async def test_delete_view_succeeds_when_binary_has_another_view(
         f"/api/v1/binaries/{binary_id}/views", json={"name": "second"}
     )
     second_view_id = create_response.json()["id"]
+    await client.post(f"/api/v1/binaries/{binary_id}/last-view", json={"viewId": second_view_id})
 
     response = await client.delete(f"/api/v1/views/{second_view_id}")
     assert response.status_code == 204
 
     remaining = (await client.get(f"/api/v1/binaries/{binary_id}/views")).json()
     assert [v["id"] for v in remaining] == [default_view_id]
+    state = await viewer_session.get(BinaryUiState, binary_id)
+    assert state is None
 
 
 @pytest.mark.asyncio
@@ -506,12 +563,6 @@ async def test_open_functions_repairs_disconnected_existing_roots(
     assert placed.status_code == 200
     placed_nodes = {node["functionId"]: node for node in placed.json()["nodes"]}
     assert set(placed_nodes) == {by_address[0x401000], by_address[0x401100]}
-    assert await find_canvas_origin(
-        session,
-        function_id=by_address[0x401100],
-        candidate_ids={by_address[0x401000]},
-    ) == (by_address[0x401000], "fanout")
-
     response = await client.post(
         f"/api/v1/views/{view_id}/open-functions",
         json={"dllBase": "0x400000", "addresses": ["0x401000", "0x401100"]},

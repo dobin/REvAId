@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import pytest
 
-from graphrev.adapters.llm import create_adapter
-from graphrev.adapters.llm.mock import MockLlmAdapter
-from graphrev.core.config import Settings
+from revaid.adapters.llm import create_adapter
+from revaid.adapters.llm.mock import MockLlmAdapter
+from revaid.core.config import Settings
 
 
 def _settings(**overrides: object) -> Settings:
@@ -50,7 +50,7 @@ def test_default_settings_disable_latency_simulation() -> None:
 
 
 def test_create_adapter_litellm_returns_litellm_adapter() -> None:
-    from graphrev.adapters.llm.litellm_adapter import LiteLlmAdapter
+    from revaid.adapters.llm.litellm_adapter import LiteLlmAdapter
 
     adapter = create_adapter("litellm", _settings())
     assert isinstance(adapter, LiteLlmAdapter)
@@ -59,7 +59,7 @@ def test_create_adapter_litellm_returns_litellm_adapter() -> None:
 
 
 def test_create_adapter_opencode_returns_opencode_adapter() -> None:
-    from graphrev.adapters.llm.opencode_adapter import OpenCodeAdapter
+    from revaid.adapters.llm.opencode_adapter import OpenCodeAdapter
 
     adapter = create_adapter("opencode", _settings())
     assert isinstance(adapter, OpenCodeAdapter)

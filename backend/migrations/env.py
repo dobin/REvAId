@@ -1,4 +1,4 @@
-"""Alembic environment, wired to Settings.db_path and Base.metadata.
+"""Analysis Alembic environment, wired to Settings.db_path and Base.metadata.
 
 ``render_as_batch=True`` is required for SQLite ALTER support (SQLite can't
 ALTER most column properties in place; batch mode recreates the table).
@@ -14,8 +14,8 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from graphrev.core.config import get_settings
-from graphrev.db.models import Base
+from revaid.core.config import get_settings
+from revaid.db.models import Base
 
 config = context.config
 

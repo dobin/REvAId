@@ -19,8 +19,11 @@ dependencies = [
 ]
 
 [project.scripts]
-graphrev = "graphrev.cli.__main__:app"
-graphrev-mcp = "graphrev.mcp.server:main"
+graphrev = "revaid.cli.__main__:app"
+graphrev-mcp = "revaid.mcp.server:main"
+revaid-analysis = "revaid.cli.__main__:app"
+revaid-mcp = "revaid.mcp.server:main"
+revaid-ui-db = "revaid_ui.cli.dbtools:app"
 
 [dependency-groups]
 dev = [
@@ -40,7 +43,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/graphrev"]
+packages = ["src/revaid", "src/revaid_ui", "src/revaid_contracts"]
 
 # ---------------------------------------------------------------------------
 # Ruff
@@ -59,7 +62,7 @@ ignore = ["ANN401"]
 "migrations/**" = ["ANN", "E501"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["graphrev"]
+known-first-party = ["revaid", "revaid_ui", "revaid_contracts"]
 
 # ---------------------------------------------------------------------------
 # mypy
@@ -72,7 +75,11 @@ mypy_path = "src"
 exclude = ["migrations/"]
 
 [[tool.mypy.overrides]]
-module = "graphrev.cli.*"
+module = "revaid.cli.*"
+disallow_untyped_decorators = false
+
+[[tool.mypy.overrides]]
+module = "revaid_ui.cli.*"
 disallow_untyped_decorators = false
 
 # ---------------------------------------------------------------------------
@@ -93,29 +100,24 @@ markers = [
 # import-linter — enforces TAD §2.2 layering
 # ---------------------------------------------------------------------------
 [tool.importlinter]
-root_packages = ["graphrev"]
+root_packages = ["revaid", "revaid_ui", "revaid_contracts"]
 
 [[tool.importlinter.contracts]]
 name = "Layers: api -> services -> repositories -> db"
 type = "layers"
-layers = [
-  "graphrev.api",
-  "graphrev.services",
-  "graphrev.repositories",
-  "graphrev.db",
-]
+layers = ["revaid.api", "revaid.services", "revaid.repositories", "revaid.db"]
 
 [[tool.importlinter.contracts]]
 name = "Services must not import api"
 type = "forbidden"
-source_modules = ["graphrev.services"]
-forbidden_modules = ["graphrev.api"]
+source_modules = ["revaid.services"]
+forbidden_modules = ["revaid.api"]
 
 [[tool.importlinter.contracts]]
 name = "Repositories must not import services or summarization"
 type = "forbidden"
-source_modules = ["graphrev.repositories"]
-forbidden_modules = ["graphrev.services", "graphrev.summarization"]
+source_modules = ["revaid.repositories"]
+forbidden_modules = ["revaid.services", "revaid.summarization"]
 
 [[tool.importlinter.contracts]]
 name = "Only adapters/*/base may be imported outside their own package"
@@ -125,25 +127,31 @@ type = "forbidden"
 # one sanctioned place that imports `.mock`/`.rest` directly. Every other
 # module reaches `.mock`/`.rest` only indirectly, through that factory —
 # without this flag, import-linter would (correctly, but too strictly for
-# this design) flag `graphrev.cli -> graphrev.adapters.ghidra ->
-# graphrev.adapters.ghidra.mock` as broken even though `cli` never imports
+# this design) flag `revaid.cli -> revaid.adapters.ghidra ->
+# `revaid.adapters.ghidra.mock` as broken even though `cli` never imports
 # `.mock` itself.
 allow_indirect_imports = true
 source_modules = [
-  "graphrev.api",
-  "graphrev.services",
-  "graphrev.repositories",
-  "graphrev.db",
-  "graphrev.summarization",
-  "graphrev.classification",
-  "graphrev.events",
-  "graphrev.ingestion",
-  "graphrev.cli",
+  "revaid.api",
+  "revaid.services",
+  "revaid.repositories",
+  "revaid.db",
+  "revaid.summarization",
+  "revaid.classification",
+  "revaid.events",
+  "revaid.ingestion",
+  "revaid.cli",
 ]
 forbidden_modules = [
-  "graphrev.adapters.ghidra.mock",
-  "graphrev.adapters.ghidra.rest",
-  "graphrev.adapters.llm.mock",
-  "graphrev.adapters.llm.litellm_adapter",
-  "graphrev.adapters.llm.opencode_adapter",
+  "revaid.adapters.ghidra.mock",
+  "revaid.adapters.ghidra.rest",
+  "revaid.adapters.llm.mock",
+  "revaid.adapters.llm.litellm_adapter",
+  "revaid.adapters.llm.opencode_adapter",
 ]
+
+[[tool.importlinter.contracts]]
+name = "Viewer code never imports analysis implementation"
+type = "forbidden"
+source_modules = ["revaid_ui"]
+forbidden_modules = ["revaid"]

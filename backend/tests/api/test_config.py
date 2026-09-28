@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from httpx import AsyncClient
 
-from graphrev.core.config import get_settings
+from revaid.core.config import get_settings
 
 
 @pytest.mark.asyncio

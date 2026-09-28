@@ -12,17 +12,17 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from graphrev.core.config import Settings
-from graphrev.core.errors import AppError, ErrorCode
-from graphrev.db.models import Binary, Edge, Function
-from graphrev.schemas.ingest import (
+from revaid.core.config import Settings
+from revaid.core.errors import AppError, ErrorCode
+from revaid.db.models import Binary, Edge, Function
+from revaid.schemas.ingest import (
     GhidraExportBinary,
     GhidraExportDocument,
     GhidraExportEdge,
     GhidraExportFunction,
     GhidraExportParam,
 )
-from graphrev.services import binary_service
+from revaid.services import binary_service
 
 
 def _document() -> GhidraExportDocument:

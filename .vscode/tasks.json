@@ -3,16 +3,24 @@
   "tasks": [
     {
       "label": "dev:all",
-      "dependsOn": ["api", "web"],
+      "dependsOn": ["analysis", "viewer", "web"],
       "dependsOrder": "parallel",
       "group": { "kind": "build", "isDefault": true },
       "isBackground": true
     },
     {
-      "label": "api",
+      "label": "analysis",
       "type": "shell",
       "isBackground": true,
-      "command": "uv run uvicorn graphrev.main:app --reload --host 127.0.0.1 --port 8000",
+      "command": "uv run uvicorn revaid.main:app --reload --host 127.0.0.1 --port 8000",
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "problemMatcher": []
+    },
+    {
+      "label": "viewer",
+      "type": "shell",
+      "isBackground": true,
+      "command": "uv run uvicorn revaid_ui.main:app --reload --host 127.0.0.1 --port 8002",
       "options": { "cwd": "${workspaceFolder}/backend" },
       "problemMatcher": []
     },

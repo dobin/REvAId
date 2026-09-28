@@ -17,7 +17,7 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       proxy: {
         "/api": {
-          target: "http://127.0.0.1:8000",
+          target: env.GRAPHREV_VIEWER_URL ?? "http://127.0.0.1:8002",
           changeOrigin: true,
         },
       },
@@ -27,7 +27,7 @@ export default defineConfig(({ mode }) => {
       ...(webDomain ? { allowedHosts: [webDomain] } : {}),
       proxy: {
         "/api": {
-          target: "http://127.0.0.1:8000",
+          target: env.GRAPHREV_VIEWER_URL ?? "http://127.0.0.1:8002",
           changeOrigin: true,
         },
       },

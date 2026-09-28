@@ -6,9 +6,9 @@ from collections import Counter
 
 import pytest
 
-from graphrev.adapters.ghidra import create_adapter
-from graphrev.adapters.ghidra.base import RawBinaryRef, RawEdge, RawFunction
-from graphrev.adapters.ghidra.mock import MockGhidraAdapter
+from revaid.adapters.ghidra import create_adapter
+from revaid.adapters.ghidra.base import RawBinaryRef, RawEdge, RawFunction
+from revaid.adapters.ghidra.mock import MockGhidraAdapter
 
 SEED = 1337
 
@@ -145,7 +145,7 @@ def test_create_adapter_mock_returns_mock_ghidra_adapter() -> None:
 
 
 def test_create_adapter_rest_raises_not_implemented() -> None:
-    from graphrev.adapters.ghidra import GhidraAdapterNotImplementedError
+    from revaid.adapters.ghidra import GhidraAdapterNotImplementedError
 
     with pytest.raises(GhidraAdapterNotImplementedError):
         create_adapter("rest", seed=SEED)

@@ -7,7 +7,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from graphrev.db.models import Function, View
+from revaid.db.models import Function
 
 
 async def _get_binary_id(client: AsyncClient, name: str) -> int:
@@ -22,18 +22,31 @@ async def _get_function_id_by_name(client: AsyncClient, binary_id: int, name: st
     return int(next(r["id"] for r in search["rows"] if r["displayName"] == name))
 
 
-async def _get_view_id(session: AsyncSession, binary_id: int) -> int:
-    result = await session.execute(select(View.id).where(View.binary_id == binary_id).limit(1))
-    return result.scalar_one()
+async def _get_view_id(client: AsyncClient, binary_id: int) -> int:
+    response = await client.get(f"/api/v1/binaries/{binary_id}/views")
+    assert response.status_code == 200
+    return int(response.json()[0]["id"])
+
+
+async def _place_functions(client: AsyncClient, view_id: int, function_ids: list[int]) -> None:
+    response = await client.patch(
+        f"/api/v1/views/{view_id}/nodes",
+        json={"upsert": [{"functionId": function_id} for function_id in function_ids]},
+    )
+    assert response.status_code == 200
 
 
 @pytest.mark.asyncio
-async def test_neighbours_requires_view_id(client: AsyncClient, ingested: None) -> None:
+async def test_neighbours_can_be_queried_without_a_view(
+    client: AsyncClient, ingested: None
+) -> None:
     binary_id = await _get_binary_id(client, "acme.exe")
     function_id = await _get_function_id_by_name(client, binary_id, "main")
 
     response = await client.get(f"/api/v1/functions/{function_id}/neighbours")
-    assert response.status_code == 422
+    assert response.status_code == 200
+    assert response.json()["rows"]
+    assert all(row["onCanvas"] is False for row in response.json()["rows"])
 
 
 @pytest.mark.asyncio
@@ -42,7 +55,9 @@ async def test_main_callees_primary_page_shape(
 ) -> None:
     binary_id = await _get_binary_id(client, "acme.exe")
     function_id = await _get_function_id_by_name(client, binary_id, "main")
-    view_id = await _get_view_id(session, binary_id)
+    view_id = await _get_view_id(client, binary_id)
+    page = await client.get(f"/api/v1/functions/{function_id}/neighbours")
+    await _place_functions(client, view_id, [row["id"] for row in page.json()["rows"]])
 
     response = await client.get(
         f"/api/v1/functions/{function_id}/neighbours",
@@ -72,7 +87,7 @@ async def test_neighbour_rows_use_llm_name_when_no_analyst_rename(
 
     binary_id = await _get_binary_id(client, "acme.exe")
     function_id = await _get_function_id_by_name(client, binary_id, "main")
-    view_id = await _get_view_id(session, binary_id)
+    view_id = await _get_view_id(client, binary_id)
 
     # Give one callee an LLM-proposed name directly (the worker path is
     # covered by test_summary_worker; this tests the read/display side).
@@ -85,6 +100,7 @@ async def test_neighbour_rows_use_llm_name_when_no_analyst_rename(
     assert rows, "expected at least one callee row"
     target = rows[0]
     assert target["nameLlm"] is None  # nothing proposed yet
+    await _place_functions(client, view_id, [target["id"]])
 
     await session.execute(
         update(Function).where(Function.id == target["id"]).values(name_llm="callee_proposed")
@@ -109,24 +125,21 @@ async def test_neighbour_row_fan_out_requires_code_and_no_placeholder_module(
 
     binary_id = await _get_binary_id(client, "acme.exe")
     function_id = await _get_function_id_by_name(client, binary_id, "main")
-    view_id = await _get_view_id(session, binary_id)
+    view_id = await _get_view_id(client, binary_id)
     url = f"/api/v1/functions/{function_id}/neighbours"
     params = {"viewId": view_id, "direction": "callees", "group": "primary"}
 
     response = await client.get(url, params=params)
     target = response.json()["rows"][0]
+    await _place_functions(client, view_id, [target["id"]])
     assert target["canFanOut"] is True
 
     await session.execute(
-        update(Function)
-        .where(Function.id == target["id"])
-        .values(assembly=None, code_c=None)
+        update(Function).where(Function.id == target["id"]).values(assembly=None, code_c=None)
     )
     await session.commit()
     response = await client.get(url, params=params)
-    assert next(r for r in response.json()["rows"] if r["id"] == target["id"])[
-        "canFanOut"
-    ] is False
+    assert next(r for r in response.json()["rows"] if r["id"] == target["id"])["canFanOut"] is False
 
     await session.execute(
         update(Function)
@@ -135,9 +148,7 @@ async def test_neighbour_row_fan_out_requires_code_and_no_placeholder_module(
     )
     await session.commit()
     response = await client.get(url, params=params)
-    assert next(r for r in response.json()["rows"] if r["id"] == target["id"])[
-        "canFanOut"
-    ] is False
+    assert next(r for r in response.json()["rows"] if r["id"] == target["id"])["canFanOut"] is False
 
 
 @pytest.mark.asyncio
@@ -146,7 +157,7 @@ async def test_dispatch_large_callees_are_capped_at_table_row_cap(
 ) -> None:
     binary_id = await _get_binary_id(client, "acme.exe")
     function_id = await _get_function_id_by_name(client, binary_id, "dispatch_large")
-    view_id = await _get_view_id(session, binary_id)
+    view_id = await _get_view_id(client, binary_id)
 
     response = await client.get(
         f"/api/v1/functions/{function_id}/neighbours",
@@ -164,7 +175,11 @@ async def test_big_hub_caller_table_is_suppressed(
 ) -> None:
     binary_id = await _get_binary_id(client, "acme.exe")
     function_id = await _get_function_id_by_name(client, binary_id, "mem_copy_block")
-    view_id = await _get_view_id(session, binary_id)
+    view_id = await _get_view_id(client, binary_id)
+    caller_page = await client.get(
+        f"/api/v1/functions/{function_id}/neighbours", params={"direction": "callers"}
+    )
+    await _place_functions(client, view_id, [row["id"] for row in caller_page.json()["rows"]])
 
     response = await client.get(
         f"/api/v1/functions/{function_id}/neighbours",
@@ -183,7 +198,7 @@ async def test_dispatch_large_may_be_incomplete_true_for_callees(
 ) -> None:
     binary_id = await _get_binary_id(client, "acme.exe")
     function_id = await _get_function_id_by_name(client, binary_id, "dispatch_large")
-    view_id = await _get_view_id(session, binary_id)
+    view_id = await _get_view_id(client, binary_id)
 
     response = await client.get(
         f"/api/v1/functions/{function_id}/neighbours",
@@ -199,7 +214,7 @@ async def test_get_neighbours_causes_no_summary_status_side_effects(
     """C2c/Q23: the GET must never enqueue/mutate `summary_status`."""
     binary_id = await _get_binary_id(client, "acme.exe")
     function_id = await _get_function_id_by_name(client, binary_id, "main")
-    view_id = await _get_view_id(session, binary_id)
+    view_id = await _get_view_id(client, binary_id)
 
     before = (await session.execute(select(Function.summary_status))).scalars().all()
 
@@ -222,7 +237,7 @@ async def test_utility_override_patch_moves_row_and_sets_analyst_source(
     binary_id = await _get_binary_id(client, "acme.exe")
     root_id = await _get_function_id_by_name(client, binary_id, "main")
     dispatcher_id = await _get_function_id_by_name(client, binary_id, "dispatch_small")
-    view_id = await _get_view_id(session, binary_id)
+    view_id = await _get_view_id(client, binary_id)
 
     # `dispatch_small` (has fan_out=34, not high fan_in) is a plain "computed"
     # non-utility function to start with. Wire an edge from `main` to it via

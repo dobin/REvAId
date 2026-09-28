@@ -12,7 +12,7 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
-    "gen-types": "openapi-typescript http://127.0.0.1:8000/openapi.json -o src/api/generated.ts",
+    "gen-types": "openapi-typescript http://127.0.0.1:8002/openapi.json -o src/api/generated.ts",
     "e2e": "playwright test"
   },
   "dependencies": {

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from graphrev.adapters.llm.base import (
+from revaid.adapters.llm.base import (
     RateLimitError,
     SummarizationError,
     SummaryRequest,
     TransientProviderError,
 )
-from graphrev.adapters.llm.mock import MockLlmAdapter
+from revaid.adapters.llm.mock import MockLlmAdapter
 
 
 def _req(address: int = 0x401000, name: str = "do_thing") -> SummaryRequest:

@@ -1,4 +1,4 @@
-"""B2/B3 uniqueness, self-edges, cascades, SET NULLs, and closed-enum CHECKs."""
+"""Analysis and viewer local constraints, external IDs, and closed enums."""
 
 from __future__ import annotations
 
@@ -7,8 +7,9 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from graphrev.core.clock import utc_now_iso
-from graphrev.db.models import Binary, Edge, Function, View, ViewNode
+from revaid.core.clock import utc_now_iso
+from revaid.db.models import Binary, Edge, Function
+from revaid_ui.db.models import View, ViewNode
 
 
 def _now() -> str:
@@ -118,78 +119,69 @@ async def test_summary_status_rejects_garbage(session: AsyncSession) -> None:
 
 
 @pytest.mark.asyncio
-async def test_view_node_unique_per_view_and_function(session: AsyncSession) -> None:
-    binary = await _make_binary(session)
-    fn = await _make_function(session, binary, 0x1000, "a")
-    view = View(binary_id=binary.id, name="Default", created_at=_now(), updated_at=_now())
-    session.add(view)
-    await session.flush()
+async def test_view_node_unique_per_view_and_function(viewer_session: AsyncSession) -> None:
+    view = View(binary_id=54321, name="Default", created_at=_now(), updated_at=_now())
+    viewer_session.add(view)
+    await viewer_session.flush()
 
-    session.add(ViewNode(view_id=view.id, function_id=fn.id, created_at=_now(), updated_at=_now()))
-    await session.flush()
+    viewer_session.add(
+        ViewNode(view_id=view.id, function_id=12345, created_at=_now(), updated_at=_now())
+    )
+    await viewer_session.flush()
 
-    session.add(ViewNode(view_id=view.id, function_id=fn.id, created_at=_now(), updated_at=_now()))
+    viewer_session.add(
+        ViewNode(view_id=view.id, function_id=12345, created_at=_now(), updated_at=_now())
+    )
     with pytest.raises(IntegrityError):
-        await session.flush()
+        await viewer_session.flush()
 
 
 @pytest.mark.asyncio
-async def test_origin_kind_rejects_garbage(session: AsyncSession) -> None:
-    binary = await _make_binary(session)
-    fn = await _make_function(session, binary, 0x1000, "a")
-    view = View(binary_id=binary.id, name="Default", created_at=_now(), updated_at=_now())
-    session.add(view)
-    await session.flush()
+async def test_origin_kind_rejects_garbage(viewer_session: AsyncSession) -> None:
+    view = View(binary_id=54321, name="Default", created_at=_now(), updated_at=_now())
+    viewer_session.add(view)
+    await viewer_session.flush()
 
-    session.add(
+    viewer_session.add(
         ViewNode(
             view_id=view.id,
-            function_id=fn.id,
+            function_id=12345,
             origin_kind="bogus",
             created_at=_now(),
             updated_at=_now(),
         )
     )
     with pytest.raises(IntegrityError):
-        await session.flush()
+        await viewer_session.flush()
 
 
 @pytest.mark.asyncio
-async def test_origin_kind_accepts_fanin(session: AsyncSession) -> None:
+async def test_origin_kind_accepts_fanin(viewer_session: AsyncSession) -> None:
     """0004 widened the CHECK to admit `fanin` (leftward caller fan-out)."""
-    binary = await _make_binary(session)
-    fn = await _make_function(session, binary, 0x1000, "a")
-    origin = await _make_function(session, binary, 0x2000, "b")
-    view = View(binary_id=binary.id, name="Default", created_at=_now(), updated_at=_now())
-    session.add(view)
-    await session.flush()
+    view = View(binary_id=54321, name="Default", created_at=_now(), updated_at=_now())
+    viewer_session.add(view)
+    await viewer_session.flush()
 
-    session.add(
+    viewer_session.add(
         ViewNode(
             view_id=view.id,
-            function_id=fn.id,
-            origin_function_id=origin.id,
+            function_id=12345,
+            origin_function_id=23456,
             origin_kind="fanin",
             created_at=_now(),
             updated_at=_now(),
         )
     )
     # No IntegrityError — the widened CHECK admits it.
-    await session.flush()
+    await viewer_session.flush()
 
 
 @pytest.mark.asyncio
-async def test_deleting_binary_cascades_to_children(session: AsyncSession) -> None:
+async def test_deleting_binary_cascades_only_analysis_facts(session: AsyncSession) -> None:
     binary = await _make_binary(session)
     fn_a = await _make_function(session, binary, 0x1000, "a")
     fn_b = await _make_function(session, binary, 0x2000, "b")
     session.add(Edge(binary_id=binary.id, caller_id=fn_a.id, callee_id=fn_b.id, kind="call"))
-    view = View(binary_id=binary.id, name="Default", created_at=_now(), updated_at=_now())
-    session.add(view)
-    await session.flush()
-    session.add(
-        ViewNode(view_id=view.id, function_id=fn_a.id, created_at=_now(), updated_at=_now())
-    )
     await session.commit()
 
     await session.delete(binary)
@@ -197,28 +189,50 @@ async def test_deleting_binary_cascades_to_children(session: AsyncSession) -> No
 
     assert (await session.execute(select(Function))).first() is None
     assert (await session.execute(select(Edge))).first() is None
-    assert (await session.execute(select(View))).first() is None
-    assert (await session.execute(select(ViewNode))).first() is None
 
 
 @pytest.mark.asyncio
-async def test_deleting_view_nulls_binary_last_view_id(session: AsyncSession) -> None:
-    binary = await _make_binary(session)
-    view = View(binary_id=binary.id, name="Default", created_at=_now(), updated_at=_now())
-    session.add(view)
-    await session.flush()
-    binary.last_view_id = view.id
-    await session.commit()
-
-    await session.delete(view)
-    await session.commit()
-
-    await session.refresh(binary)
-    assert binary.last_view_id is None
+async def test_viewer_database_accepts_external_analysis_ids(viewer_session: AsyncSession) -> None:
+    view = View(binary_id=98765, name="External", created_at=_now(), updated_at=_now())
+    viewer_session.add(view)
+    await viewer_session.flush()
+    viewer_session.add(
+        ViewNode(
+            view_id=view.id,
+            function_id=87654,
+            origin_function_id=76543,
+            origin_kind="fanout",
+            created_at=_now(),
+            updated_at=_now(),
+        )
+    )
+    await viewer_session.flush()
 
 
 @pytest.mark.asyncio
-async def test_deleting_function_nulls_root_and_origin_references(session: AsyncSession) -> None:
+async def test_deleting_view_cascades_to_local_nodes(viewer_session: AsyncSession) -> None:
+    view = View(binary_id=54321, name="Default", created_at=_now(), updated_at=_now())
+    viewer_session.add(view)
+    await viewer_session.flush()
+    node = ViewNode(
+        view_id=view.id,
+        function_id=12345,
+        created_at=_now(),
+        updated_at=_now(),
+    )
+    viewer_session.add(node)
+    await viewer_session.commit()
+
+    await viewer_session.delete(view)
+    await viewer_session.commit()
+
+    assert (await viewer_session.execute(select(ViewNode))).first() is None
+
+
+@pytest.mark.asyncio
+async def test_external_function_ids_do_not_cascade_in_viewer_db(
+    session: AsyncSession, viewer_session: AsyncSession
+) -> None:
     binary = await _make_binary(session)
     fn = await _make_function(session, binary, 0x1000, "a")
     other = await _make_function(session, binary, 0x2000, "b")
@@ -229,25 +243,23 @@ async def test_deleting_function_nulls_root_and_origin_references(session: Async
         created_at=_now(),
         updated_at=_now(),
     )
-    session.add(view)
-    await session.flush()
-    session.add(
-        ViewNode(
-            view_id=view.id,
-            function_id=other.id,
-            origin_function_id=fn.id,
-            origin_kind="fanout",
-            created_at=_now(),
-            updated_at=_now(),
-        )
+    viewer_session.add(view)
+    await viewer_session.flush()
+    node = ViewNode(
+        view_id=view.id,
+        function_id=other.id,
+        origin_function_id=fn.id,
+        origin_kind="fanout",
+        created_at=_now(),
+        updated_at=_now(),
     )
-    await session.commit()
+    viewer_session.add(node)
+    await viewer_session.commit()
 
     await session.delete(fn)
     await session.commit()
 
-    await session.refresh(view)
-    assert view.root_function_id is None
-
-    node = (await session.execute(select(ViewNode))).scalar_one()
-    assert node.origin_function_id is None
+    stored_view = await viewer_session.get(View, view.id)
+    stored_node = (await viewer_session.execute(select(ViewNode))).scalar_one()
+    assert stored_view is not None and stored_view.root_function_id == fn.id
+    assert stored_node.origin_function_id == fn.id

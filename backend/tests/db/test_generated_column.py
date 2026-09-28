@@ -6,8 +6,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from graphrev.core.clock import utc_now_iso
-from graphrev.db.models import Binary, Function
+from revaid.core.clock import utc_now_iso
+from revaid.db.models import Binary, Function
 
 
 def _now() -> str:
@@ -97,9 +97,7 @@ async def test_is_utility_effective_usable_in_order_by(session: AsyncSession) ->
     rows = (
         (
             await session.execute(
-                select(Function.name).order_by(
-                    Function.is_utility_effective.asc(), Function.name
-                )
+                select(Function.name).order_by(Function.is_utility_effective.asc(), Function.name)
             )
         )
         .scalars()
