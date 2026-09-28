@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from revaid.core.config import get_settings
 from revaid.db.models import Binary, Function
 from revaid.repositories.binaries import get_binary_by_name_version, list_binaries
 from revaid.repositories.edges import list_callees, list_callers
@@ -121,6 +122,12 @@ async def set_mcp_function_info(
     summary_long: str | None = None,
 ) -> McpFunctionUpdateDto:
     """Set the supplied non-null LLM-authored fields."""
+    if get_settings().public_mode:
+        raise AppError(
+            ErrorCode.PUBLIC_MODE_FORBIDDEN,
+            "Function updates are disabled (public mode).",
+        )
+
     binary = await _require_binary(session, binary_name, binary_version)
     fn = await _resolve_function(
         session,

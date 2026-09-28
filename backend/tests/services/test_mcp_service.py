@@ -6,6 +6,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from revaid.core.clock import utc_now_iso
+from revaid.core.config import get_settings
 from revaid.core.errors import AppError, ErrorCode
 from revaid.db.models import Edge, Function
 from revaid.repositories.binaries import get_or_create_binary
@@ -112,6 +113,34 @@ async def test_set_function_info_updates_only_supplied_llm_fields(
     assert fn.summary_short == "Parses an incoming packet."
     assert fn.summary_long == "existing details"
     assert fn.summary_status == "ready"
+
+
+@pytest.mark.asyncio
+async def test_set_function_info_is_forbidden_in_public_mode(
+    session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    binary, _ = await get_or_create_binary(session, name="agent.exe", version="")
+    fn = await _function(session, binary_id=binary.id, address=0x1000, name="FUN_1000")
+    await session.commit()
+
+    monkeypatch.setenv("GRAPHREV_PUBLIC_MODE", "true")
+    get_settings.cache_clear()
+    try:
+        with pytest.raises(AppError) as raised:
+            await set_mcp_function_info(
+                session,
+                binary_name=binary.name,
+                binary_version=binary.version,
+                function_id=fn.id,
+                name_llm="renamed_function",
+            )
+    finally:
+        get_settings.cache_clear()
+
+    await session.refresh(fn)
+    assert raised.value.code == ErrorCode.PUBLIC_MODE_FORBIDDEN
+    assert fn.name_llm is None
 
 
 @pytest.mark.asyncio
