@@ -34,6 +34,9 @@ async def _return_binary(binary_id: int):
 
 
 class EmptyViewerAnalysisClient:
+    async def health(self) -> bool:
+        return True
+
     async def get_binary(self, binary_id: int):
         return await _return_binary(binary_id)
 
@@ -132,6 +135,9 @@ async def test_viewer_app_serves_facade_routes_without_analysis_session(
     class StubAnalysis:
         async def health(self) -> bool:
             return await _return_true()
+
+        async def health_details(self):
+            return {"status": "ok", "decompiler_health": {"reachable": False}}
 
         async def get_binary(self, binary_id: int):
             return await _return_binary(binary_id)

@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
-from pathlib import Path
-
 from fastapi import APIRouter
 from sqlalchemy import text
 
@@ -12,43 +9,9 @@ from revaid.adapters.llm.base import LlmHealth
 from revaid.api.deps import LlmAdapterDep, SessionDep, SettingsDep
 from revaid.db.startup import ANALYSIS_MIGRATION_REVISION
 from revaid.schemas.config import DecompilerHealthDto, HealthDto, LlmHealthDto
+from revaid.services.decompiler_health import check_decompiler_health
 
 router = APIRouter(tags=["health"])
-
-
-async def _decompiler_health(executable: str | None) -> DecompilerHealthDto:
-    """Verify configured Kuna path and version without analyzing a binary."""
-    if not executable:
-        return DecompilerHealthDto(
-            reachable=False, detail="No decompiler executable is configured."
-        )
-    path = Path(executable)
-    if not path.is_file():
-        return DecompilerHealthDto(
-            reachable=False, detail="Configured decompiler path is not a file."
-        )
-    if not path.stat().st_mode & 0o111:
-        return DecompilerHealthDto(
-            reachable=False, detail="Configured decompiler is not executable."
-        )
-    try:
-        process = await asyncio.create_subprocess_exec(
-            str(path),
-            "--version",
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-        )
-        output, _ = await asyncio.wait_for(process.communicate(), timeout=5)
-    except (OSError, TimeoutError):
-        return DecompilerHealthDto(reachable=False, detail="Could not run configured decompiler.")
-    version = output.decode("utf-8", errors="replace").strip()
-    if process.returncode != 0:
-        return DecompilerHealthDto(
-            reachable=False, detail="Configured decompiler version check failed."
-        )
-    if "kuna" not in version.lower():
-        return DecompilerHealthDto(reachable=False, detail="Configured executable is not Kuna.")
-    return DecompilerHealthDto(reachable=True, detail=version[:200] or "Kuna is available.")
 
 
 @router.get("/health", response_model=HealthDto)
@@ -78,7 +41,8 @@ async def get_health(
         )
     except Exception:  # pragma: no cover - defensive; health must never 500
         llm_health = LlmHealth(reachable=False, detail="health check raised")
-    decompiler_health = await _decompiler_health(settings.decompiler_executable)
+    reachable, detail = await check_decompiler_health(settings.decompiler_executable)
+    decompiler_health = DecompilerHealthDto(reachable=reachable, detail=detail)
 
     return HealthDto(
         status="ok" if db_ok else "degraded",

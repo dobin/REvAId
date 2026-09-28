@@ -186,6 +186,18 @@ class HttpAnalysisClient(AnalysisClient):
         payload = await self._request("GET", "/internal/v1/health")
         return payload is not None and payload.get("status") == "ok"
 
+    async def health_details(self) -> dict[str, object]:
+        payload = await self._request("GET", "/internal/v1/health")
+        if payload is None:
+            return {"status": "unavailable"}
+        decompiler_health = payload.get("decompiler_health")
+        if not isinstance(decompiler_health, dict):
+            payload["decompiler_health"] = {
+                "reachable": False,
+                "detail": "Analysis service did not report decompiler health.",
+            }
+        return payload
+
     async def config(self) -> dict[str, Any]:
         payload = await self._request("GET", "/internal/v1/config")
         assert payload is not None

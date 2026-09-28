@@ -29,8 +29,19 @@ async def get_health(
     except Exception:  # health should report degradation instead of raising
         viewer_db_ok = False
     analysis_ok = False
+    analysis_health: dict[str, object] = {}
     with suppress(Exception):
-        analysis_ok = await analysis.health()
+        analysis_health = await analysis.health_details()
+        analysis_ok = analysis_health.get("status") == "ok"
+    decompiler_health = analysis_health.get(
+        "decompiler_health",
+        {
+            "reachable": False,
+            "detail": "Decompiler health unavailable from analysis service.",
+        },
+    )
+    if not isinstance(decompiler_health, dict):
+        decompiler_health = {}
     analysis_config = {}
     with suppress(Exception):
         analysis_config = await analysis.config()
@@ -50,6 +61,11 @@ async def get_health(
         llm_adapter=str(adapters.get("llm", "analysis")),
         llm_health=LlmHealthDto(reachable=analysis_ok, detail=None),
         decompiler_health=DecompilerHealthDto(
-            reachable=False, detail="Available on analysis service."
+            reachable=decompiler_health.get("reachable") is True,
+            detail=(
+                str(decompiler_health["detail"])
+                if decompiler_health.get("detail") is not None
+                else None
+            ),
         ),
     )

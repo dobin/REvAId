@@ -5,16 +5,44 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
+from time import monotonic
 
 from fastapi import FastAPI
 
-from revaid_contracts.logging import configure_logging
+from revaid_contracts.analysis import AnalysisClient
+from revaid_contracts.logging import configure_logging, get_logger
 from revaid_ui.analysis.client import HttpAnalysisClient
 from revaid_ui.core.config import Settings
 from revaid_ui.db.engine import create_engine, create_session_factory, dispose_engine
 from revaid_ui.db.revision import VIEWER_MIGRATION_REVISION, read_revision, require_revision
 from revaid_ui.db.startup import reconcile_viewer_state
 from revaid_ui.events.bus import InProcessEventBus
+
+logger = get_logger(__name__)
+
+
+async def wait_for_analysis(
+    analysis: AnalysisClient,
+    *,
+    timeout_seconds: float = 30.0,
+    retry_interval_seconds: float = 0.25,
+) -> None:
+    """Wait briefly for analysis readiness before reconciling saved viewer state."""
+    deadline = monotonic() + timeout_seconds
+    last_error: Exception | None = None
+    while True:
+        try:
+            if await analysis.health():
+                return
+            last_error = RuntimeError("Analysis service health check is not ready.")
+        except Exception as exc:  # temporary connection failures during parallel startup
+            last_error = exc
+        remaining = deadline - monotonic()
+        if remaining <= 0:
+            raise RuntimeError(
+                f"Analysis service did not become ready within {timeout_seconds:g} seconds."
+            ) from last_error
+        await asyncio.sleep(min(retry_interval_seconds, remaining))
 
 
 @asynccontextmanager
@@ -40,6 +68,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         revision = await read_revision(viewer_session_factory, "Viewer")
         require_revision(revision, VIEWER_MIGRATION_REVISION, "Viewer")
+        await wait_for_analysis(analysis_client)
         async with viewer_session_factory() as viewer_session:
             await reconcile_viewer_state(analysis_client, viewer_session)
         reconcile_task = asyncio.create_task(

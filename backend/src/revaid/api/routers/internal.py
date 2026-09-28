@@ -46,6 +46,7 @@ from revaid.schemas.summary import (
 )
 from revaid.services import function_service, llm_status_service, queue_service, summary_service
 from revaid.services.binary_service import import_ghidra_export
+from revaid.services.decompiler_health import check_decompiler_health
 from revaid_contracts.analysis import (
     AddressResolution,
     AddressResolutionRequest,
@@ -75,10 +76,14 @@ __all__ = ["router"]
 
 
 @router.get("/health")
-async def internal_health(session: SessionDep) -> dict[str, str]:
+async def internal_health(session: SessionDep, settings: SettingsDep) -> dict[str, object]:
     assert session is not None
     await session.execute(select(1))
-    return {"status": "ok"}
+    reachable, detail = await check_decompiler_health(settings.decompiler_executable)
+    return {
+        "status": "ok",
+        "decompiler_health": {"reachable": reachable, "detail": detail},
+    }
 
 
 @router.get("/config")
