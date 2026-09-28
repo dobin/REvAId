@@ -69,13 +69,17 @@ api-prod:
         --workers 1
 
 analysis:
-    cd backend && uv run uvicorn revaid.main:app --reload --host 127.0.0.1 --port 8000
+    cd backend && uv run uvicorn revaid.main:app --reload \
+        --host "${GRAPHREV_ANALYSIS_HOST:-${GRAPHREV_HOST:-127.0.0.1}}" \
+        --port "${GRAPHREV_ANALYSIS_PORT:-${GRAPHREV_PORT:-8000}}"
 
 analysis-prod:
     cd backend && uv run uvicorn revaid.main:app --host "${GRAPHREV_ANALYSIS_HOST:-127.0.0.1}" --port "${GRAPHREV_ANALYSIS_PORT:-8000}" --workers 1
 
 viewer:
-    cd backend && uv run uvicorn revaid_ui.main:app --reload --host 127.0.0.1 --port 8002
+    cd backend && uv run uvicorn revaid_ui.main:app --reload \
+        --host "${GRAPHREV_VIEWER_HOST:-${GRAPHREV_HOST:-127.0.0.1}}" \
+        --port "${GRAPHREV_VIEWER_PORT:-8002}"
 
 viewer-prod:
     cd backend && uv run uvicorn revaid_ui.main:app --host "${GRAPHREV_VIEWER_HOST:-127.0.0.1}" --port "${GRAPHREV_VIEWER_PORT:-8002}" --workers 1
@@ -98,7 +102,9 @@ viewer-stats:
     cd backend && uv run revaid-ui-db
 
 web:
-    cd frontend && npm run dev
+    cd frontend && npm run dev -- \
+        --host "${GRAPHREV_WEB_HOST:-${GRAPHREV_HOST:-127.0.0.1}}" \
+        --port "${GRAPHREV_WEB_PORT:-5173}"
 
 ingest *args:
     cd backend && uv run graphrev ingest {{ args }}
