@@ -96,7 +96,7 @@ dev-split:
     just dev
 
 mcp:
-    cd backend && uv run graphrev-mcp
+    cd backend && GRAPHREV_MCP_HOST="${GRAPHREV_MCP_HOST:-${GRAPHREV_HOST:-127.0.0.1}}" uv run graphrev-mcp
 
 viewer-stats:
     cd backend && uv run revaid-ui-db
