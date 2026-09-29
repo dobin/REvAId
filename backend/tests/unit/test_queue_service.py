@@ -5,10 +5,10 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from revaid.core.clock import utc_now_iso
 from revaid.db.models import Binary, Function
 from revaid.services.queue_service import get_queue_snapshot, queue_event_payload
 from revaid.summarization.queue import SummaryQueue
+from revaid_contracts.clock import utc_now_iso
 
 
 async def _make_function(session: AsyncSession, *, name: str = "do_thing") -> Function:

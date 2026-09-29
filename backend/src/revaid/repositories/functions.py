@@ -16,9 +16,9 @@ from sqlalchemy import String, cast, func, or_, select, text, update
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from revaid.core.clock import utc_now_iso
 from revaid.db.enums import FunctionKind
 from revaid.db.models import INGESTION_OWNED_COLUMNS, Function
+from revaid_contracts.clock import utc_now_iso
 
 __all__ = [
     "INGESTION_OWNED_COLUMNS",

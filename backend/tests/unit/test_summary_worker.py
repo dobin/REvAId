@@ -16,11 +16,11 @@ from revaid.adapters.llm.base import (
     SummaryResult,
     TransientProviderError,
 )
-from revaid.core.clock import utc_now_iso
 from revaid.db.models import Binary, Function, LlmWorkerStatus
 from revaid.summarization import worker as worker_module
 from revaid.summarization.queue import SummaryQueue
 from revaid.summarization.worker import run_one_item
+from revaid_contracts.clock import utc_now_iso
 
 
 @pytest.fixture(autouse=True)

@@ -10,13 +10,13 @@ from time import monotonic
 from fastapi import FastAPI
 
 from revaid_contracts.analysis import AnalysisClient
+from revaid_contracts.events import InProcessEventBus
 from revaid_contracts.logging import configure_logging, get_logger
 from revaid_ui.analysis.client import HttpAnalysisClient
 from revaid_ui.core.config import Settings
 from revaid_ui.db.engine import create_engine, create_session_factory, dispose_engine
 from revaid_ui.db.revision import VIEWER_MIGRATION_REVISION, read_revision, require_revision
 from revaid_ui.db.startup import reconcile_viewer_state
-from revaid_ui.events.bus import InProcessEventBus
 
 logger = get_logger(__name__)
 

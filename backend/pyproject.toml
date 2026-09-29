@@ -20,9 +20,9 @@ dependencies = [
 
 [project.scripts]
 graphrev = "revaid.cli.__main__:app"
-graphrev-mcp = "revaid.mcp.server:main"
+graphrev-mcp = "revaid_mcp.server:main"
 revaid-analysis = "revaid.cli.__main__:app"
-revaid-mcp = "revaid.mcp.server:main"
+revaid-mcp = "revaid_mcp.server:main"
 revaid-ui-db = "revaid_ui.cli.dbtools:app"
 
 [dependency-groups]
@@ -43,7 +43,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/revaid", "src/revaid_ui", "src/revaid_contracts"]
+packages = ["src/revaid", "src/revaid_ui", "src/revaid_mcp", "src/revaid_contracts"]
 
 # ---------------------------------------------------------------------------
 # Ruff
@@ -62,7 +62,7 @@ ignore = ["ANN401"]
 "migrations/**" = ["ANN", "E501"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["revaid", "revaid_ui", "revaid_contracts"]
+known-first-party = ["revaid", "revaid_ui", "revaid_mcp", "revaid_contracts"]
 
 # ---------------------------------------------------------------------------
 # mypy
@@ -100,7 +100,7 @@ markers = [
 # import-linter — enforces TAD §2.2 layering
 # ---------------------------------------------------------------------------
 [tool.importlinter]
-root_packages = ["revaid", "revaid_ui", "revaid_contracts"]
+root_packages = ["revaid", "revaid_ui", "revaid_mcp", "revaid_contracts"]
 
 [[tool.importlinter.contracts]]
 name = "Layers: api -> services -> repositories -> db"
@@ -138,7 +138,6 @@ source_modules = [
   "revaid.db",
   "revaid.summarization",
   "revaid.classification",
-  "revaid.events",
   "revaid.ingestion",
   "revaid.cli",
 ]
@@ -155,3 +154,9 @@ name = "Viewer code never imports analysis implementation"
 type = "forbidden"
 source_modules = ["revaid_ui"]
 forbidden_modules = ["revaid"]
+
+[[tool.importlinter.contracts]]
+name = "Analysis code never imports the MCP server"
+type = "forbidden"
+source_modules = ["revaid"]
+forbidden_modules = ["revaid_mcp"]

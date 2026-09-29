@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from revaid_contracts.schemas.summary import CancelPendingResponseDto, QueueSnapshotDto
 from revaid_ui.api.deps import AnalysisClientDep
-from revaid_ui.schemas.summary import CancelPendingResponseDto, QueueSnapshotDto
 
 router = APIRouter(tags=["queue"])
 

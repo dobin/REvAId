@@ -6,7 +6,6 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from revaid.core.clock import utc_now_iso
 from revaid.db.models import Edge, Function
 from revaid.repositories.binaries import (
     delete_binary,
@@ -14,6 +13,7 @@ from revaid.repositories.binaries import (
     get_or_create_binary,
     list_binaries,
 )
+from revaid_contracts.clock import utc_now_iso
 from revaid_ui.db.models import BinaryUiState, View, ViewNode
 from revaid_ui.repositories.views import get_last_view_ids, set_last_view_id
 

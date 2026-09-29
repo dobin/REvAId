@@ -5,9 +5,9 @@ from __future__ import annotations
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from revaid_ui.core.clock import utc_now_iso
+from revaid_contracts.clock import utc_now_iso
+from revaid_contracts.ids import random_view_id
 from revaid_ui.core.config import get_settings
-from revaid_ui.core.ids import random_view_id
 from revaid_ui.db.models import View, ViewNode
 
 

@@ -6,9 +6,9 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from revaid.core.clock import utc_now_iso
 from revaid.db.models import Binary, Edge, Function
 from revaid.repositories.neighbours import fetch_neighbour_page
+from revaid_contracts.clock import utc_now_iso
 from revaid_ui.db.models import View, ViewNode
 from revaid_ui.repositories.view_nodes import list_visible_function_ids
 

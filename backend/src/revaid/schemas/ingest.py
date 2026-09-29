@@ -13,13 +13,13 @@ of the API, TAD §4) and ``snake_case`` in Python via :class:`ApiModel`.
 
 from __future__ import annotations
 
-from enum import StrEnum
 from typing import Any, Literal
 
 from pydantic import Field, field_validator, model_validator
 
 from revaid.db.enums import EdgeKind, FunctionKind
 from revaid_contracts.common import ApiModel
+from revaid_contracts.schemas.ingest import ImportJobPhase
 
 #: Schema v2 adds per-caller ``calleeOrder``; Kuna schema v4 adds ``data``
 #: function rows and ``call``/``jump``/``data`` edge kinds. v1 remains
@@ -158,27 +158,6 @@ class ImportResultDto(ApiModel):
     edges_inserted: int
     placeholders_created: int
     failures: list[str] = Field(default_factory=list)
-
-
-class ImportJobPhase(StrEnum):
-    """Observable phases for a staged Ghidra import."""
-
-    UPLOADING = "uploading"
-    QUEUED = "queued"
-    DECOMPILING = "decompiling"
-    IMPORTING = "importing"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
-
-
-class ImportJobAcceptedDto(ApiModel):
-    """Returned as soon as a raw export has been staged safely."""
-
-    job_id: str
-    phase: ImportJobPhase
-    bytes_received: int
-    source_kind: str
 
 
 class ImportJobStatusDto(ApiModel):

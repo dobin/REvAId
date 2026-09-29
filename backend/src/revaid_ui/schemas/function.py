@@ -58,6 +58,42 @@ class FunctionDto(ApiModel):
     caller_count: int = 0
 
 
+def function_dto_from_analysis(payload: dict[str, object]) -> FunctionDto:
+    """Build the viewer ``FunctionDto`` from an analysis function payload.
+
+    The viewer is a tolerant reader: derived display fields are computed here
+    so every route (by id, by address, patch) shares one derivation.
+    """
+    summary_status = payload.get("summary_status", "none")
+    return FunctionDto.model_validate(
+        {
+            **payload,
+            "display_name": (
+                payload.get("name_analyst") or payload.get("name_llm") or payload.get("name")
+            ),
+            "is_renamed": payload.get("name_analyst") is not None,
+            "utility_source": (
+                "analyst" if payload.get("utility_override") is not None else "computed"
+            ),
+            "summary": {
+                "status": summary_status,
+                "short": payload.get("summary_short"),
+                "long": payload.get("summary_long"),
+                "model": payload.get("summary_model"),
+                "adapter": payload.get("summary_adapter"),
+                "error_code": payload.get("summary_error_code"),
+                "low_confidence": payload.get("summary_low_confidence", False),
+                "generated_at": payload.get("summary_generated_at"),
+                "is_stale": summary_status == "stale",
+            },
+            "has_notes": bool(payload.get("notes")),
+            "notes_updated_at": payload.get("notes_updated_at"),
+            "callee_count": payload.get("fan_out", 0),
+            "caller_count": payload.get("fan_in", 0),
+        }
+    )
+
+
 class FunctionUpdateDto(ApiModel):
     name_analyst: str | None = None
     notes: str | None = None

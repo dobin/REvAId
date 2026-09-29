@@ -9,10 +9,10 @@ import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from revaid.adapters.llm.base import LlmHealth, SummaryRequest, SummaryResult
-from revaid.core.clock import utc_now_iso
 from revaid.db.models import Binary, Function
 from revaid.summarization.queue import SummaryQueue
 from revaid.summarization.worker import SummaryWorkerPool
+from revaid_contracts.clock import utc_now_iso
 
 
 class _ConcurrencyTrackingAdapter:

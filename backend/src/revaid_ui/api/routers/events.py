@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Request
 from starlette.responses import StreamingResponse
 
-from revaid_ui.events.sse import sse_event_stream
+from revaid_contracts.events import sse_event_stream
 
 router = APIRouter(tags=["events"])
 

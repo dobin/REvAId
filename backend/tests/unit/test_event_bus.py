@@ -6,8 +6,7 @@ import asyncio
 
 import pytest
 
-from revaid.events.bus import InProcessEventBus
-from revaid.events.sse import format_sse, sse_event_stream
+from revaid_contracts.events import InProcessEventBus, format_sse, sse_event_stream
 
 
 async def test_publish_delivers_to_all_subscribers() -> None:

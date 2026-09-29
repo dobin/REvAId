@@ -8,8 +8,8 @@ from sqlalchemy import text
 from revaid.adapters.llm.base import LlmHealth
 from revaid.api.deps import LlmAdapterDep, SessionDep, SettingsDep
 from revaid.db.startup import ANALYSIS_MIGRATION_REVISION
-from revaid.schemas.config import DecompilerHealthDto, HealthDto, LlmHealthDto
 from revaid.services.decompiler_health import check_decompiler_health
+from revaid_contracts.schemas.config import DecompilerHealthDto, HealthDto, LlmHealthDto
 
 router = APIRouter(tags=["health"])
 

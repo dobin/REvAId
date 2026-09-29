@@ -1,20 +1,9 @@
-"""Viewer binary summary DTO and analysis contract mapping."""
+"""``AnalysisBinary`` → ``BinarySummaryDto`` mapping for the viewer."""
 
 from __future__ import annotations
 
 from revaid_contracts.analysis import AnalysisBinary
-from revaid_contracts.common import ApiModel
-
-
-class BinarySummaryDto(ApiModel):
-    id: int
-    name: str
-    version: str
-    analysis_image_base: int | None
-    function_count: int
-    edge_count: int
-    last_view_id: int | None = None
-    created_at: str
+from revaid_contracts.schemas.binary import BinarySummaryDto
 
 
 def binary_summary_from_analysis(

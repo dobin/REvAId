@@ -19,6 +19,8 @@ from revaid_contracts.http_errors import (
 )
 from revaid_contracts.logging import bind_request_id, clear_request_context
 
+__all__ = ["create_base_app"]
+
 
 def create_base_app(*, title: str, settings: Any, lifespan_handler: Any) -> FastAPI:
     app = FastAPI(title=title, version="0.1.0", lifespan=lifespan_handler)

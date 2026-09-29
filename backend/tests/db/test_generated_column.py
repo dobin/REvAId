@@ -6,8 +6,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from revaid.core.clock import utc_now_iso
 from revaid.db.models import Binary, Function
+from revaid_contracts.clock import utc_now_iso
 
 
 def _now() -> str:

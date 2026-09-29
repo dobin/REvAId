@@ -6,8 +6,8 @@ from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from revaid_contracts.analysis import AnalysisClient
-from revaid_ui.core.clock import utc_now_iso
-from revaid_ui.core.logging import get_logger
+from revaid_contracts.clock import utc_now_iso
+from revaid_contracts.logging import get_logger
 from revaid_ui.db.models import BinaryUiState, View, ViewNode
 
 logger = get_logger(__name__)

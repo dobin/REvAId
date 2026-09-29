@@ -5,7 +5,6 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from revaid.core.clock import utc_now_iso
 from revaid.db.models import Function
 from revaid.repositories.binaries import get_or_create_binary
 from revaid.repositories.functions import (
@@ -14,6 +13,7 @@ from revaid.repositories.functions import (
     resolve_function_by_address,
     search_functions,
 )
+from revaid_contracts.clock import utc_now_iso
 
 
 async def _make_function(

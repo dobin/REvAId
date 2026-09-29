@@ -51,7 +51,7 @@ async def test_standalone_mcp_starts_and_advertises_analysis_tools(migrated_db: 
         "GRAPHREV_MCP_PORT": str(port),
     }
     process = subprocess.Popen(
-        [sys.executable, "-m", "revaid.mcp.server"],
+        [sys.executable, "-m", "revaid_mcp.server"],
         cwd=BACKEND_DIR,
         env=env,
         stdout=subprocess.DEVNULL,

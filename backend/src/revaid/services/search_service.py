@@ -7,8 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from revaid.core.config import Settings
 from revaid.repositories.binaries import get_binary_by_id
 from revaid.repositories.functions import search_functions
-from revaid.schemas.search import FunctionSearchPageDto, function_search_row_from_function
+from revaid.schemas.search import function_search_row_from_function
 from revaid_contracts.http_errors import AppError, ErrorCode
+from revaid_contracts.schemas.search import FunctionSearchPageDto
 
 
 async def search_functions_dto(

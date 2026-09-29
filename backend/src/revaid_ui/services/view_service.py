@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from revaid_contracts.analysis import AnalysisClient, CallPair, FeaturedFunction
 from revaid_contracts.errors import ErrorCode
 from revaid_contracts.http_errors import AppError
-from revaid_ui.core.ids import random_view_id
+from revaid_contracts.ids import random_view_id
 from revaid_ui.db.models import View
 from revaid_ui.repositories.views import (
     clear_last_view_ids_for_view,

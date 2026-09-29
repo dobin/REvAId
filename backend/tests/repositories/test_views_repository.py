@@ -5,7 +5,7 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from revaid.core.clock import utc_now_iso
+from revaid_contracts.clock import utc_now_iso
 from revaid_ui.db.models import BinaryUiState, View
 from revaid_ui.repositories.view_nodes import upsert_view_nodes
 from revaid_ui.repositories.views import (

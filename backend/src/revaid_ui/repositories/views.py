@@ -6,7 +6,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from revaid_ui.core.clock import utc_now_iso
+from revaid_contracts.clock import utc_now_iso
 from revaid_ui.db.models import BinaryUiState, View, ViewNode
 
 __all__ = [

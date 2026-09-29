@@ -14,7 +14,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from revaid_ui.core.clock import utc_now_iso
+from revaid_contracts.clock import utc_now_iso
 from revaid_ui.db.models import ViewNode
 
 __all__ = [

@@ -15,9 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from revaid.adapters.llm.base import LlmAdapter
 from revaid.core.config import Settings, get_settings
 from revaid.db.uow import write_lock
-from revaid.events.bus import InProcessEventBus
 from revaid.ingestion.import_jobs import ImportJobManager
 from revaid.summarization.queue import SummaryQueue
+from revaid_contracts.events import InProcessEventBus
 from revaid_contracts.http_errors import AppError, ErrorCode
 
 

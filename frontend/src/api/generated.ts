@@ -4,80 +4,6 @@
  */
 
 export interface paths {
-    "/api/v1/config": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Config */
-        get: operations["get_config_api_v1_config_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Get Health */
-        get: operations["get_health_api_v1_health_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/llm-status": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Llm Status
-         * @description Return recent worker evidence only; this endpoint never probes an LLM.
-         */
-        get: operations["get_llm_status_api_v1_llm_status_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/llm-status/probe": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Probe Llm Status
-         * @description Run one user-requested live reachability probe without changing worker status.
-         */
-        post: operations["probe_llm_status_api_v1_llm_status_probe_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/binaries": {
         parameters: {
             query?: never;
@@ -104,13 +30,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Import Binary
-         * @description Stream a raw Ghidra JSON export to staging and enqueue its import.
-         *
-         *     The configured byte cap is enforced during the read: Content-Length is
-         *     merely an early rejection optimization because chunked requests lack it.
-         */
+        /** Import Binary */
         post: operations["import_binary_api_v1_binaries_import_post"];
         delete?: never;
         options?: never;
@@ -127,10 +47,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /**
-         * Decompile Binary
-         * @description Stream a raw binary and analyze it with the configured local decompiler.
-         */
+        /** Decompile Binary */
         post: operations["decompile_binary_api_v1_binaries_decompile_post"];
         delete?: never;
         options?: never;
@@ -224,22 +141,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/functions/{function_id}": {
+    "/api/v1/config": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** Get Function */
-        get: operations["get_function_api_v1_functions__function_id__get"];
+        /** Get Config */
+        get: operations["get_config_api_v1_config_get"];
         put?: never;
         post?: never;
         delete?: never;
         options?: never;
         head?: never;
-        /** Update Function */
-        patch: operations["update_function_api_v1_functions__function_id__patch"];
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Health */
+        get: operations["get_health_api_v1_health_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/llm-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Llm Status */
+        get: operations["get_llm_status_api_v1_llm_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/llm-status/probe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Probe Llm Status */
+        post: operations["probe_llm_status_api_v1_llm_status_probe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/functions/{function_id}/neighbours": {
@@ -254,6 +221,98 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Queue
+         * @description Queue snapshot for the chip (endpoint 20).
+         */
+        get: operations["get_queue_api_v1_queue_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/queue/cancel-pending": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Pending
+         * @description Drop all queued-unstarted items (endpoint 21).
+         */
+        post: operations["cancel_pending_api_v1_queue_cancel_pending_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/functions/{function_id}/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Demand Summary */
+        post: operations["demand_summary_api_v1_functions__function_id__summary_post"];
+        /** Release Summary */
+        delete: operations["release_summary_api_v1_functions__function_id__summary_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/functions/{function_id}/summary/regenerate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Regenerate Summary */
+        post: operations["regenerate_summary_api_v1_functions__function_id__summary_regenerate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/binaries/{binary_id}/summaries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Clear Binary Summaries */
+        delete: operations["clear_binary_summaries_api_v1_binaries__binary_id__summaries_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -364,114 +423,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/functions/{function_id}/summary": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Demand Summary
-         * @description Demand a summary (endpoint 17). Returns **202** immediately if new
-         *     work was scheduled (C5a — never blocks on the LLM), or **200** if a
-         *     ready result was already cached (C3).
-         */
-        post: operations["demand_summary_api_v1_functions__function_id__summary_post"];
-        /**
-         * Release Summary
-         * @description Release demand / cancel if unstarted (endpoint 18, C8). Advisory only
-         *     — an in-flight generation is never interrupted.
-         */
-        delete: operations["release_summary_api_v1_functions__function_id__summary_delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/binaries/{binary_id}/summaries": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * Clear Binary Summaries
-         * @description TESTING affordance: wipe every LLM summary (`summary_short`/
-         *     `summary_long` and friends) for all functions of the binary.
-         */
-        delete: operations["clear_binary_summaries_api_v1_binaries__binary_id__summaries_delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/functions/{function_id}/summary/regenerate": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Regenerate Summary
-         * @description Force regeneration, bypassing the cache (endpoint 19, C7).
-         */
-        post: operations["regenerate_summary_api_v1_functions__function_id__summary_regenerate_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/queue": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get Queue
-         * @description Queue snapshot for the chip (endpoint 20).
-         */
-        get: operations["get_queue_api_v1_queue_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/queue/cancel-pending": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Cancel Pending
-         * @description Drop all queued-unstarted items (endpoint 21).
-         */
-        post: operations["cancel_pending_api_v1_queue_cancel_pending_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/events": {
         parameters: {
             query?: never;
@@ -487,6 +438,24 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/api/v1/functions/{function_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Function */
+        get: operations["get_function_api_v1_functions__function_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Update Function */
+        patch: operations["update_function_api_v1_functions__function_id__patch"];
         trace?: never;
     };
 }
@@ -545,7 +514,7 @@ export interface components {
             /** Edgecount */
             edgeCount: number;
             /** Lastviewid */
-            lastViewId: number | null;
+            lastViewId?: number | null;
             /** Createdat */
             createdAt: string;
         };
@@ -565,6 +534,13 @@ export interface components {
         CancelPendingResponseDto: {
             /** Cancelledcount */
             cancelledCount: number;
+        };
+        /** CodeMatchLineDto */
+        CodeMatchLineDto: {
+            /** Linenumber */
+            lineNumber: number;
+            /** Text */
+            text: string;
         };
         /**
          * DecompilerHealthDto
@@ -602,62 +578,115 @@ export interface components {
             binaryId: number;
             /** Address */
             address: number;
-            /** Displayname */
-            displayName: string;
             /** Name */
             name: string;
             /** Nameanalyst */
-            nameAnalyst: string | null;
+            nameAnalyst?: string | null;
             /** Namellm */
-            nameLlm: string | null;
-            /** Isrenamed */
+            nameLlm?: string | null;
+            /** Displayname */
+            displayName: string;
+            /**
+             * Isrenamed
+             * @default false
+             */
             isRenamed: boolean;
-            /** Parameters */
-            parameters: components["schemas"]["FunctionParamDto"][];
-            /** Signature */
-            signature: string | null;
-            /** Assembly */
-            assembly: string | null;
-            /** Codec */
-            codeC: string | null;
             /** Kind */
             kind: string;
             /** Placeholdermodule */
-            placeholderModule: string | null;
-            /** Fanin */
-            fanIn: number;
-            /** Fanout */
-            fanOut: number;
-            /** Isutility */
-            isUtility: boolean;
-            /** Utilitysource */
-            utilitySource: string;
-            /** Utilityoverride */
-            utilityOverride: string | null;
-            /** Isentrypoint */
-            isEntryPoint: boolean;
-            summary: components["schemas"]["FunctionSummaryStateDto"];
-            /** Notes */
-            notes: string;
-            /** Hasnotes */
-            hasNotes: boolean;
-            /** Notesupdatedat */
-            notesUpdatedAt: string | null;
-            /** Calleecount */
-            calleeCount: number;
-            /** Callercount */
-            callerCount: number;
-            /** Hasindirectcalls */
+            placeholderModule?: string | null;
+            /** Assembly */
+            assembly?: string | null;
+            /** Codec */
+            codeC?: string | null;
+            /** Parameters */
+            parameters?: {
+                [key: string]: unknown;
+            }[];
+            /** Signature */
+            signature?: string | null;
+            /**
+             * Hasindirectcalls
+             * @default false
+             */
             hasIndirectCalls: boolean;
-        };
-        /** FunctionParamDto */
-        FunctionParamDto: {
-            /** Ordinal */
-            ordinal: number;
-            /** Name */
-            name: string;
-            /** Type */
-            type: string;
+            /**
+             * Summarystatus
+             * @default none
+             */
+            summaryStatus: string;
+            /** Summaryshort */
+            summaryShort?: string | null;
+            summary: components["schemas"]["FunctionSummaryDto"];
+            /** Summarylong */
+            summaryLong?: string | null;
+            /** Summarymodel */
+            summaryModel?: string | null;
+            /** Summaryadapter */
+            summaryAdapter?: string | null;
+            /** Summaryerrorcode */
+            summaryErrorCode?: string | null;
+            /**
+             * Summarylowconfidence
+             * @default false
+             */
+            summaryLowConfidence: boolean;
+            /** Summarygeneratedat */
+            summaryGeneratedAt?: string | null;
+            /**
+             * Fanin
+             * @default 0
+             */
+            fanIn: number;
+            /**
+             * Fanout
+             * @default 0
+             */
+            fanOut: number;
+            /**
+             * Isentrypoint
+             * @default false
+             */
+            isEntryPoint: boolean;
+            /**
+             * Isutility
+             * @default false
+             */
+            isUtility: boolean;
+            /**
+             * Isfeatured
+             * @default false
+             */
+            isFeatured: boolean;
+            /** Utilityoverride */
+            utilityOverride?: string | null;
+            /**
+             * Utilitysource
+             * @default computed
+             */
+            utilitySource: string;
+            /**
+             * Notes
+             * @default
+             */
+            notes: string;
+            /** Notesupdatedat */
+            notesUpdatedAt?: string | null;
+            /**
+             * Hasnotes
+             * @default false
+             */
+            hasNotes: boolean;
+            /**
+             * Calleecount
+             * @default 0
+             */
+            calleeCount: number;
+            /**
+             * Callercount
+             * @default 0
+             */
+            callerCount: number;
         };
         /** FunctionSearchPageDto */
         FunctionSearchPageDto: {
@@ -674,8 +703,7 @@ export interface components {
         };
         /**
          * FunctionSearchRowDto
-         * @description A narrow row for the search results list — no code, no long summary,
-         *     matching the `NeighbourRowDto` philosophy of TAD §3.4.
+         * @description A narrow row for the search results list — no code, no long summary.
          */
         FunctionSearchRowDto: {
             /** Id */
@@ -696,40 +724,50 @@ export interface components {
             hasNotes: boolean;
             /** Isentrypoint */
             isEntryPoint: boolean;
+            /** Codematches */
+            codeMatches: components["schemas"]["CodeMatchLineDto"][];
+            /** Codematchestruncated */
+            codeMatchesTruncated: boolean;
         };
-        /** FunctionSummaryStateDto */
-        FunctionSummaryStateDto: {
+        /** FunctionSummaryDto */
+        FunctionSummaryDto: {
             /** Status */
             status: string;
             /** Short */
-            short: string | null;
+            short?: string | null;
             /** Long */
-            long: string | null;
+            long?: string | null;
             /** Model */
-            model: string | null;
+            model?: string | null;
             /** Adapter */
-            adapter: string | null;
+            adapter?: string | null;
             /** Errorcode */
-            errorCode: string | null;
-            /** Lowconfidence */
+            errorCode?: string | null;
+            /**
+             * Lowconfidence
+             * @default false
+             */
             lowConfidence: boolean;
             /** Generatedat */
-            generatedAt: string | null;
-            /** Isstale */
+            generatedAt?: string | null;
+            /**
+             * Isstale
+             * @default false
+             */
             isStale: boolean;
         };
-        /**
-         * FunctionUpdateDto
-         * @description ``PATCH /functions/{id}`` request body (D36/E2c).
-         *
-         *     Every field is optional-and-absent-means-"leave unchanged" (Pydantic v2
-         *     ``model_fields_set`` is used by the service layer to distinguish "not
-         *     provided" from "explicitly set to null"). M0 scope is `utility_override`
-         *     only — `name_analyst`/`notes` are I10.
-         */
+        /** FunctionUpdateDto */
         FunctionUpdateDto: {
+            /** Nameanalyst */
+            nameAnalyst?: string | null;
+            /** Notes */
+            notes?: string | null;
+            /** Isentrypoint */
+            isEntryPoint?: boolean | null;
+            /** Isfeatured */
+            isFeatured?: boolean | null;
             /** Utilityoverride */
-            utilityOverride?: ("always" | "never") | null;
+            utilityOverride?: string | null;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -774,13 +812,7 @@ export interface components {
          * @enum {string}
          */
         ImportJobPhase: "uploading" | "queued" | "decompiling" | "importing" | "completed" | "failed" | "cancelled";
-        /**
-         * ImportJobStatusDto
-         * @description Process-local import-job state.
-         *
-         *     Jobs intentionally do not survive an API process restart in this first
-         *     scalable-import iteration. `failure_samples` is bounded by configuration.
-         */
+        /** ImportJobStatusDto */
         ImportJobStatusDto: {
             /** Jobid */
             jobId: string;
@@ -789,7 +821,10 @@ export interface components {
             bytesReceived: number;
             /** Sourcekind */
             sourceKind: string;
-            result?: components["schemas"]["ImportResultDto"] | null;
+            /** Result */
+            result?: {
+                [key: string]: unknown;
+            } | null;
             /** Errormessage */
             errorMessage?: string | null;
             /** Errorcode */
@@ -800,31 +835,6 @@ export interface components {
             } | null;
             /** Failuresamples */
             failureSamples?: string[];
-        };
-        /**
-         * ImportResultDto
-         * @description Outcome of an import, returned synchronously (I12).
-         *
-         *     No SSE ``binary`` event is emitted (that transport is unbuilt in M0); the
-         *     client refetches ``GET /binaries`` on success instead.
-         */
-        ImportResultDto: {
-            /** Binaryid */
-            binaryId: number;
-            /** Name */
-            name: string;
-            /** Version */
-            version: string;
-            /** Functionsinserted */
-            functionsInserted: number;
-            /** Functionsupdated */
-            functionsUpdated: number;
-            /** Edgesinserted */
-            edgesInserted: number;
-            /** Placeholderscreated */
-            placeholdersCreated: number;
-            /** Failures */
-            failures?: string[];
         };
         /** InFlightItemDto */
         InFlightItemDto: {
@@ -1018,22 +1028,7 @@ export interface components {
             /** Viewid */
             viewId: number;
         };
-        /**
-         * SummaryDemandRequestDto
-         * @description ``POST /functions/{id}/summary`` request body.
-         *
-         *     ``reason`` is logging-only (card|table_row|detail|prefetch); it never
-         *     affects queueing behaviour, only what shows up in structured logs.
-         *
-         *     ``priority`` is bounded to `SummaryQueue`'s own
-         *     [`MIN_PRIORITY`, `MAX_PRIORITY`] range at the DTO layer, so an
-         *     out-of-range value fails FastAPI's 422 validation *before* any DB write
-         *     happens — previously an out-of-range priority reached
-         *     `services.summary_service.demand_summary`, whose own `queue.enqueue`
-         *     raised `ValueError` (an unhandled 500) after the row had already been
-         *     flipped to `summary_status='pending'`, stranding it there until the
-         *     next boot's `recover_pending_summaries` sweep.
-         */
+        /** SummaryDemandRequestDto */
         SummaryDemandRequestDto: {
             /** Priority */
             priority: number;
@@ -1217,86 +1212,6 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    get_config_api_v1_config_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AppConfigDto"];
-                };
-            };
-        };
-    };
-    get_health_api_v1_health_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HealthDto"];
-                };
-            };
-        };
-    };
-    get_llm_status_api_v1_llm_status_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LlmStatusDto"];
-                };
-            };
-        };
-    };
-    probe_llm_status_api_v1_llm_status_probe_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["LlmProbeDto"];
-                };
-            };
-        };
-    };
     list_binaries_api_v1_binaries_get: {
         parameters: {
             query?: never;
@@ -1496,8 +1411,8 @@ export interface operations {
     search_binary_functions_api_v1_binaries__binary_id__functions_get: {
         parameters: {
             query?: {
-                /** @description Substring filter (B11/E1a). */
                 q?: string | null;
+                include_code?: boolean;
                 limit?: number;
                 offset?: number;
             };
@@ -1532,7 +1447,7 @@ export interface operations {
     resolve_function_by_address_api_v1_binaries__binary_id__functions_by_address_get: {
         parameters: {
             query: {
-                /** @description Hex (`0x...`) or decimal address (D2). */
+                /** @description Hex (`0x...`) or decimal address. */
                 address: string;
             };
             header?: never;
@@ -1563,13 +1478,11 @@ export interface operations {
             };
         };
     };
-    get_function_api_v1_functions__function_id__get: {
+    get_config_api_v1_config_get: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                function_id: number;
-            };
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -1580,34 +1493,19 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FunctionDto"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["AppConfigDto"];
                 };
             };
         };
     };
-    update_function_api_v1_functions__function_id__patch: {
+    get_health_api_v1_health_get: {
         parameters: {
             query?: never;
             header?: never;
-            path: {
-                function_id: number;
-            };
+            path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["FunctionUpdateDto"];
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -1615,25 +1513,56 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["FunctionDto"];
+                    "application/json": components["schemas"]["HealthDto"];
                 };
             };
-            /** @description Validation Error */
-            422: {
+        };
+    };
+    get_llm_status_api_v1_llm_status_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
+                    "application/json": components["schemas"]["LlmStatusDto"];
+                };
+            };
+        };
+    };
+    probe_llm_status_api_v1_llm_status_probe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LlmProbeDto"];
                 };
             };
         };
     };
     get_neighbours_api_v1_functions__function_id__neighbours_get: {
         parameters: {
-            query: {
-                /** @description Required — on_canvas is a view fact (E2). */
-                viewId: number;
+            query?: {
+                /** @description Optional viewer canvas overlay. */
+                viewId?: number | null;
                 direction?: "callees" | "callers";
                 group?: "primary" | "utility";
                 limit?: number;
@@ -1659,6 +1588,172 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["NeighbourPageDto"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_queue_api_v1_queue_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueSnapshotDto"];
+                };
+            };
+        };
+    };
+    cancel_pending_api_v1_queue_cancel_pending_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CancelPendingResponseDto"];
+                };
+            };
+        };
+    };
+    demand_summary_api_v1_functions__function_id__summary_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                function_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SummaryDemandRequestDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SummaryDemandResponseDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    release_summary_api_v1_functions__function_id__summary_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                function_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    regenerate_summary_api_v1_functions__function_id__summary_regenerate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                function_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    clear_binary_summaries_api_v1_binaries__binary_id__summaries_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                binary_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -1966,170 +2061,6 @@ export interface operations {
             };
         };
     };
-    demand_summary_api_v1_functions__function_id__summary_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                function_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["SummaryDemandRequestDto"];
-            };
-        };
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SummaryDemandResponseDto"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    release_summary_api_v1_functions__function_id__summary_delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                function_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    clear_binary_summaries_api_v1_binaries__binary_id__summaries_delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                binary_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    regenerate_summary_api_v1_functions__function_id__summary_regenerate_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                function_id: number;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            202: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SummaryDemandResponseDto"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    get_queue_api_v1_queue_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["QueueSnapshotDto"];
-                };
-            };
-        };
-    };
-    cancel_pending_api_v1_queue_cancel_pending_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CancelPendingResponseDto"];
-                };
-            };
-        };
-    };
     get_events_api_v1_events_get: {
         parameters: {
             query?: never;
@@ -2146,6 +2077,72 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+        };
+    };
+    get_function_api_v1_functions__function_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                function_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FunctionDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_function_api_v1_functions__function_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                function_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FunctionUpdateDto"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FunctionDto"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

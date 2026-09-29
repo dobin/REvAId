@@ -7,8 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from revaid.core.clock import utc_now_iso
 from revaid.db.models import Binary, Edge, Function
+from revaid_contracts.clock import utc_now_iso
 from revaid_ui.db.models import View, ViewNode
 
 

@@ -6,12 +6,12 @@ import pytest
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from revaid.core.clock import utc_now_iso
 from revaid.core.config import Settings
 from revaid.db.models import Binary, Function
 from revaid.db.startup import recompute_utility_if_threshold_changed, recover_pending_summaries
 from revaid.summarization.queue import MAX_PRIORITY, SummaryQueue
 from revaid_contracts.analysis import AnalysisBinary
+from revaid_contracts.clock import utc_now_iso
 from revaid_ui.db.models import BinaryUiState, View, ViewNode
 from revaid_ui.db.startup import reconcile_viewer_state
 

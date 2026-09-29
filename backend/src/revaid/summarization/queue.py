@@ -33,8 +33,8 @@ import time
 import uuid
 from dataclasses import dataclass, field
 
-from revaid.core.clock import utc_now_iso
 from revaid_contracts.analysis import MAX_SUMMARY_PRIORITY, MIN_SUMMARY_PRIORITY
+from revaid_contracts.clock import utc_now_iso
 
 #: TAD §2.6 priority ladder — lower wins. 0 is the selected card's own
 #: summary; 3 is off-screen/lookahead. Keep in sync with

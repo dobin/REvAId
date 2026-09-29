@@ -6,14 +6,14 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from revaid.db.models import Function
-from revaid.events.bus import EventBus
-from revaid.schemas.summary import (
+from revaid.summarization.queue import SummaryQueue
+from revaid_contracts.events import EventBus
+from revaid_contracts.schemas.summary import (
     CancelPendingResponseDto,
     InFlightItemDto,
     QueuedItemDto,
     QueueSnapshotDto,
 )
-from revaid.summarization.queue import SummaryQueue
 
 
 def queue_event_payload(queue: SummaryQueue) -> dict[str, object]:

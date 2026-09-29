@@ -5,18 +5,12 @@ from __future__ import annotations
 from pydantic import Field
 
 from revaid_contracts.common import ApiModel
-
-
-class ImportJobAcceptedDto(ApiModel):
-    job_id: str
-    phase: str
-    bytes_received: int
-    source_kind: str
+from revaid_contracts.schemas.ingest import ImportJobPhase
 
 
 class ImportJobStatusDto(ApiModel):
     job_id: str
-    phase: str
+    phase: ImportJobPhase
     bytes_received: int
     source_kind: str
     result: dict[str, object] | None = None

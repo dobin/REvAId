@@ -18,14 +18,11 @@ from uuid import uuid4
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from revaid.core.config import Settings
-from revaid.schemas.ingest import (
-    ImportJobAcceptedDto,
-    ImportJobPhase,
-    ImportJobStatusDto,
-)
+from revaid.schemas.ingest import ImportJobStatusDto
 from revaid.services.binary_service import import_ghidra_export, load_ghidra_export_file
 from revaid_contracts.http_errors import AppError, ErrorCode
 from revaid_contracts.logging import get_logger, log_event
+from revaid_contracts.schemas.ingest import ImportJobAcceptedDto, ImportJobPhase
 
 logger = get_logger(__name__)
 

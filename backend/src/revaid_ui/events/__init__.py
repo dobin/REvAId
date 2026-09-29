@@ -1,1 +1,0 @@
-"""Viewer event stream support."""

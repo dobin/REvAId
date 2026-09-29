@@ -1,20 +1,9 @@
-"""``GET /binaries`` DTOs (E1) — TAD §3.4 ``BinarySummaryDto``."""
+"""``BinaryWithCounts`` → ``BinarySummaryDto`` mapping (E1)."""
 
 from __future__ import annotations
 
 from revaid.repositories.binaries import BinaryWithCounts
-from revaid_contracts.common import ApiModel
-
-
-class BinarySummaryDto(ApiModel):
-    id: int
-    name: str
-    version: str
-    analysis_image_base: int | None
-    function_count: int
-    edge_count: int
-    last_view_id: int | None
-    created_at: str
+from revaid_contracts.schemas.binary import BinarySummaryDto
 
 
 def binary_summary_from_row(

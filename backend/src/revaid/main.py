@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from revaid.api.app_base import create_base_app
 from revaid.api.routers import (
     binaries,
     config,
@@ -17,8 +16,9 @@ from revaid.api.routers import (
     summaries,
 )
 from revaid.core.config import Settings, get_settings
-from revaid.events.bus import InProcessEventBus
 from revaid.lifespan import lifespan
+from revaid_contracts.app_base import create_base_app
+from revaid_contracts.events import InProcessEventBus
 
 __all__ = ["app", "create_app"]
 

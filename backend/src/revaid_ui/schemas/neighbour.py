@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from revaid_ui.schemas.common import ApiModel
+from revaid_contracts.common import ApiModel
 
 
 class NeighbourRowDto(ApiModel):

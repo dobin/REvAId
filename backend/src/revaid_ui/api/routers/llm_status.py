@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
+from revaid_contracts.schemas.llm_status import LlmProbeDto, LlmStatusDto
 from revaid_ui.api.deps import AnalysisClientDep
-from revaid_ui.schemas.llm_status import LlmProbeDto, LlmStatusDto
 
 router = APIRouter(tags=["llm-status"])
 

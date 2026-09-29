@@ -13,7 +13,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from revaid.core.config import Settings
-from revaid.core.errors import AppError, ErrorCode
 from revaid.db.models import Binary, Edge, Function
 from revaid.schemas.ingest import (
     GhidraExportBinary,
@@ -23,6 +22,7 @@ from revaid.schemas.ingest import (
     GhidraExportParam,
 )
 from revaid.services import binary_service
+from revaid_contracts.http_errors import AppError, ErrorCode
 
 
 def _document() -> GhidraExportDocument:

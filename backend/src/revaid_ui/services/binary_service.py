@@ -7,8 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from revaid_contracts.analysis import AnalysisClient
 from revaid_contracts.errors import ErrorCode
 from revaid_contracts.http_errors import AppError
+from revaid_contracts.schemas.binary import BinarySummaryDto
 from revaid_ui.repositories import views as views_repository
-from revaid_ui.schemas.binary import BinarySummaryDto, binary_summary_from_analysis
+from revaid_ui.schemas.binary import binary_summary_from_analysis
 
 
 async def list_binaries_from_analysis(

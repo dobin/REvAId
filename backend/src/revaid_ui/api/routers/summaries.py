@@ -8,8 +8,9 @@ from fastapi import APIRouter, Response, status
 
 from revaid_contracts.errors import ErrorCode
 from revaid_contracts.http_errors import AppError
+from revaid_contracts.schemas.summary import SummaryDemandResponseDto
 from revaid_ui.api.deps import AnalysisClientDep
-from revaid_ui.schemas.summary import SummaryDemandRequestDto, SummaryDemandResponseDto
+from revaid_ui.schemas.summary import SummaryDemandRequestDto
 
 router = APIRouter(tags=["summaries"])
 

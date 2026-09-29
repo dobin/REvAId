@@ -10,10 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from revaid_contracts.analysis import AnalysisClient
 from revaid_contracts.errors import ErrorCode
+from revaid_contracts.events import InProcessEventBus
 from revaid_contracts.http_errors import AppError
 from revaid_ui.core.config import Settings
 from revaid_ui.db.uow import viewer_write_lock
-from revaid_ui.events.bus import InProcessEventBus
 
 
 def get_settings_dep(request: Request) -> Settings:

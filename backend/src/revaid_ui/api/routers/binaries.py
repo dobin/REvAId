@@ -9,49 +9,21 @@ from fastapi import APIRouter, Query, Request, status
 
 from revaid_contracts.errors import ErrorCode
 from revaid_contracts.http_errors import AppError
+from revaid_contracts.schemas.binary import BinarySummaryDto
+from revaid_contracts.schemas.ingest import ImportJobAcceptedDto
+from revaid_contracts.schemas.search import EntryPointDto, EntryPointsDto, FunctionSearchPageDto
 from revaid_ui.api.deps import (
     AnalysisClientDep,
     SettingsDep,
     ViewerSessionDep,
     ViewerWriteSessionDep,
 )
-from revaid_ui.schemas.binary import BinarySummaryDto
-from revaid_ui.schemas.function import FunctionDto
-from revaid_ui.schemas.ingest import ImportJobAcceptedDto, ImportJobStatusDto
-from revaid_ui.schemas.search import EntryPointDto, EntryPointsDto, FunctionSearchPageDto
+from revaid_ui.schemas.function import FunctionDto, function_dto_from_analysis
+from revaid_ui.schemas.ingest import ImportJobStatusDto
 from revaid_ui.services import binary_service
 
 router = APIRouter(tags=["binaries"])
 _SAFE_BINARY_FILENAME_RE = re.compile(r"^[A-Za-z0-9_.()-]+$")
-
-
-def function_dto_from_analysis(payload: dict[str, object]) -> dict[str, object]:
-    summary_status = payload.get("summary_status", "none")
-    return {
-        **payload,
-        "display_name": (
-            payload.get("name_analyst") or payload.get("name_llm") or payload.get("name")
-        ),
-        "is_renamed": payload.get("name_analyst") is not None,
-        "utility_source": (
-            "analyst" if payload.get("utility_override") is not None else "computed"
-        ),
-        "summary": {
-            "status": summary_status,
-            "short": payload.get("summary_short"),
-            "long": payload.get("summary_long"),
-            "model": payload.get("summary_model"),
-            "adapter": payload.get("summary_adapter"),
-            "error_code": payload.get("summary_error_code"),
-            "low_confidence": payload.get("summary_low_confidence", False),
-            "generated_at": payload.get("summary_generated_at"),
-            "is_stale": summary_status == "stale",
-        },
-        "has_notes": bool(payload.get("notes")),
-        "notes_updated_at": payload.get("notes_updated_at"),
-        "callee_count": payload.get("fan_out", 0),
-        "caller_count": payload.get("fan_in", 0),
-    }
 
 
 def _parse_address(raw: str) -> int:
@@ -199,4 +171,4 @@ async def resolve_function_by_address(
     address: str = Query(..., description="Hex (`0x...`) or decimal address."),
 ) -> FunctionDto:
     payload = await analysis.resolve_function_by_address(binary_id, _parse_address(address))
-    return FunctionDto.model_validate(function_dto_from_analysis(payload))
+    return function_dto_from_analysis(payload)

@@ -7,9 +7,9 @@ from contextlib import suppress
 from fastapi import APIRouter
 from sqlalchemy import text
 
+from revaid_contracts.schemas.config import DecompilerHealthDto, HealthDto, LlmHealthDto
 from revaid_ui.api.deps import AnalysisClientDep, ViewerSessionDep
 from revaid_ui.db.revision import VIEWER_MIGRATION_REVISION
-from revaid_ui.schemas.config import DecompilerHealthDto, HealthDto, LlmHealthDto
 
 router = APIRouter(tags=["health"])
 

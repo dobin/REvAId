@@ -1,8 +1,16 @@
-"""Viewer-facing analysis search and entry-point responses."""
+"""Function search (B11/E1a) and entry-point (E1b) DTOs."""
 
 from __future__ import annotations
 
 from revaid_contracts.common import ApiModel
+
+__all__ = [
+    "CodeMatchLineDto",
+    "EntryPointDto",
+    "EntryPointsDto",
+    "FunctionSearchPageDto",
+    "FunctionSearchRowDto",
+]
 
 
 class CodeMatchLineDto(ApiModel):
@@ -11,6 +19,8 @@ class CodeMatchLineDto(ApiModel):
 
 
 class FunctionSearchRowDto(ApiModel):
+    """A narrow row for the search results list — no code, no long summary."""
+
     id: int
     address: int
     display_name: str

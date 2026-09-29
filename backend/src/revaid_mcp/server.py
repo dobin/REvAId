@@ -87,7 +87,8 @@ async def get_function(
     Ambiguous names must be retried with id or address.
     Set include_assembly to true to include disassembly (asm) in the result.
     Set include_decompile to false to omit decompiled C from the result.
-    Prefer the decompiled C for most use cases; it is more compact and easier to parse than the assembly.
+    Prefer the decompiled C for most use cases; it is more compact and easier to
+    parse than the assembly.
     """
     try:
         async with _sessions()() as session:

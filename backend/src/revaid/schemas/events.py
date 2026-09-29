@@ -1,7 +1,7 @@
 """SSE event payload DTOs (TAD §4.2 #22, E5/E5a/E5b).
 
 These are rendered as the ``data:`` line of an SSE frame
-(:func:`revaid.events.sse.format_sse`), so — unlike every other DTO in
+(:func:`revaid_contracts.events.format_sse`), so — unlike every other DTO in
 ``schemas/`` — they are turned into plain ``dict``s via ``model_dump(mode=
 "json", by_alias=True)`` rather than returned from a FastAPI route directly.
 They still inherit :class:`~revaid_contracts.common.ApiModel` so the wire

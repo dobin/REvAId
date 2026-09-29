@@ -8,15 +8,13 @@ from pathlib import Path
 from fastapi import APIRouter, Query, Request, status
 
 from revaid.api.deps import ImportJobManagerDep, SessionDep, SettingsDep, WriteSessionDep
-from revaid.schemas.binary import BinarySummaryDto
 from revaid.schemas.function import FunctionDto
-from revaid.schemas.ingest import ImportJobAcceptedDto, ImportJobStatusDto
-from revaid.schemas.search import (
-    EntryPointsDto,
-    FunctionSearchPageDto,
-)
+from revaid.schemas.ingest import ImportJobStatusDto
 from revaid.services import binary_service, function_service, search_service
 from revaid_contracts.http_errors import AppError, ErrorCode
+from revaid_contracts.schemas.binary import BinarySummaryDto
+from revaid_contracts.schemas.ingest import ImportJobAcceptedDto
+from revaid_contracts.schemas.search import EntryPointsDto, FunctionSearchPageDto
 
 router = APIRouter(tags=["binaries"])
 

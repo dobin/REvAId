@@ -5,10 +5,10 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from revaid.core.clock import utc_now_iso
-from revaid.core.errors import AppError
 from revaid.db.models import Binary, Edge, Function
 from revaid.summarization.context import build_summary_request
+from revaid_contracts.clock import utc_now_iso
+from revaid_contracts.http_errors import AppError
 
 
 async def _make_binary(session: AsyncSession, name: str = "acme.exe") -> Binary:

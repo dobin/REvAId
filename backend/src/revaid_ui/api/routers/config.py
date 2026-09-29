@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from revaid.schemas.config import AppConfigDto
+from revaid_contracts.schemas.config import AppConfigDto
 from revaid_ui.api.deps import AnalysisClientDep
 
 router = APIRouter(tags=["config"])

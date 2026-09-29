@@ -5,12 +5,12 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from revaid.core.clock import utc_now_iso
 from revaid.core.config import get_settings
-from revaid.core.errors import AppError, ErrorCode
 from revaid.db.models import Edge, Function
 from revaid.repositories.binaries import get_or_create_binary
 from revaid.services.mcp_service import get_mcp_function, set_mcp_function_info
+from revaid_contracts.clock import utc_now_iso
+from revaid_contracts.http_errors import AppError, ErrorCode
 
 
 async def _function(session: AsyncSession, *, binary_id: int, address: int, name: str) -> Function:

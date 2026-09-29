@@ -12,9 +12,9 @@ from typing import Literal
 
 from pydantic import Field
 
+from revaid_contracts.common import ApiModel
 from revaid_ui.db.enums import OriginKind
 from revaid_ui.db.models import View, ViewNode
-from revaid_ui.schemas.common import ApiModel
 
 
 class ViewSummaryDto(ApiModel):

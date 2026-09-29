@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from revaid.adapters.llm.base import LlmAdapter
 from revaid.core.config import Settings
 from revaid.repositories.llm_status import get_worker_status
-from revaid.schemas.llm_status import LlmProbeDto, LlmStatusDto
+from revaid_contracts.schemas.llm_status import LlmProbeDto, LlmStatusDto
 
 
 async def get_passive_status(session: AsyncSession, settings: Settings) -> LlmStatusDto:

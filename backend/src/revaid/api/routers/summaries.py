@@ -5,8 +5,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Response, status
 
 from revaid.api.deps import EventBusDep, SummaryQueueDep, WriteSessionDep
-from revaid.schemas.summary import SummaryDemandRequestDto, SummaryDemandResponseDto
+from revaid.schemas.summary import SummaryDemandRequestDto
 from revaid.services import summary_service
+from revaid_contracts.schemas.summary import SummaryDemandResponseDto
 
 router = APIRouter(tags=["summaries"])
 

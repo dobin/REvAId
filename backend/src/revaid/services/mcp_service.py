@@ -216,9 +216,7 @@ async def _resolve_function(
         if fn is not None and fn.binary_id != binary.id:
             fn = None
     elif parsed_address is not None:
-        fn = await get_function_by_address(
-            session, binary_id=binary.id, address=parsed_address
-        )
+        fn = await get_function_by_address(session, binary_id=binary.id, address=parsed_address)
     else:
         matches = await resolve_functions_by_name(session, binary_id=binary.id, name=name or "")
         if len(matches) > 1:

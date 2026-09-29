@@ -1,59 +1,13 @@
-"""``GET /binaries/{id}/functions`` (search, B11/E1a) and
-``GET /binaries/{id}/entry-points`` (E1b) DTOs.
-
-Not given explicit payload shapes in TAD §3.4/§4.3 — these mirror the
-`NeighbourPageDto` `rows/total/limit/offset` pattern (§3.4) for consistency
-with the rest of the API.
-"""
+"""``Function`` row → search/entry-point DTO mappings; DTOs live in ``revaid_contracts``."""
 
 from __future__ import annotations
 
-from pydantic import Field
-
 from revaid.db.models import Function
-from revaid_contracts.common import ApiModel
-
-
-class CodeMatchLineDto(ApiModel):
-    line_number: int
-    text: str
-
-
-class FunctionSearchRowDto(ApiModel):
-    """A narrow row for the search results list — no code, no long summary,
-    matching the `NeighbourRowDto` philosophy of TAD §3.4."""
-
-    id: int
-    address: int
-    display_name: str
-    is_renamed: bool
-    kind: str
-    is_utility: bool
-    fan_in: int
-    has_notes: bool
-    is_entry_point: bool
-    code_matches: list[CodeMatchLineDto] = Field(default_factory=list)
-    code_matches_truncated: bool = False
-
-
-class FunctionSearchPageDto(ApiModel):
-    rows: list[FunctionSearchRowDto]
-    total: int
-    limit: int
-    offset: int
-    query: str | None
-
-
-class EntryPointDto(ApiModel):
-    id: int
-    address: int
-    display_name: str
-    fan_out: int
-    fan_in: int
-
-
-class EntryPointsDto(ApiModel):
-    entry_points: list[EntryPointDto]
+from revaid_contracts.schemas.search import (
+    CodeMatchLineDto,
+    EntryPointDto,
+    FunctionSearchRowDto,
+)
 
 
 def function_search_row_from_function(

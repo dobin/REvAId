@@ -11,8 +11,8 @@ from dataclasses import dataclass
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from revaid.core.clock import utc_now_iso
 from revaid.db.models import Binary, Edge, Function
+from revaid_contracts.clock import utc_now_iso
 
 
 async def get_or_create_binary(

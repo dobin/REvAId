@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
-from revaid_ui.api.app_base import create_base_app
+from revaid_contracts.app_base import create_base_app
 from revaid_ui.api.routers import (
     binaries,
     config,

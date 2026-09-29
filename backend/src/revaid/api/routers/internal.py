@@ -32,18 +32,11 @@ from revaid.schemas.config import app_config_from_settings
 from revaid.schemas.function import FunctionUpdateDto, function_dto_from_row
 from revaid.schemas.ingest import (
     GhidraExportDocument,
-    ImportJobAcceptedDto,
     ImportJobStatusDto,
     ImportResultDto,
 )
-from revaid.schemas.llm_status import LlmProbeDto, LlmStatusDto
 from revaid.schemas.search import function_search_row_from_function
-from revaid.schemas.summary import (
-    CancelPendingResponseDto,
-    QueueSnapshotDto,
-    SummaryDemandRequestDto,
-    SummaryDemandResponseDto,
-)
+from revaid.schemas.summary import SummaryDemandRequestDto
 from revaid.services import function_service, llm_status_service, queue_service, summary_service
 from revaid.services.binary_service import import_ghidra_export
 from revaid.services.decompiler_health import check_decompiler_health
@@ -65,6 +58,13 @@ from revaid_contracts.analysis import (
     NeighbourQuery,
 )
 from revaid_contracts.http_errors import AppError, ErrorCode
+from revaid_contracts.schemas.ingest import ImportJobAcceptedDto
+from revaid_contracts.schemas.llm_status import LlmProbeDto, LlmStatusDto
+from revaid_contracts.schemas.summary import (
+    CancelPendingResponseDto,
+    QueueSnapshotDto,
+    SummaryDemandResponseDto,
+)
 
 router = APIRouter(
     prefix="/internal/v1",

@@ -21,14 +21,16 @@ from revaid.repositories.binaries import (
     list_binaries,
 )
 from revaid.repositories.functions import list_entry_points
-from revaid.schemas.binary import BinarySummaryDto, binary_summary_from_row
+from revaid.schemas.binary import binary_summary_from_row
 from revaid.schemas.ingest import (
     SUPPORTED_EXPORT_SCHEMA_VERSIONS,
     GhidraExportDocument,
     ImportResultDto,
 )
-from revaid.schemas.search import EntryPointDto, EntryPointsDto, entry_point_dto_from_function
+from revaid.schemas.search import entry_point_dto_from_function
 from revaid_contracts.http_errors import AppError, ErrorCode
+from revaid_contracts.schemas.binary import BinarySummaryDto
+from revaid_contracts.schemas.search import EntryPointDto, EntryPointsDto
 
 #: E1b: "≤ 5 empty-canvas suggestions" — enforced server-side regardless of
 #: whatever a caller might request, since there is no query parameter for it

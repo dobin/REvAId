@@ -45,13 +45,13 @@ from revaid.adapters.llm.base import (
     SummaryResult,
     TransientProviderError,
 )
-from revaid.core.clock import utc_now_iso
 from revaid.core.hashing import summary_input_hash
 from revaid.db.enums import LlmWorkerOutcome
 from revaid.db.uow import unit_of_work
 from revaid.repositories.llm_status import record_worker_outcome
 from revaid.summarization.context import build_summary_request
 from revaid.summarization.queue import QueueItem, SummaryQueue
+from revaid_contracts.clock import utc_now_iso
 from revaid_contracts.logging import get_logger, log_event
 
 logger = get_logger(__name__)

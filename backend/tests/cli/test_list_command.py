@@ -10,9 +10,9 @@ from pathlib import Path
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from revaid.core.clock import utc_now_iso
 from revaid.db.models import Edge, Function
 from revaid.repositories.binaries import get_or_create_binary
+from revaid_contracts.clock import utc_now_iso
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 

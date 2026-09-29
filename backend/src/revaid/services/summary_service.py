@@ -13,13 +13,13 @@ from __future__ import annotations
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from revaid.events.bus import EventBus
 from revaid.repositories.binaries import get_binary_by_id
 from revaid.repositories.functions import get_function_by_id
-from revaid.schemas.summary import SummaryDemandResponseDto
 from revaid.services.queue_service import queue_event_payload
 from revaid.summarization.queue import MIN_PRIORITY, QueueFullError, SummaryQueue
+from revaid_contracts.events import EventBus
 from revaid_contracts.http_errors import AppError, ErrorCode
+from revaid_contracts.schemas.summary import SummaryDemandResponseDto
 
 #: Statuses from which a demand request actually schedules work. `ready` is
 #: served straight from cache (C3); `pending` is already queued (dedup, no

@@ -6,12 +6,12 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from revaid.core.clock import utc_now_iso
 from revaid.db.models import Binary, Function
 from revaid.repositories.functions import (
     upsert_function,
     upsert_functions_batch,
 )
+from revaid_contracts.clock import utc_now_iso
 
 
 async def _make_binary(session: AsyncSession, name: str = "acme.exe") -> Binary:

@@ -16,11 +16,11 @@ from revaid.db.startup import (
     recompute_utility_if_threshold_changed,
     recover_pending_summaries,
 )
-from revaid.events.bus import InProcessEventBus
 from revaid.ingestion.import_jobs import ImportJobManager
 from revaid.services.queue_service import queue_event_payload_with_items
 from revaid.summarization.queue import SummaryQueue
 from revaid.summarization.worker import SummaryWorkerPool
+from revaid_contracts.events import InProcessEventBus
 from revaid_contracts.logging import configure_logging, get_logger, restore_uvicorn_formatters
 
 logger = get_logger(__name__)
