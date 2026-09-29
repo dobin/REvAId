@@ -81,9 +81,34 @@ function neighbourPage(
   };
 }
 
+const functionData = {
+  functionId: 1,
+  references: [{
+    instructionAddress: 0x401010,
+    instructionText: "LEA RCX,[0x402000]",
+    item: {
+      id: 7,
+      address: 0x402000,
+      section: ".rdata",
+      kind: "string",
+      size: 6,
+      valueText: "hello",
+      previewHex: null,
+      isWritable: false,
+      refCount: 1,
+    },
+  }],
+  total: 1,
+  limit: 200,
+  offset: 0,
+};
+
 function mockWorkspaceFetch() {
   vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
     const url = String(input);
+    if (url.includes("/data?")) {
+      return Promise.resolve(new Response(JSON.stringify(functionData), { status: 200 }));
+    }
     if (url.includes("/neighbours?")) {
       const direction = url.includes("direction=callers") ? "callers" : "callees";
       const group = url.includes("group=utility") ? "utility" : "primary";
@@ -127,6 +152,8 @@ describe("DetailPanel", () => {
     expect(screen.getByLabelText("Function detail")).toHaveStyle({ width: "672px" });
     expect(await screen.findByText("caller_fn")).toBeInTheDocument();
     expect(await screen.findByText("callee_fn")).toBeInTheDocument();
+    expect(await screen.findByText(/hello/)).toBeInTheDocument();
+    expect(screen.getByText("Data accessed")).toBeInTheDocument();
   });
 
   it("explains when the function has no decompilation or assembly", async () => {

@@ -121,6 +121,15 @@ class HttpAnalysisClient(AnalysisClient):
         assert payload is not None
         return payload
 
+    async def get_function_data(self, function_id: int, limit: int, offset: int) -> dict[str, Any]:
+        payload = await self._request(
+            "GET",
+            f"/internal/v1/functions/{function_id}/data",
+            params={"limit": str(limit), "offset": str(offset)},
+        )
+        assert payload is not None
+        return payload
+
     async def update_function(self, function_id: int, payload: dict[str, object]) -> dict[str, Any]:
         response = await self._request(
             "PATCH", f"/internal/v1/functions/{function_id}", json_body=payload

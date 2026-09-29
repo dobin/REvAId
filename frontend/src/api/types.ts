@@ -529,3 +529,29 @@ export interface LlmStatusEvent {
 }
 
 export type ServerEvent = SummaryEvent | QueueEvent | BinaryEvent | ReconcileEvent | LlmStatusEvent;
+
+export interface DataItemDto {
+  id: number;
+  address: number;
+  section: string | null;
+  kind: string;
+  size: number;
+  valueText: string | null;
+  previewHex: string | null;
+  isWritable: boolean;
+  refCount: number;
+}
+
+export interface FunctionDataRefDto {
+  instructionAddress: number;
+  instructionText: string;
+  item: DataItemDto;
+}
+
+export interface FunctionDataDto {
+  functionId: FunctionId;
+  references: FunctionDataRefDto[];
+  total: number;
+  limit: number;
+  offset: number;
+}

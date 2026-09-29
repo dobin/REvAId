@@ -23,6 +23,9 @@ __all__ = [
     "AnalysisBinary",
     "AnalysisClient",
     "AnalysisFunction",
+    "AnalysisDataItem",
+    "AnalysisFunctionData",
+    "AnalysisFunctionDataRef",
     "AnalysisModel",
     "CallPair",
     "CanvasOrigin",
@@ -104,6 +107,32 @@ class AnalysisFunction(ResolvedFunction):
     summary_error_code: str | None = None
     summary_generated_at: str | None = None
     notes_updated_at: str | None = None
+
+
+class AnalysisDataItem(AnalysisModel):
+    id: int
+    address: int
+    section: str | None
+    kind: str
+    size: int
+    value_text: str | None
+    preview_hex: str | None = None
+    is_writable: bool
+    ref_count: int
+
+
+class AnalysisFunctionDataRef(AnalysisModel):
+    instruction_address: int
+    instruction_text: str
+    item: AnalysisDataItem
+
+
+class AnalysisFunctionData(AnalysisModel):
+    function_id: int
+    references: list[AnalysisFunctionDataRef]
+    total: int
+    limit: int
+    offset: int
 
 
 class AddressResolution(AnalysisModel):
@@ -272,6 +301,10 @@ class AnalysisClient(Protocol):
     ) -> dict[str, object]: ...
 
     async def get_function_detail(self, function_id: int) -> dict[str, object]: ...
+
+    async def get_function_data(
+        self, function_id: int, limit: int, offset: int
+    ) -> dict[str, object]: ...
 
     async def update_function(
         self, function_id: int, payload: dict[str, object]

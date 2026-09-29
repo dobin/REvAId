@@ -20,8 +20,9 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { useConfig } from "@/config/ConfigProvider";
-import { useCreateViewMutation, useViewsQuery } from "@/api/queries/views";
-import { getLatestMyViewId, recordMyView } from "@/lib/myViews";
+import { ApiError } from "@/api/client";
+import { useCreateViewMutation, useViewQuery, useViewsQuery } from "@/api/queries/views";
+import { forgetMyView, getLatestMyViewId, recordMyView } from "@/lib/myViews";
 import type { BinaryId, ViewId } from "@/api/types";
 
 /** Fresh anonymous views get a stable, non-colliding name. The server does
@@ -51,6 +52,19 @@ export function useWorkspaceView(binaryId: BinaryId | null): {
     setSelectedViewId(null);
     creatingRef.current = false;
   }, [binaryId]);
+
+  // A persisted view id can outlive its server row (DB reset, re-ingest).
+  // Drop it on 404 and re-resolve instead of showing an empty canvas forever.
+  const selectedView = useViewQuery(selectedViewId);
+  useEffect(() => {
+    const error = selectedView.error;
+    if (binaryId === null || selectedViewId === null) return;
+    if (error instanceof ApiError && error.status === 404) {
+      forgetMyView(binaryId, selectedViewId);
+      creatingRef.current = false;
+      setSelectedViewId(null);
+    }
+  }, [binaryId, selectedViewId, selectedView.error]);
 
   useEffect(() => {
     if (binaryId === null || selectedViewId !== null) return;

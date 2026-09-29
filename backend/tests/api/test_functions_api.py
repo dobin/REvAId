@@ -55,6 +55,73 @@ async def test_get_function_404_for_missing_function(client: AsyncClient) -> Non
 
 
 @pytest.mark.asyncio
+async def test_get_function_data_lists_accessed_items(
+    client: AsyncClient, session: AsyncSession, ingested: None
+) -> None:
+    from sqlalchemy import select
+
+    from revaid.db.models import Function
+    from revaid.repositories.data_items import (
+        DataItemValues,
+        DataRefValues,
+        replace_binary_data,
+    )
+
+    function_id = await _get_main_function_id(client)
+    binary_id = (
+        await session.execute(select(Function.binary_id).where(Function.id == function_id))
+    ).scalar_one()
+    await replace_binary_data(
+        session,
+        binary_id=binary_id,
+        items=[
+            DataItemValues(
+                address=0x402000,
+                rva=0x2000,
+                section=".rdata",
+                kind="string",
+                size=6,
+                value_text="hello",
+                target_address=None,
+                preview_hex=None,
+                is_writable=False,
+            )
+        ],
+        refs=[
+            DataRefValues(
+                function_id=function_id,
+                item_address=0x402000,
+                instruction_address=0x401010,
+                instruction_text="LEA RCX,[0x402000]",
+            )
+        ],
+    )
+    await session.commit()
+
+    response = await client.get(f"/api/v1/functions/{function_id}/data")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["total"] == 1
+    ref = body["references"][0]
+    assert ref["instructionAddress"] == 0x401010
+    assert ref["item"]["valueText"] == "hello"
+    assert ref["item"]["kind"] == "string"
+    assert ref["item"]["isWritable"] is False
+
+
+@pytest.mark.asyncio
+async def test_get_function_data_empty_and_404(client: AsyncClient, ingested: None) -> None:
+    function_id = await _get_main_function_id(client)
+    empty = (await client.get(f"/api/v1/functions/{function_id}/data")).json()
+    assert empty["references"] == []
+    assert empty["total"] == 0
+
+    missing = await client.get("/api/v1/functions/99999/data")
+    assert missing.status_code == 404
+    assert missing.json()["error"]["code"] == "FUNCTION_NOT_FOUND"
+
+
+@pytest.mark.asyncio
 async def test_display_name_precedence_analyst_beats_llm_beats_ghidra(
     client: AsyncClient, session: AsyncSession, ingested: None
 ) -> None:

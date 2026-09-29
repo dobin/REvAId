@@ -19,6 +19,7 @@ from revaid.api.deps import (
 from revaid.db.models import Edge, Function
 from revaid.db.startup import ANALYSIS_MIGRATION_REVISION
 from revaid.repositories.binaries import get_binary_by_id, list_binaries
+from revaid.repositories.data_items import list_function_refs
 from revaid.repositories.edges import find_canvas_origin
 from revaid.repositories.functions import (
     get_function_address_bounds,
@@ -45,7 +46,10 @@ from revaid_contracts.analysis import (
     AddressResolutionRequest,
     AddressResolutionResponse,
     AnalysisBinary,
+    AnalysisDataItem,
     AnalysisFunction,
+    AnalysisFunctionData,
+    AnalysisFunctionDataRef,
     CallPair,
     CanvasOrigin,
     CanvasOriginRequest,
@@ -422,6 +426,44 @@ async def get_analysis_function(function_id: int, session: SessionDep) -> Analys
         notes=dto.notes,
         notes_updated_at=dto.notes_updated_at,
         has_indirect_calls=dto.has_indirect_calls,
+    )
+
+
+@router.get("/functions/{function_id}/data", response_model=AnalysisFunctionData)
+async def get_analysis_function_data(
+    function_id: int,
+    session: SessionDep,
+    limit: int = Query(default=200, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> AnalysisFunctionData:
+    if await session.get(Function, function_id) is None:
+        raise AppError(ErrorCode.FUNCTION_NOT_FOUND, f"No function {function_id}.")
+    rows, total = await list_function_refs(
+        session, function_id=function_id, limit=limit, offset=offset
+    )
+    return AnalysisFunctionData(
+        function_id=function_id,
+        references=[
+            AnalysisFunctionDataRef(
+                instruction_address=row.ref.instruction_address,
+                instruction_text=row.ref.instruction_text,
+                item=AnalysisDataItem(
+                    id=row.item.id,
+                    address=row.item.address,
+                    section=row.item.section,
+                    kind=row.item.kind,
+                    size=row.item.size,
+                    value_text=row.item.value_text,
+                    preview_hex=row.item.preview_hex,
+                    is_writable=row.item.is_writable,
+                    ref_count=row.item.ref_count,
+                ),
+            )
+            for row in rows
+        ],
+        total=total,
+        limit=limit,
+        offset=offset,
     )
 
 

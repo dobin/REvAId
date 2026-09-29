@@ -6,8 +6,9 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { useFunctionQuery } from "@/api/queries/functions";
+import { useFunctionDataQuery } from "@/api/queries/functionData";
 import { useInfiniteNeighboursQuery } from "@/api/queries/neighbours";
-import type { FunctionId, ViewId } from "@/api/types";
+import type { DataItemDto, FunctionId, ViewId } from "@/api/types";
 import { toHex } from "@/lib/hex";
 import { useAppStore } from "@/store";
 
@@ -116,6 +117,60 @@ function NeighbourList({
             <li key={row.id} className="gr-ground-truth">{row.displayName}</li>
           ))}
         </ul>
+      )}
+    </section>
+  );
+}
+
+const BYTES_PREVIEW_LENGTH = 16;
+
+/** First 16 bytes of a `bytes` item as space-separated hex pairs. */
+function formatBytesPreview(item: DataItemDto): string | null {
+  if (item.kind !== "bytes" || !item.previewHex) return null;
+  const pairs = item.previewHex.slice(0, BYTES_PREVIEW_LENGTH * 2).match(/.{1,2}/g) ?? [];
+  const more = item.previewHex.length > BYTES_PREVIEW_LENGTH * 2 ? " …" : "";
+  return `${pairs.join(" ")}${more}`;
+}
+
+function DataAccessSection({ functionId }: { functionId: FunctionId }) {
+  const { data, isPending, isError } = useFunctionDataQuery(functionId);
+
+  // Group per data item; several instructions may touch the same item.
+  const groups = new Map<number, { item: DataItemDto; instructions: string[] }>();
+  for (const ref of data?.references ?? []) {
+    const group = groups.get(ref.item.id) ?? { item: ref.item, instructions: [] };
+    group.instructions.push(`${toHex(ref.instructionAddress)}  ${ref.instructionText}`);
+    groups.set(ref.item.id, group);
+  }
+
+  return (
+    <section style={{ marginTop: "1rem" }}>
+      <h3 style={{ fontSize: "0.875rem", margin: "0 0 0.25rem" }}>Data accessed</h3>
+      {isPending ? (
+        <p>Loading data…</p>
+      ) : isError ? (
+        <p>Could not load data.</p>
+      ) : groups.size === 0 ? (
+        <p style={{ color: "#6b7280", fontSize: "0.8125rem" }}>None</p>
+      ) : (
+        <>
+          <ul style={{ fontSize: "0.8125rem", margin: 0, paddingLeft: "1.25rem" }}>
+            {[...groups.values()].map(({ item, instructions }) => (
+              <li key={item.id} className="gr-ground-truth" title={instructions.join("\n")}>
+                <span style={{ color: "#6b7280" }}>[{item.kind}]</span>{" "}
+                {item.valueText ?? formatBytesPreview(item) ?? toHex(item.address)}
+                {item.section ? <span style={{ color: "#6b7280" }}> · {item.section}</span> : null}
+                {item.isWritable ? <span style={{ color: "#b45309" }}> · writable</span> : null}
+                {instructions.length > 1 ? ` ×${String(instructions.length)}` : ""}
+              </li>
+            ))}
+          </ul>
+          {data.total > data.references.length && (
+            <p style={{ color: "#6b7280", fontSize: "0.8125rem" }}>
+              {data.total - data.references.length} more references not shown.
+            </p>
+          )}
+        </>
       )}
     </section>
   );
@@ -258,6 +313,7 @@ export function DetailPanel({ viewId }: { viewId: ViewId | null }) {
           />
           <NeighbourList functionId={fn.id} viewId={viewId} direction="callers" />
           <NeighbourList functionId={fn.id} viewId={viewId} direction="callees" />
+          <DataAccessSection functionId={fn.id} />
         </div>
       )}
     </aside>
