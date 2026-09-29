@@ -126,6 +126,18 @@ class McpFunctionSelector(ApiModel):
     name: str | None = None
 
 
+class McpFunctionQueryResultDto(ApiModel):
+    requested: McpFunctionSelector
+    function: McpFunctionDetailDto | None = None
+    error: str | None = None
+
+
+class McpGetFunctionsDto(ApiModel):
+    binary_name: str
+    binary_version: str
+    functions: list[McpFunctionQueryResultDto]
+
+
 class McpDecompiledFunctionDto(ApiModel):
     requested: McpFunctionSelector
     id: int | None = None

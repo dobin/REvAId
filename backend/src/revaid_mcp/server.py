@@ -21,6 +21,7 @@ from revaid.schemas.mcp import (
     McpFunctionSearchPageDto,
     McpFunctionSelector,
     McpFunctionUpdateDto,
+    McpGetFunctionsDto,
     McpRelatedByDataPageDto,
 )
 from revaid.services.mcp_service import (
@@ -31,6 +32,7 @@ from revaid.services.mcp_service import (
     get_mcp_data_item,
     get_mcp_function,
     get_mcp_function_data,
+    get_mcp_functions,
     list_mcp_binaries,
     search_mcp_code,
     search_mcp_data,
@@ -69,9 +71,8 @@ async def find_functions(
     limit: int = 50,
     offset: int = 0,
 ) -> McpFunctionSearchPageDto:
-    """Find functions by name, address, notes, or decompiled C content.
+    """Find functions of a binary by name, address, notes, or decompiled C content (query).
 
-    Set case_insensitive to false to require matching text case exactly.
     """
     settings = get_settings()
     try:
@@ -176,6 +177,34 @@ async def get_function(
                 function_id=function_id,
                 address=address,
                 name=name,
+                include_assembly=include_assembly,
+                include_decompile=include_decompile,
+            )
+    except AppError as exc:
+        raise _tool_error(exc) from exc
+
+
+@mcp.tool()
+async def get_functions(
+    binary_name: str,
+    functions: list[McpFunctionSelector],
+    binary_version: str = "",
+    include_assembly: bool = False,
+    include_decompile: bool = True,
+) -> McpGetFunctionsDto:
+    """Return detailed analysis context for up to 20 functions in one call.
+
+    Each selector sets exactly one of function_id, address, or exact name.
+    Unknown, ambiguous, or invalid selectors are reported per entry. The
+    include_assembly and include_decompile options apply to every result.
+    """
+    try:
+        async with _sessions()() as session:
+            return await get_mcp_functions(
+                session,
+                binary_name=binary_name,
+                binary_version=binary_version,
+                functions=functions,
                 include_assembly=include_assembly,
                 include_decompile=include_decompile,
             )

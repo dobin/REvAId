@@ -41,11 +41,13 @@ from revaid.schemas.mcp import (
     McpFunctionDataDto,
     McpFunctionDataRefDto,
     McpFunctionDetailDto,
+    McpFunctionQueryResultDto,
     McpFunctionsByDataPageDto,
     McpFunctionSearchPageDto,
     McpFunctionSelector,
     McpFunctionUpdateDto,
     McpFunctionWithDataDto,
+    McpGetFunctionsDto,
     McpRelatedByDataDto,
     McpRelatedByDataPageDto,
     mcp_data_item_from_row,
@@ -263,6 +265,58 @@ async def get_mcp_function(
         callees=callees,
         include_assembly=include_assembly,
         include_decompile=include_decompile,
+    )
+
+
+async def get_mcp_functions(
+    session: AsyncSession,
+    *,
+    binary_name: str,
+    binary_version: str,
+    functions: list[McpFunctionSelector],
+    include_assembly: bool = False,
+    include_decompile: bool = True,
+) -> McpGetFunctionsDto:
+    """Return detailed analysis context for several functions."""
+    binary = await _require_binary(session, binary_name, binary_version)
+    if not functions:
+        raise AppError(ErrorCode.VALIDATION_ERROR, "functions must not be empty")
+    if len(functions) > MAX_DECOMPILE_MANY:
+        raise AppError(
+            ErrorCode.VALIDATION_ERROR,
+            f"At most {MAX_DECOMPILE_MANY} functions per call.",
+        )
+
+    results: list[McpFunctionQueryResultDto] = []
+    for selector in functions:
+        try:
+            fn = await _resolve_function(
+                session,
+                binary=binary,
+                function_id=selector.function_id,
+                address=selector.address,
+                name=selector.name,
+            )
+            callers = await list_callers(session, function_id=fn.id)
+            callees = await list_callees(session, function_id=fn.id)
+            detail = mcp_function_detail_from_row(
+                fn,
+                binary_name=binary.name,
+                binary_version=binary.version,
+                callers=callers,
+                callees=callees,
+                include_assembly=include_assembly,
+                include_decompile=include_decompile,
+            )
+        except AppError as exc:
+            results.append(McpFunctionQueryResultDto(requested=selector, error=exc.message))
+            continue
+        results.append(McpFunctionQueryResultDto(requested=selector, function=detail))
+
+    return McpGetFunctionsDto(
+        binary_name=binary.name,
+        binary_version=binary.version,
+        functions=results,
     )
 
 

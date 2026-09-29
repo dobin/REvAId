@@ -8,7 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from revaid.core.config import get_settings
 from revaid.db.models import Edge, Function
 from revaid.repositories.binaries import get_or_create_binary
-from revaid.services.mcp_service import find_mcp_functions, get_mcp_function, set_mcp_function_info
+from revaid.schemas.mcp import McpFunctionSelector
+from revaid.services.mcp_service import (
+    find_mcp_functions,
+    get_mcp_function,
+    get_mcp_functions,
+    set_mcp_function_info,
+)
 from revaid_contracts.clock import utc_now_iso
 from revaid_contracts.http_errors import AppError, ErrorCode
 
@@ -125,6 +131,59 @@ async def test_get_function_accepts_hex_address_string(session: AsyncSession) ->
 
     assert detail.id == fn.id
     assert detail.address == 0x401000
+
+
+@pytest.mark.asyncio
+async def test_get_functions_returns_details_and_per_item_errors(
+    session: AsyncSession,
+) -> None:
+    binary, _ = await get_or_create_binary(session, name="agent.exe", version="1")
+    first = await _function(session, binary_id=binary.id, address=0x1000, name="first")
+    second = await _function(session, binary_id=binary.id, address=0x2000, name="second")
+    session.add(Edge(binary_id=binary.id, caller_id=first.id, callee_id=second.id))
+    await session.commit()
+
+    result = await get_mcp_functions(
+        session,
+        binary_name=binary.name,
+        binary_version=binary.version,
+        functions=[
+            McpFunctionSelector(function_id=first.id),
+            McpFunctionSelector(address="0x2000"),
+            McpFunctionSelector(name="missing"),
+        ],
+        include_assembly=True,
+        include_decompile=False,
+    )
+
+    assert result.binary_name == binary.name
+    assert result.binary_version == binary.version
+    assert len(result.functions) == 3
+    first_result, second_result, missing_result = result.functions
+    assert first_result.function is not None
+    assert first_result.function.id == first.id
+    assert first_result.function.assembly == "1000: RET"
+    assert first_result.function.code_c is None
+    assert [fn.id for fn in first_result.function.callees] == [second.id]
+    assert second_result.function is not None
+    assert [fn.id for fn in second_result.function.callers] == [first.id]
+    assert missing_result.function is None
+    assert missing_result.error is not None
+
+
+@pytest.mark.asyncio
+async def test_get_functions_validates_batch_size(session: AsyncSession) -> None:
+    binary, _ = await get_or_create_binary(session, name="agent.exe", version="1")
+
+    with pytest.raises(AppError) as raised:
+        await get_mcp_functions(
+            session,
+            binary_name=binary.name,
+            binary_version=binary.version,
+            functions=[McpFunctionSelector(function_id=1)] * 21,
+        )
+
+    assert raised.value.code == ErrorCode.VALIDATION_ERROR
 
 
 @pytest.mark.asyncio
