@@ -51,7 +51,7 @@ Agents can use this tool before other calls to discover the exact binary identit
 
 ### `find_functions`
 
-Searches functions belonging to one binary. Parameters include `binary_name`, optional `binary_version`, optional `query`, `limit`, and `offset`.
+Searches functions belonging to one binary. Parameters include `binary_name`, optional `binary_version`, optional `query`, `case_insensitive` (default `true`), `limit`, and `offset`. Set `case_insensitive` to `false` to require exact letter case for text matches.
 
 The query is a case-insensitive substring search over:
 

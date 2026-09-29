@@ -357,16 +357,16 @@ async def search_functions(
     *,
     binary_id: int,
     query: str | None,
+    case_insensitive: bool = True,
     limit: int,
     offset: int,
     include_code_c: bool = False,
 ) -> tuple[list[Function], int]:
-    """Paginated, case-insensitive substring search over a binary's functions
-    (B11/E1a).
+    """Paginated substring search over a binary's functions (B11/E1a).
 
     Matches `name`, `name_llm`, `name_analyst`, `notes`, or `address` via
-    ``LIKE '%q%' COLLATE NOCASE`` (TAD §3.3 design note — an FTS5 upgrade is
-    an additive M1 item, TQ1). The address match is substring-based against
+    case-insensitive matching by default; set ``case_insensitive=False`` for
+    case-sensitive text matching. The address match is substring-based against
     both the decimal and hex (`0x`-stripped) renderings of `address`, so a
     query like `1000` or `0x1000` finds function `0x00401000`. Returns
     `(page, total)`; `total` is the count across the whole match set, not
@@ -379,9 +379,13 @@ async def search_functions(
         text_columns = [Function.name, Function.name_llm, Function.name_analyst, Function.notes]
         if include_code_c:
             text_columns.append(Function.code_c)
-        match_expressions = [
-            col.collate("NOCASE").contains(query, autoescape=True) for col in text_columns
-        ]
+        if case_insensitive:
+            match_expressions = [
+                col.collate("NOCASE").contains(query, autoescape=True) for col in text_columns
+            ]
+        else:
+            # instr performs a literal, case-sensitive substring match in SQLite.
+            match_expressions = [func.instr(col, query) > 0 for col in text_columns]
         # Address: decimal rendering, plus hex rendering (``0x`` prefix optional).
         match_expressions.append(cast(Function.address, String).contains(query, autoescape=True))
         hex_query = query.strip().removeprefix("0x").removeprefix("0X").upper()

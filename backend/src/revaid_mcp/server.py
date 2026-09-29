@@ -65,10 +65,14 @@ async def find_functions(
     binary_name: str,
     binary_version: str = "",
     query: str | None = None,
+    case_insensitive: bool = True,
     limit: int = 50,
     offset: int = 0,
 ) -> McpFunctionSearchPageDto:
-    """Find functions in one binary by name, address, notes, or decompiled C content."""
+    """Find functions by name, address, notes, or decompiled C content.
+
+    Set case_insensitive to false to require matching text case exactly.
+    """
     settings = get_settings()
     try:
         async with _sessions()() as session:
@@ -77,6 +81,7 @@ async def find_functions(
                 binary_name=binary_name,
                 binary_version=binary_version,
                 query=query,
+                case_insensitive=case_insensitive,
                 limit=limit,
                 offset=offset,
                 max_limit=settings.function_search_max_limit,

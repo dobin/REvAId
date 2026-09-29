@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from revaid.core.config import get_settings
 from revaid.db.models import Edge, Function
 from revaid.repositories.binaries import get_or_create_binary
-from revaid.services.mcp_service import get_mcp_function, set_mcp_function_info
+from revaid.services.mcp_service import find_mcp_functions, get_mcp_function, set_mcp_function_info
 from revaid_contracts.clock import utc_now_iso
 from revaid_contracts.http_errors import AppError, ErrorCode
 
@@ -87,6 +87,27 @@ async def test_get_function_includes_callers_and_ordered_callees(
         include_decompile=False,
     )
     assert detail_without_decompile.code_c is None
+
+
+@pytest.mark.asyncio
+async def test_find_functions_accepts_case_sensitive_search(session: AsyncSession) -> None:
+    binary, _ = await get_or_create_binary(session, name="agent.exe", version="1")
+    await _function(session, binary_id=binary.id, address=0x1000, name="parse_config")
+    await session.commit()
+
+    result = await find_mcp_functions(
+        session,
+        binary_name=binary.name,
+        binary_version=binary.version,
+        query="PARSE",
+        case_insensitive=False,
+        limit=50,
+        offset=0,
+        max_limit=200,
+    )
+
+    assert result.total == 0
+    assert result.functions == []
 
 
 @pytest.mark.asyncio

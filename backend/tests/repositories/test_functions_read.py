@@ -80,6 +80,24 @@ async def test_search_functions_matches_name_case_insensitively(
 
 
 @pytest.mark.asyncio
+async def test_search_functions_can_match_name_case_sensitively(session: AsyncSession) -> None:
+    binary, _ = await get_or_create_binary(session, name="acme.exe", version="1.0")
+    await _make_function(session, binary_id=binary.id, address=0x1000, name="parse_config")
+    await session.commit()
+
+    rows, total = await search_functions(
+        session,
+        binary_id=binary.id,
+        query="PARSE",
+        case_insensitive=False,
+        limit=50,
+        offset=0,
+    )
+    assert total == 0
+    assert rows == []
+
+
+@pytest.mark.asyncio
 async def test_search_functions_matches_name_analyst_and_notes(session: AsyncSession) -> None:
     binary, _ = await get_or_create_binary(session, name="acme.exe", version="1.0")
     await _make_function(
