@@ -40,8 +40,14 @@ export function useEntryPointsQuery(binaryId: BinaryId | null) {
 async function fetchFunctionSearch(
   binaryId: BinaryId,
   query: string,
+  offset: number,
 ): Promise<FunctionSearchPageDto> {
-  const params = new URLSearchParams({ q: query });
+  const params = new URLSearchParams({
+    q: query,
+    include_code: "true",
+    limit: "50",
+    offset: String(offset),
+  });
   return apiClient.get<FunctionSearchPageDto>(
     `/binaries/${String(binaryId)}/functions?${params.toString()}`,
   );
@@ -53,11 +59,11 @@ async function fetchFunctionSearch(
  * until both a binary is selected and the query is non-empty, so an empty
  * sidebar search box does not fetch the whole (unfiltered) function list.
  */
-export function useFunctionSearchQuery(binaryId: BinaryId | null, query: string) {
+export function useFunctionSearchQuery(binaryId: BinaryId | null, query: string, offset = 0) {
   const trimmed = query.trim();
   return useQuery({
-    queryKey: ["function-search", binaryId, trimmed],
-    queryFn: () => fetchFunctionSearch(binaryId as BinaryId, trimmed),
+    queryKey: ["function-search", binaryId, trimmed, offset],
+    queryFn: () => fetchFunctionSearch(binaryId as BinaryId, trimmed, offset),
     enabled: binaryId !== null && trimmed.length > 0,
   });
 }

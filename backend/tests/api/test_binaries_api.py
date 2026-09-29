@@ -107,6 +107,24 @@ async def test_search_functions_by_substring(client: AsyncClient, ingested: None
     assert body["total"] > 0
     assert all("parse" in row["displayName"].lower() for row in body["rows"])
     assert body["query"] == "parse"
+    assert "codeMatches" in body["rows"][0]
+
+
+@pytest.mark.asyncio
+async def test_search_functions_include_code_flag_returns_match_lines(
+    client: AsyncClient, ingested: None
+) -> None:
+    binaries = (await client.get("/api/v1/binaries")).json()
+    acme_id = next(b["id"] for b in binaries if b["name"] == "acme.exe")
+
+    response = await client.get(
+        f"/api/v1/binaries/{acme_id}/functions",
+        params={"q": "return", "include_code": "true"},
+    )
+    assert response.status_code == 200
+    row = response.json()["rows"][0]
+    assert row["codeMatches"]
+    assert row["codeMatches"][0]["lineNumber"] == 1
 
 
 @pytest.mark.asyncio

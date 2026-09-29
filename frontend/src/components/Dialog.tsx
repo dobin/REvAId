@@ -42,19 +42,21 @@ export function Dialog({
   title,
   children,
   trigger,
+  width = "min(32rem, calc(100vw - 2rem))",
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   children: ReactNode;
   trigger?: ReactNode;
+  width?: string;
 }) {
   return (
     <RadixDialog.Root open={open} onOpenChange={onOpenChange}>
       {trigger ? <RadixDialog.Trigger asChild>{trigger}</RadixDialog.Trigger> : null}
       <RadixDialog.Portal>
         <RadixDialog.Overlay style={overlayStyle} />
-        <RadixDialog.Content style={contentStyle} aria-describedby={undefined}>
+        <RadixDialog.Content style={{ ...contentStyle, width }} aria-describedby={undefined}>
           <RadixDialog.Title style={titleStyle}>{title}</RadixDialog.Title>
           {children}
         </RadixDialog.Content>

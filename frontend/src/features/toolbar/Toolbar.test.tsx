@@ -36,4 +36,19 @@ describe("Toolbar", () => {
     expect(homeLink).toBeInTheDocument();
     expect(homeLink.closest("a")).toHaveAttribute("href", "/");
   });
+
+  it("shows Explore and Search links for the current binary", () => {
+    const queryClient = new QueryClient();
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/sample.exe/search"]}>
+          <Toolbar binaryName="sample.exe" />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getByRole("link", { name: "Explore" })).toHaveAttribute("href", "/sample.exe/");
+    expect(screen.getByRole("link", { name: "Search" })).toHaveAttribute("href", "/sample.exe/search");
+    expect(screen.getByRole("link", { name: "Search" })).toHaveAttribute("aria-current", "page");
+  });
 });

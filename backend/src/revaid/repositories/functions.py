@@ -374,20 +374,21 @@ async def search_functions(
     """
     filters = [Function.binary_id == binary_id]
     if query:
-        like = f"%{query}%"
-        address_query = query.strip()
-        if address_query.lower().startswith("0x"):
-            address_query = address_query[2:]
-        match_expressions = [
-            Function.name.collate("NOCASE").like(like),
-            Function.name_llm.collate("NOCASE").like(like),
-            Function.name_analyst.collate("NOCASE").like(like),
-            Function.notes.collate("NOCASE").like(like),
-            cast(Function.address, String).like(like),
-            func.printf("%X", Function.address).like(f"%{address_query.upper()}%"),
-        ]
+        # ``contains(..., autoescape=True)`` makes SQLAlchemy escape ``%``/``_``
+        # so the user's text is matched literally.
+        text_columns = [Function.name, Function.name_llm, Function.name_analyst, Function.notes]
         if include_code_c:
-            match_expressions.append(Function.code_c.collate("NOCASE").like(like))
+            text_columns.append(Function.code_c)
+        match_expressions = [
+            col.collate("NOCASE").contains(query, autoescape=True) for col in text_columns
+        ]
+        # Address: decimal rendering, plus hex rendering (``0x`` prefix optional).
+        match_expressions.append(cast(Function.address, String).contains(query, autoescape=True))
+        hex_query = query.strip().removeprefix("0x").removeprefix("0X").upper()
+        if hex_query:
+            match_expressions.append(
+                func.printf("%X", Function.address).contains(hex_query, autoescape=True)
+            )
         filters.append(or_(*match_expressions))
 
     base_stmt = select(Function).where(*filters)

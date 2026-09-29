@@ -164,6 +164,7 @@ async def internal_search_functions(
     binary_id: int,
     session: SessionDep,
     q: str | None = None,
+    include_code: bool = False,
     limit: int = 50,
     offset: int = 0,
 ) -> dict[str, object]:
@@ -172,11 +173,18 @@ async def internal_search_functions(
         raise AppError(ErrorCode.BINARY_NOT_FOUND, f"No binary {binary_id}.")
     limit = min(max(limit, 1), 200)
     functions, total = await search_functions(
-        session, binary_id=binary_id, query=q, limit=limit, offset=max(offset, 0)
+        session,
+        binary_id=binary_id,
+        query=q,
+        limit=limit,
+        offset=max(offset, 0),
+        include_code_c=include_code,
     )
     return {
         "rows": [
-            function_search_row_from_function(function).model_dump(mode="json")
+            function_search_row_from_function(
+                function, include_code_c=include_code, query=q
+            ).model_dump(mode="json")
             for function in functions
         ],
         "total": total,

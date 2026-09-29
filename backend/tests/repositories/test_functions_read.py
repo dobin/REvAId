@@ -162,6 +162,46 @@ async def test_search_functions_can_include_decompiled_c(session: AsyncSession) 
 
 
 @pytest.mark.asyncio
+async def test_search_functions_matches_literal_c_and_maps_all_lines(session: AsyncSession) -> None:
+    from revaid.schemas.search import function_search_row_from_function
+
+    binary, _ = await get_or_create_binary(session, name="literal.exe", version="1.0")
+    source = "first Needle here\nneedle twice needle\n" + "\n".join(
+        f"needle line {line}" for line in range(3, 24)
+    )
+    await _make_function(
+        session,
+        binary_id=binary.id,
+        address=0x1000,
+        name="unrelated",
+        code_c=source,
+    )
+    await session.commit()
+
+    rows, total = await search_functions(
+        session, binary_id=binary.id, query="NEEDLE", limit=50, offset=0, include_code_c=True
+    )
+    assert total == 1
+    assert len(rows) == 1
+    row = function_search_row_from_function(rows[0], include_code_c=True, query="NEEDLE")
+    assert row.code_matches[0].line_number == 1
+    assert row.code_matches[1].line_number == 2
+    assert len(row.code_matches) == 20
+    assert row.code_matches_truncated is True
+
+    literal_rows, literal_total = await search_functions(
+        session,
+        binary_id=binary.id,
+        query="needle%",
+        limit=50,
+        offset=0,
+        include_code_c=True,
+    )
+    assert literal_total == 0
+    assert literal_rows == []
+
+
+@pytest.mark.asyncio
 async def test_search_functions_matches_address_decimal_and_hex(
     session: AsyncSession,
 ) -> None:

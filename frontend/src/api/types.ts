@@ -141,6 +141,7 @@ export interface FunctionDto {
   };
   notes: string;
   hasNotes: boolean;
+  isEntryPoint?: boolean;
   notesUpdatedAt: string | null;
   calleeCount: number;
   callerCount: number;
@@ -311,6 +312,13 @@ export interface FunctionSearchRowDto {
   fanIn: number;
   hasNotes: boolean;
   isEntryPoint: boolean;
+  codeMatches: CodeMatchLineDto[];
+  codeMatchesTruncated: boolean;
+}
+
+export interface CodeMatchLineDto {
+  lineNumber: number;
+  text: string;
 }
 
 export interface FunctionSearchPageDto {

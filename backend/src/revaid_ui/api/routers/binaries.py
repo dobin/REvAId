@@ -179,6 +179,7 @@ async def search_binary_functions(
     settings: SettingsDep,
     analysis: AnalysisClientDep,
     q: str | None = Query(default=None),
+    include_code: bool = Query(default=False),
     limit: int = Query(default=0, ge=0),
     offset: int = Query(default=0, ge=0),
 ) -> FunctionSearchPageDto:
@@ -187,7 +188,7 @@ async def search_binary_functions(
         settings.function_search_max_limit,
     )
     return FunctionSearchPageDto.model_validate(
-        await analysis.search_functions(binary_id, q, page_limit, offset)
+        await analysis.search_functions(binary_id, q, page_limit, offset, include_code)
     )
 
 

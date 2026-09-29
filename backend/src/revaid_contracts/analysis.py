@@ -259,7 +259,12 @@ class AnalysisClient(Protocol):
     async def get_neighbours(self, query: NeighbourQuery) -> NeighbourPage: ...
 
     async def search_functions(
-        self, binary_id: int, query: str | None, limit: int, offset: int
+        self,
+        binary_id: int,
+        query: str | None,
+        limit: int,
+        offset: int,
+        include_code: bool = False,
     ) -> dict[str, object]: ...
 
     async def resolve_function_by_address(

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, Navigate, Route, Routes, useLocation, useNavigate } from "react-router";
+import { Link, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router";
 import { ConfigProvider } from "@/config/ConfigProvider";
 import type { BinaryId } from "@/api/types";
 import { useBinariesQuery } from "@/api/queries/binaries";
@@ -14,6 +14,7 @@ import { BinariesPage } from "@/features/binaries/BinariesPage";
 import { EmptyState } from "@/components/EmptyState";
 import { CanvasActionsRegistryProvider, useCreateCanvasActionsRegistry } from "@/features/canvas/CanvasActions";
 import { SseProvider } from "@/realtime/SseProvider";
+import { SearchPage } from "@/features/search/SearchPage";
 
 /**
  * The workspace shell for one open binary, keyed by the binary's name in the
@@ -25,8 +26,22 @@ function BinaryWorkspace({ binaryName }: { binaryName: string }) {
   const actionsRegistry = useCreateCanvasActionsRegistry();
   const navigate = useNavigate();
   const location = useLocation();
+  const isSearchPage = /\/search\/?$/.test(location.pathname);
   const { data: binaries, isPending, isError } = useBinariesQuery();
   const [runtimeBase, setRuntimeBase] = useState<number | null>(null);
+  const state: unknown = location.state;
+  const focusFunctionId = getFocusFunctionId(state);
+
+  useEffect(() => {
+    if (isSearchPage || focusFunctionId === null) return;
+    const frame = window.requestAnimationFrame(() => {
+      actionsRegistry.current?.focusFunction(focusFunctionId);
+      void navigate(location.pathname, { replace: true, state: null });
+    });
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [actionsRegistry, focusFunctionId, isSearchPage, location.pathname, navigate]);
 
   const binary = binaries?.find((candidate) => candidate.name === binaryName);
   const selectedBinaryId: BinaryId | null = binary?.id ?? null;
@@ -84,8 +99,7 @@ function BinaryWorkspace({ binaryName }: { binaryName: string }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-      <Toolbar
-      />
+      <Toolbar binaryName={binary.name} />
       <CanvasActionsRegistryProvider value={actionsRegistry}>
         <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
           <Sidebar
@@ -101,8 +115,20 @@ function BinaryWorkspace({ binaryName }: { binaryName: string }) {
             openFunctionsError={openFunctionsError}
             openFunctionsKey={location.search}
           />
-          <main style={{ flex: 1, minWidth: 0 }}>
-            <CanvasView selectedBinaryId={selectedBinaryId} viewId={selectedViewId} actionsRegistry={actionsRegistry} />
+          <main style={{ flex: 1, minWidth: 0, minHeight: 0, display: "flex" }}>
+            {isSearchPage && selectedBinaryId !== null ? (
+              <SearchPage
+                binaryId={selectedBinaryId}
+                binaryName={binary.name}
+                viewId={selectedViewId}
+                analysisImageBase={binary.analysisImageBase}
+                runtimeBase={runtimeBase}
+              />
+            ) : (
+              <div style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
+                <CanvasView selectedBinaryId={selectedBinaryId} viewId={selectedViewId} actionsRegistry={actionsRegistry} />
+              </div>
+            )}
           </main>
           {selectedBinaryId !== null && selectedViewId !== null && (
             <AutoPlaceEntryPoint
@@ -111,11 +137,19 @@ function BinaryWorkspace({ binaryName }: { binaryName: string }) {
               viewId={selectedViewId}
             />
           )}
-          <DetailPanel viewId={selectedViewId} />
+          {!isSearchPage && <DetailPanel viewId={selectedViewId} />}
         </div>
       </CanvasActionsRegistryProvider>
     </div>
   );
+}
+
+function getFocusFunctionId(state: unknown): number | null {
+  if (typeof state !== "object" || state === null || !("focusFunctionId" in state)) {
+    return null;
+  }
+  const functionId = state.focusFunctionId;
+  return typeof functionId === "number" ? functionId : null;
 }
 
 /**
@@ -125,17 +159,20 @@ function BinaryWorkspace({ binaryName }: { binaryName: string }) {
 function BinaryWorkspaceRoute() {
   const location = useLocation();
   const navigate = useNavigate();
-  const binaryName = decodeURIComponent(
-    location.pathname.replace(/^\//, "").replace(/\/+$/, ""),
-  );
+  const { binaryName: routeBinaryName = "" } = useParams();
+  const binaryName = routeBinaryName;
+  const isSearchPage = /\/search\/?$/.test(location.pathname);
+  const expectedPath = isSearchPage
+    ? location.pathname.replace(/\/+$/, "")
+    : `${location.pathname.replace(/\/+$/, "")}/`;
 
   useEffect(() => {
-    if (!location.pathname.endsWith("/")) {
-      void navigate(`${location.pathname}/`, { replace: true });
+    if (location.pathname !== expectedPath) {
+      void navigate(expectedPath, { replace: true });
     }
-  }, [location.pathname, navigate]);
+  }, [expectedPath, location.pathname, navigate]);
 
-  if (!location.pathname.endsWith("/")) return <EmptyState title="Redirecting…" />;
+  if (location.pathname !== expectedPath) return <EmptyState title="Redirecting…" />;
   return <BinaryWorkspace binaryName={binaryName} />;
 }
 
@@ -143,7 +180,7 @@ function AppShell() {
   return (
     <Routes>
       <Route path="/" element={<BinariesPage />} />
-      <Route path="/:binaryName" element={<BinaryWorkspaceRoute />} />
+      <Route path="/:binaryName/*" element={<BinaryWorkspaceRoute />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

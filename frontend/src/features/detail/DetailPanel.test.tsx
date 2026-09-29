@@ -103,6 +103,7 @@ describe("DetailPanel", () => {
       useAppStore.getState().clearSelection();
     });
     vi.unstubAllGlobals();
+    window.localStorage.removeItem("graphrev.detailPanelWidth");
   });
 
   it("shows readable C source and assembly for the selected function", async () => {
@@ -123,7 +124,7 @@ describe("DetailPanel", () => {
     expect(
       screen.getByText((_, element) => element?.tagName === "CODE" && element.textContent === functionDto.assembly),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText("Function detail")).toHaveStyle({ width: "42rem" });
+    expect(screen.getByLabelText("Function detail")).toHaveStyle({ width: "672px" });
     expect(await screen.findByText("caller_fn")).toBeInTheDocument();
     expect(await screen.findByText("callee_fn")).toBeInTheDocument();
   });
@@ -168,5 +169,26 @@ describe("DetailPanel", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /close function detail/i }));
     expect(screen.queryByLabelText(/function detail/i)).not.toBeInTheDocument();
+  });
+
+  it("resizes the detail panel with the keyboard and persists the selected width", async () => {
+    act(() => {
+      useAppStore.getState().selectFunction(1);
+    });
+    mockWorkspaceFetch();
+
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <DetailPanel viewId={1} />
+      </QueryClientProvider>,
+    );
+
+    const separator = screen.getByRole("separator", { name: "Resize function details panel" });
+    fireEvent.keyDown(separator, { key: "ArrowLeft" });
+
+    expect(screen.getByLabelText("Function detail")).toHaveStyle({ width: "688px" });
+    await waitFor(() => {
+      expect(window.localStorage.getItem("graphrev.detailPanelWidth")).toBe("688");
+    });
   });
 });

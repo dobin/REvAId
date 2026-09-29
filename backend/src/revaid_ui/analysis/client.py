@@ -87,12 +87,22 @@ class HttpAnalysisClient(AnalysisClient):
         return response is not None
 
     async def search_functions(
-        self, binary_id: int, query: str | None, limit: int, offset: int
+        self,
+        binary_id: int,
+        query: str | None,
+        limit: int,
+        offset: int,
+        include_code: bool = False,
     ) -> dict[str, Any]:
         payload = await self._request(
             "GET",
             f"/internal/v1/binaries/{binary_id}/functions",
-            params={"q": query, "limit": str(limit), "offset": str(offset)},
+            params={
+                "q": query,
+                "limit": str(limit),
+                "offset": str(offset),
+                "include_code": str(include_code).lower(),
+            },
         )
         assert payload is not None
         return payload

@@ -19,6 +19,7 @@ async def search_functions_dto(
     query: str | None,
     limit: int,
     offset: int,
+    include_code_c: bool = False,
 ) -> FunctionSearchPageDto:
     binary = await get_binary_by_id(session, binary_id)
     if binary is None:
@@ -30,10 +31,18 @@ async def search_functions_dto(
 
     clamped_limit = min(limit, settings.function_search_max_limit)
     functions, total = await search_functions(
-        session, binary_id=binary_id, query=query, limit=clamped_limit, offset=offset
+        session,
+        binary_id=binary_id,
+        query=query,
+        limit=clamped_limit,
+        offset=offset,
+        include_code_c=include_code_c,
     )
     return FunctionSearchPageDto(
-        rows=[function_search_row_from_function(fn) for fn in functions],
+        rows=[
+            function_search_row_from_function(fn, include_code_c=include_code_c, query=query)
+            for fn in functions
+        ],
         total=total,
         limit=clamped_limit,
         offset=offset,

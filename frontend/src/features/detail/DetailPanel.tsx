@@ -4,14 +4,28 @@
  * currently selected function. Ground-truth code is intentionally shown here
  * rather than on a canvas card, where it would make the graph unreadable.
  */
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFunctionQuery } from "@/api/queries/functions";
 import { useInfiniteNeighboursQuery } from "@/api/queries/neighbours";
 import type { FunctionId, ViewId } from "@/api/types";
 import { toHex } from "@/lib/hex";
 import { useAppStore } from "@/store";
 
-const panelWidth = "42rem";
+const DETAIL_PANEL_WIDTH_KEY = "graphrev.detailPanelWidth";
+const DEFAULT_PANEL_WIDTH = 672;
+const MIN_PANEL_WIDTH = 280;
+const MAX_PANEL_WIDTH = 960;
+
+function readPanelWidth(): number {
+  try {
+    const saved = Number(window.localStorage.getItem(DETAIL_PANEL_WIDTH_KEY));
+    return Number.isFinite(saved) && saved >= MIN_PANEL_WIDTH && saved <= MAX_PANEL_WIDTH
+      ? saved
+      : DEFAULT_PANEL_WIDTH;
+  } catch {
+    return DEFAULT_PANEL_WIDTH;
+  }
+}
 
 function CodeSection({ title, code, unavailableMessage }: {
   title: string;
@@ -110,22 +124,85 @@ function NeighbourList({
 export function DetailPanel({ viewId }: { viewId: ViewId | null }) {
   const selectedFunctionId = useAppStore((s) => s.selectedFunctionId);
   const clearSelection = useAppStore((s) => s.clearSelection);
+  const [panelWidth, setPanelWidth] = useState(readPanelWidth);
+  const [resizing, setResizing] = useState(false);
+  const dragStart = useRef<{ pointerX: number; width: number } | null>(null);
   const { data: fn, isPending, isError } = useFunctionQuery(selectedFunctionId);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(DETAIL_PANEL_WIDTH_KEY, String(panelWidth));
+    } catch {
+      // Keep resizing usable when browser storage is unavailable.
+    }
+  }, [panelWidth]);
+
+  useEffect(() => {
+    if (!resizing) return;
+    const move = (event: PointerEvent) => {
+      const start = dragStart.current;
+      if (!start) return;
+      setPanelWidth(Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, start.width + start.pointerX - event.clientX)));
+    };
+    const stop = () => {
+      dragStart.current = null;
+      setResizing(false);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+    };
+  }, [resizing]);
 
   if (selectedFunctionId === null) return null;
 
   return (
     <aside
       style={{
-        width: panelWidth,
+        width: `${String(panelWidth)}px`,
         minWidth: 0,
         flexShrink: 0,
+        position: "relative",
         overflowY: "auto",
         padding: "1rem",
         borderLeft: "1px solid #e5e7eb",
       }}
       aria-label="Function detail"
     >
+      <div
+        role="separator"
+        aria-label="Resize function details panel"
+        aria-orientation="vertical"
+        aria-valuemin={MIN_PANEL_WIDTH}
+        aria-valuemax={MAX_PANEL_WIDTH}
+        aria-valuenow={panelWidth}
+        tabIndex={0}
+        onPointerDown={(event) => {
+          event.preventDefault();
+          dragStart.current = { pointerX: event.clientX, width: panelWidth };
+          setResizing(true);
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+          event.preventDefault();
+          const delta = event.key === "ArrowLeft" ? 16 : -16;
+          setPanelWidth((width) => Math.min(MAX_PANEL_WIDTH, Math.max(MIN_PANEL_WIDTH, width + delta)));
+        }}
+        style={{
+          position: "absolute",
+          top: 0,
+          bottom: 0,
+          left: 0,
+          width: "6px",
+          cursor: "col-resize",
+          touchAction: "none",
+          zIndex: 1,
+        }}
+      />
       {isPending && <p>Loading…</p>}
       {isError && <p>Could not load function.</p>}
       {fn && (

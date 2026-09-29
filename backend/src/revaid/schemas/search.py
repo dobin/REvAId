@@ -8,8 +8,15 @@ with the rest of the API.
 
 from __future__ import annotations
 
+from pydantic import Field
+
 from revaid.db.models import Function
 from revaid_contracts.common import ApiModel
+
+
+class CodeMatchLineDto(ApiModel):
+    line_number: int
+    text: str
 
 
 class FunctionSearchRowDto(ApiModel):
@@ -25,6 +32,8 @@ class FunctionSearchRowDto(ApiModel):
     fan_in: int
     has_notes: bool
     is_entry_point: bool
+    code_matches: list[CodeMatchLineDto] = Field(default_factory=list)
+    code_matches_truncated: bool = False
 
 
 class FunctionSearchPageDto(ApiModel):
@@ -47,7 +56,23 @@ class EntryPointsDto(ApiModel):
     entry_points: list[EntryPointDto]
 
 
-def function_search_row_from_function(fn: Function) -> FunctionSearchRowDto:
+def function_search_row_from_function(
+    fn: Function,
+    *,
+    include_code_c: bool = False,
+    max_code_matches: int = 20,
+    query: str | None = None,
+) -> FunctionSearchRowDto:
+    code_matches: list[CodeMatchLineDto] = []
+    code_matches_truncated = False
+    if include_code_c and query and fn.code_c:
+        needle = query.casefold()
+        for line_number, line in enumerate(fn.code_c.splitlines(), start=1):
+            if needle in line.casefold():
+                if len(code_matches) == max_code_matches:
+                    code_matches_truncated = True
+                    break
+                code_matches.append(CodeMatchLineDto(line_number=line_number, text=line))
     return FunctionSearchRowDto(
         id=fn.id,
         address=fn.address,
@@ -58,6 +83,8 @@ def function_search_row_from_function(fn: Function) -> FunctionSearchRowDto:
         fan_in=fn.fan_in,
         has_notes=fn.notes != "",
         is_entry_point=fn.is_entry_point,
+        code_matches=code_matches,
+        code_matches_truncated=code_matches_truncated,
     )
 
 

@@ -5,6 +5,11 @@ from __future__ import annotations
 from revaid_contracts.common import ApiModel
 
 
+class CodeMatchLineDto(ApiModel):
+    line_number: int
+    text: str
+
+
 class FunctionSearchRowDto(ApiModel):
     id: int
     address: int
@@ -15,6 +20,8 @@ class FunctionSearchRowDto(ApiModel):
     fan_in: int
     has_notes: bool
     is_entry_point: bool
+    code_matches: list[CodeMatchLineDto]
+    code_matches_truncated: bool
 
 
 class FunctionSearchPageDto(ApiModel):

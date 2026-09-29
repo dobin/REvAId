@@ -152,9 +152,20 @@ async def test_viewer_app_serves_facade_routes_without_analysis_session(
             return []
 
         async def search_functions(
-            self, binary_id: int, query: str | None, limit: int, offset: int
+            self,
+            binary_id: int,
+            query: str | None,
+            limit: int,
+            offset: int,
+            include_code: bool = False,
         ):
-            return {"rows": [], "total": 0, "limit": limit, "offset": offset, "query": query}
+            return {
+                "rows": [],
+                "total": 0,
+                "limit": limit,
+                "offset": offset,
+                "query": query,
+            }
 
         async def resolve_function_by_address(self, binary_id: int, address: int):
             return {}

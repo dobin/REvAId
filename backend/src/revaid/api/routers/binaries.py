@@ -215,6 +215,7 @@ async def search_binary_functions(
     settings: SettingsDep,
     session: SessionDep,
     q: str | None = Query(default=None, description="Substring filter (B11/E1a)."),
+    include_code: bool = Query(default=False, description="Include decompiled C matching lines."),
     limit: int = Query(default=0, ge=0),
     offset: int = Query(default=0, ge=0),
 ) -> FunctionSearchPageDto:
@@ -227,6 +228,7 @@ async def search_binary_functions(
         query=q,
         limit=effective_limit,
         offset=offset,
+        include_code_c=include_code,
     )
 
 

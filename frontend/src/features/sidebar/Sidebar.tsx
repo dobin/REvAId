@@ -4,7 +4,7 @@
  */
 import type { BinaryId, OpenFunctionsRequest, ViewId } from "@/api/types";
 import { useConfig } from "@/config/ConfigProvider";
-import { FunctionSearchInput } from "./FunctionSearchInput";
+import { FunctionSearchDialog } from "@/features/search/FunctionSearchDialog";
 import { ImportBinaryButton } from "./ImportBinaryButton";
 import { LlmConnectionStatus } from "./LlmConnectionStatus";
 import { OpenFunctionsDialog } from "./OpenFunctionsDialog";
@@ -13,7 +13,6 @@ import { QueuePanel } from "./QueuePanel";
 import { RebalanceButton } from "./RebalanceButton";
 import { ResetCanvasButton } from "./ResetCanvasButton";
 import { ResetSummariesButton } from "./ResetSummariesButton";
-import { RuntimeBaseControl } from "./RuntimeBaseControl";
 import { ViewPicker } from "./ViewPicker";
 
 const sectionStyle: React.CSSProperties = {
@@ -98,15 +97,9 @@ export function Sidebar({
       )}
       {binaryId !== null && (
         <SidebarSection title="Functions">
-          <FunctionSearchInput
+          <FunctionSearchDialog
             binaryId={binaryId}
             viewId={viewId}
-            analysisImageBase={analysisImageBase}
-            runtimeBase={runtimeBase}
-          />
-
-          <RuntimeBaseControl
-            key={binaryId}
             analysisImageBase={analysisImageBase}
             runtimeBase={runtimeBase}
             onRuntimeBaseChange={onRuntimeBaseChange}

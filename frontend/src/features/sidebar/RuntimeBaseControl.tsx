@@ -31,9 +31,9 @@ export function RuntimeBaseControl({
   const invalid = text.trim().length > 0 && parsed === null;
 
   return (
-    <div style={{ marginTop: "0.75rem" }}>
-      <label style={{ display: "flex", alignItems: "center", gap: "0.375rem", fontSize: "0.75rem", color: "#6b7280" }}>
-        Image base:
+    <div style={{ width: "12rem", flex: "0 0 auto" }}>
+      <label style={{ display: "block", fontSize: "0.8125rem", fontWeight: 600 }}>
+        Image base
         <input
           type="text"
           aria-label="Runtime load base"
@@ -49,9 +49,12 @@ export function RuntimeBaseControl({
           }}
           style={{
             ...inputStyle,
-            flex: "1 1 0",
-            minWidth: 0,
-            borderColor: invalid ? "#dc2626" : "#d1d5db",
+            display: "block",
+            marginTop: "0.35rem",
+            padding: "0.55rem 0.65rem",
+            fontSize: "0.9rem",
+            fontWeight: 400,
+            borderColor: invalid ? "#dc2626" : "#cbd5e1",
           }}
         />
       </label>
@@ -59,10 +62,7 @@ export function RuntimeBaseControl({
         <p role="alert" style={{ fontSize: "0.75rem", color: "#b91c1c", margin: "0.25rem 0 0" }}>
           Enter a decimal or 0x-prefixed hexadecimal load base.
         </p>
-      ) : (
-        <p style={{ fontSize: "0.75rem", color: "#6b7280", margin: "0.25rem 0 0" }}>
-        </p>
-      )}
+      ) : null}
     </div>
   );
 }
