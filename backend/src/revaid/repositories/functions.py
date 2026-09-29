@@ -412,11 +412,15 @@ async def search_functions_by_code(
     *,
     binary_id: int,
     query: str,
+    case_insensitive: bool,
     limit: int,
     offset: int,
 ) -> tuple[list[Function], int]:
-    """Case-insensitive substring search restricted to decompiled C."""
-    match = Function.code_c.collate("NOCASE").contains(query, autoescape=True)
+    """Substring search restricted to decompiled C."""
+    if case_insensitive:
+        match = Function.code_c.collate("NOCASE").contains(query, autoescape=True)
+    else:
+        match = func.instr(Function.code_c, query) > 0
     base_stmt = select(Function).where(Function.binary_id == binary_id, match)
     total = (
         await session.execute(select(func.count()).select_from(base_stmt.subquery()))

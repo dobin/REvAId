@@ -71,8 +71,7 @@ async def find_functions(
     limit: int = 50,
     offset: int = 0,
 ) -> McpFunctionSearchPageDto:
-    """Find functions of a binary by name, address, notes, or decompiled C content (query).
-
+    """Find functions in a binary by name, address, notes, or decompiled C code.
     """
     settings = get_settings()
     try:
@@ -96,16 +95,18 @@ async def search_code(
     binary_name: str,
     query: str,
     binary_version: str = "",
+    case_insensitive: bool = True,
     context_lines: int = 3,
     limit: int = 20,
     offset: int = 0,
 ) -> McpCodeSearchPageDto:
-    """Grep the decompiled C of one binary (case-insensitive substring).
+    """Grep the decompiled C of one binary (case-insensitive by default).
 
     Returns, per matching function, only the matching lines plus context_lines
-    lines before and after (max 20); overlapping windows are merged into hunks.
-    Each line has its 1-based line number and is_match flag. Use get_function or
-    decompile_many to read whole functions.
+    lines before and after (max 20); 
+    Each line has its 1-based line number and is_match flag. 
+    
+    Use get_function or decompile_many to read whole functions.
     """
     settings = get_settings()
     try:
@@ -115,6 +116,7 @@ async def search_code(
                 binary_name=binary_name,
                 binary_version=binary_version,
                 query=query,
+                case_insensitive=case_insensitive,
                 context_lines=context_lines,
                 limit=limit,
                 offset=offset,

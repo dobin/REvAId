@@ -13,6 +13,7 @@ from revaid.services.mcp_service import (
     find_mcp_functions,
     get_mcp_function,
     get_mcp_functions,
+    search_mcp_code,
     set_mcp_function_info,
 )
 from revaid_contracts.clock import utc_now_iso
@@ -114,6 +115,42 @@ async def test_find_functions_accepts_case_sensitive_search(session: AsyncSessio
 
     assert result.total == 0
     assert result.functions == []
+
+
+@pytest.mark.asyncio
+async def test_search_code_supports_case_sensitive_matching(session: AsyncSession) -> None:
+    binary, _ = await get_or_create_binary(session, name="agent.exe", version="1")
+    fn = await _function(session, binary_id=binary.id, address=0x1000, name="search_target")
+    fn.code_c = "return MAGIC_VALUE;"
+    await session.commit()
+
+    insensitive = await search_mcp_code(
+        session,
+        binary_name=binary.name,
+        binary_version=binary.version,
+        query="magic",
+        case_insensitive=True,
+        context_lines=0,
+        limit=20,
+        offset=0,
+        max_limit=200,
+    )
+    sensitive = await search_mcp_code(
+        session,
+        binary_name=binary.name,
+        binary_version=binary.version,
+        query="magic",
+        case_insensitive=False,
+        context_lines=0,
+        limit=20,
+        offset=0,
+        max_limit=200,
+    )
+
+    assert insensitive.total_functions == 1
+    assert insensitive.functions[0].match_count == 1
+    assert sensitive.total_functions == 0
+    assert sensitive.functions == []
 
 
 @pytest.mark.asyncio

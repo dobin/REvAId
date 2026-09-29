@@ -113,10 +113,16 @@ MAX_CONTEXT_LINES = 20
 MAX_DECOMPILE_MANY = 20
 
 
-def _code_hunks(code: str, query: str, context: int) -> tuple[int, list[McpCodeHunkDto]]:
+def _code_hunks(
+    code: str, query: str, context: int, *, case_insensitive: bool
+) -> tuple[int, list[McpCodeHunkDto]]:
     lines = code.splitlines()
-    needle = query.lower()
-    hits = [i for i, text in enumerate(lines) if needle in text.lower()]
+    needle = query.lower() if case_insensitive else query
+    hits = [
+        i
+        for i, text in enumerate(lines)
+        if needle in (text.lower() if case_insensitive else text)
+    ]
     hit_set = set(hits)
     ranges: list[list[int]] = []
     for i in hits:
@@ -145,6 +151,7 @@ async def search_mcp_code(
     binary_name: str,
     binary_version: str,
     query: str,
+    case_insensitive: bool,
     context_lines: int,
     limit: int,
     offset: int,
@@ -161,11 +168,18 @@ async def search_mcp_code(
     context = max(0, min(context_lines, MAX_CONTEXT_LINES))
     clamped_limit = min(limit, max_limit)
     rows, total = await search_functions_by_code(
-        session, binary_id=binary.id, query=query, limit=clamped_limit, offset=offset
+        session,
+        binary_id=binary.id,
+        query=query,
+        case_insensitive=case_insensitive,
+        limit=clamped_limit,
+        offset=offset,
     )
     functions: list[McpCodeSearchFunctionDto] = []
     for fn in rows:
-        count, hunks = _code_hunks(fn.code_c or "", query, context)
+        count, hunks = _code_hunks(
+            fn.code_c or "", query, context, case_insensitive=case_insensitive
+        )
         if not hunks:
             continue
         functions.append(
