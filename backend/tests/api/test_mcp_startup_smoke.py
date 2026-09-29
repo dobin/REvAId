@@ -64,6 +64,8 @@ async def test_standalone_mcp_starts_and_advertises_analysis_tools(migrated_db: 
         assert {tool.name for tool in tools.tools} == {
             "list_binaries",
             "find_functions",
+            "search_code",
+            "decompile_many",
             "get_function",
             "set_function_info",
         }

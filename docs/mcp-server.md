@@ -64,6 +64,16 @@ An omitted query lists functions using pagination. `limit` is clamped to `functi
 
 Results intentionally contain summary metadata rather than full function bodies: ID, integer and hexadecimal address, names, signature, kind, short summary, and fan-in/fan-out. Use `get_function` for code and relationships.
 
+### `search_code`
+
+Greps the decompiled C of one binary (case-insensitive substring). Parameters: `binary_name`, `query`, optional `binary_version`, `context_lines` (default 3, max 20), `limit` (default 20, clamped like `find_functions`), and `offset`.
+
+For each matching function it returns ID, address, name, signature, match count, and hunks of matching lines with surrounding context. Overlapping windows are merged; each line has its 1-based number and an `isMatch` flag. Use it to locate code before fetching whole functions.
+
+### `decompile_many`
+
+Returns decompiled C for up to 20 functions in one call. `functions` is a list of selectors (`function_id`, `address`, or `name`; exactly one each). Unknown or ambiguous selectors yield a per-entry `error` and do not fail the call.
+
 ### `get_function`
 
 Returns the analysis context for one function:
@@ -141,7 +151,7 @@ Preserve these current invariants:
 - A function ID must belong to that binary.
 - Function names may be ambiguous; never silently choose one.
 - MCP writes must not overwrite ingestion-owned or analyst-owned data.
-- Full code bodies belong in `get_function`, not paginated search results.
+- Full code bodies belong in `get_function` and `decompile_many`, not paginated search results. `search_code` returns only matching snippets.
 - Headless graph queries must not depend on a UI `view_id`.
 
 Possible future additions include bulk analysis writes, explicit field-clearing semantics, bounded or paginated relationship traversal, SSE/event integration through a shared transport, authentication for non-loopback deployment, and FTS indexing for large decompiled-code datasets.

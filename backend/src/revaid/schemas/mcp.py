@@ -87,6 +87,62 @@ class McpFunctionDetailDto(ApiModel):
     callees: list[McpRelatedFunctionDto]
 
 
+class McpCodeLineDto(ApiModel):
+    line: int
+    text: str
+    is_match: bool
+
+
+class McpCodeHunkDto(ApiModel):
+    start_line: int
+    end_line: int
+    lines: list[McpCodeLineDto]
+
+
+class McpCodeSearchFunctionDto(ApiModel):
+    id: int
+    address: int
+    address_hex: str
+    display_name: str
+    signature: str | None
+    match_count: int
+    hunks: list[McpCodeHunkDto]
+
+
+class McpCodeSearchPageDto(ApiModel):
+    binary_name: str
+    binary_version: str
+    functions: list[McpCodeSearchFunctionDto]
+    total_functions: int
+    limit: int
+    offset: int
+    query: str
+    context_lines: int
+
+
+class McpFunctionSelector(ApiModel):
+    function_id: int | None = None
+    address: int | str | None = None
+    name: str | None = None
+
+
+class McpDecompiledFunctionDto(ApiModel):
+    requested: McpFunctionSelector
+    id: int | None = None
+    address: int | None = None
+    address_hex: str | None = None
+    display_name: str | None = None
+    signature: str | None = None
+    code_c: str | None = None
+    error: str | None = None
+
+
+class McpDecompileManyDto(ApiModel):
+    binary_name: str
+    binary_version: str
+    functions: list[McpDecompiledFunctionDto]
+
+
 class McpFunctionUpdateDto(ApiModel):
     id: int
     binary_name: str

@@ -13,12 +13,20 @@ from revaid.repositories.functions import (
     get_function_by_id,
     resolve_functions_by_name,
     search_functions,
+    search_functions_by_code,
     update_llm_fields,
 )
 from revaid.schemas.mcp import (
     McpBinaryDto,
     McpBinaryListDto,
+    McpCodeHunkDto,
+    McpCodeLineDto,
+    McpCodeSearchFunctionDto,
+    McpCodeSearchPageDto,
+    McpDecompiledFunctionDto,
+    McpDecompileManyDto,
     McpFunctionDetailDto,
+    McpFunctionSelector,
     McpFunctionSearchPageDto,
     McpFunctionUpdateDto,
     mcp_function_detail_from_row,
@@ -74,6 +82,133 @@ async def find_mcp_functions(
         limit=clamped_limit,
         offset=offset,
         query=query,
+    )
+
+
+MAX_CONTEXT_LINES = 20
+MAX_DECOMPILE_MANY = 20
+
+
+def _code_hunks(code: str, query: str, context: int) -> tuple[int, list[McpCodeHunkDto]]:
+    lines = code.splitlines()
+    needle = query.lower()
+    hits = [i for i, text in enumerate(lines) if needle in text.lower()]
+    hit_set = set(hits)
+    ranges: list[list[int]] = []
+    for i in hits:
+        start, end = max(0, i - context), min(len(lines) - 1, i + context)
+        if ranges and start <= ranges[-1][1] + 1:
+            ranges[-1][1] = max(ranges[-1][1], end)
+        else:
+            ranges.append([start, end])
+    hunks = [
+        McpCodeHunkDto(
+            start_line=s + 1,
+            end_line=e + 1,
+            lines=[
+                McpCodeLineDto(line=i + 1, text=lines[i], is_match=i in hit_set)
+                for i in range(s, e + 1)
+            ],
+        )
+        for s, e in ranges
+    ]
+    return len(hits), hunks
+
+
+async def search_mcp_code(
+    session: AsyncSession,
+    *,
+    binary_name: str,
+    binary_version: str,
+    query: str,
+    context_lines: int,
+    limit: int,
+    offset: int,
+    max_limit: int,
+) -> McpCodeSearchPageDto:
+    """Grep decompiled C: return matching lines with context per function."""
+    binary = await _require_binary(session, binary_name, binary_version)
+    if not query:
+        raise AppError(ErrorCode.VALIDATION_ERROR, "query must not be empty")
+    if limit < 1:
+        raise AppError(ErrorCode.VALIDATION_ERROR, "limit must be at least 1")
+    if offset < 0:
+        raise AppError(ErrorCode.VALIDATION_ERROR, "offset must not be negative")
+    context = max(0, min(context_lines, MAX_CONTEXT_LINES))
+    clamped_limit = min(limit, max_limit)
+    rows, total = await search_functions_by_code(
+        session, binary_id=binary.id, query=query, limit=clamped_limit, offset=offset
+    )
+    functions: list[McpCodeSearchFunctionDto] = []
+    for fn in rows:
+        count, hunks = _code_hunks(fn.code_c or "", query, context)
+        if not hunks:
+            continue
+        functions.append(
+            McpCodeSearchFunctionDto(
+                id=fn.id,
+                address=fn.address,
+                address_hex=f"0x{fn.address:X}",
+                display_name=fn.name_analyst or fn.name_llm or fn.name,
+                signature=fn.signature,
+                match_count=count,
+                hunks=hunks,
+            )
+        )
+    return McpCodeSearchPageDto(
+        binary_name=binary.name,
+        binary_version=binary.version,
+        functions=functions,
+        total_functions=total,
+        limit=clamped_limit,
+        offset=offset,
+        query=query,
+        context_lines=context,
+    )
+
+
+async def decompile_mcp_functions(
+    session: AsyncSession,
+    *,
+    binary_name: str,
+    binary_version: str,
+    functions: list[McpFunctionSelector],
+) -> McpDecompileManyDto:
+    """Return decompiled C for several functions; per-item errors do not abort."""
+    binary = await _require_binary(session, binary_name, binary_version)
+    if not functions:
+        raise AppError(ErrorCode.VALIDATION_ERROR, "functions must not be empty")
+    if len(functions) > MAX_DECOMPILE_MANY:
+        raise AppError(
+            ErrorCode.VALIDATION_ERROR,
+            f"At most {MAX_DECOMPILE_MANY} functions per call.",
+        )
+    results: list[McpDecompiledFunctionDto] = []
+    for sel in functions:
+        try:
+            fn = await _resolve_function(
+                session,
+                binary=binary,
+                function_id=sel.function_id,
+                address=sel.address,
+                name=sel.name,
+            )
+        except AppError as exc:
+            results.append(McpDecompiledFunctionDto(requested=sel, error=exc.message))
+            continue
+        results.append(
+            McpDecompiledFunctionDto(
+                requested=sel,
+                id=fn.id,
+                address=fn.address,
+                address_hex=f"0x{fn.address:X}",
+                display_name=fn.name_analyst or fn.name_llm or fn.name,
+                signature=fn.signature,
+                code_c=fn.code_c,
+            )
+        )
+    return McpDecompileManyDto(
+        binary_name=binary.name, binary_version=binary.version, functions=results
     )
 
 

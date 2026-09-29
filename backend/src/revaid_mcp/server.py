@@ -11,12 +11,17 @@ from revaid.db.engine import create_engine, create_session_factory, dispose_engi
 from revaid.db.uow import write_lock
 from revaid.schemas.mcp import (
     McpBinaryListDto,
+    McpCodeSearchPageDto,
+    McpDecompileManyDto,
     McpFunctionDetailDto,
     McpFunctionSearchPageDto,
+    McpFunctionSelector,
     McpFunctionUpdateDto,
 )
 from revaid.services.mcp_service import (
+    decompile_mcp_functions,
     find_mcp_functions,
+    search_mcp_code,
     get_mcp_function,
     list_mcp_binaries,
     set_mcp_function_info,
@@ -65,6 +70,63 @@ async def find_functions(
                 limit=limit,
                 offset=offset,
                 max_limit=settings.function_search_max_limit,
+            )
+    except AppError as exc:
+        raise _tool_error(exc) from exc
+
+
+@mcp.tool()
+async def search_code(
+    binary_name: str,
+    query: str,
+    binary_version: str = "",
+    context_lines: int = 3,
+    limit: int = 20,
+    offset: int = 0,
+) -> McpCodeSearchPageDto:
+    """Grep the decompiled C of one binary (case-insensitive substring).
+
+    Returns, per matching function, only the matching lines plus context_lines
+    lines before and after (max 20); overlapping windows are merged into hunks.
+    Each line has its 1-based line number and is_match flag. Use get_function or
+    decompile_many to read whole functions.
+    """
+    settings = get_settings()
+    try:
+        async with _sessions()() as session:
+            return await search_mcp_code(
+                session,
+                binary_name=binary_name,
+                binary_version=binary_version,
+                query=query,
+                context_lines=context_lines,
+                limit=limit,
+                offset=offset,
+                max_limit=settings.function_search_max_limit,
+            )
+    except AppError as exc:
+        raise _tool_error(exc) from exc
+
+
+@mcp.tool()
+async def decompile_many(
+    binary_name: str,
+    functions: list[McpFunctionSelector],
+    binary_version: str = "",
+) -> McpDecompileManyDto:
+    """Return decompiled C for up to 20 functions in one call.
+
+    Each entry in functions sets exactly one of function_id, address (integer,
+    decimal string, or 0x-hex string), or name. Failures (unknown or ambiguous
+    selectors) are reported per entry in its error field.
+    """
+    try:
+        async with _sessions()() as session:
+            return await decompile_mcp_functions(
+                session,
+                binary_name=binary_name,
+                binary_version=binary_version,
+                functions=functions,
             )
     except AppError as exc:
         raise _tool_error(exc) from exc

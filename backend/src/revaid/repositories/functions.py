@@ -403,6 +403,27 @@ async def search_functions(
     return list(rows), total
 
 
+async def search_functions_by_code(
+    session: AsyncSession,
+    *,
+    binary_id: int,
+    query: str,
+    limit: int,
+    offset: int,
+) -> tuple[list[Function], int]:
+    """Case-insensitive substring search restricted to decompiled C."""
+    match = Function.code_c.collate("NOCASE").contains(query, autoescape=True)
+    base_stmt = select(Function).where(Function.binary_id == binary_id, match)
+    total = (
+        await session.execute(select(func.count()).select_from(base_stmt.subquery()))
+    ).scalar_one()
+    page_stmt = (
+        base_stmt.order_by(Function.address.asc(), Function.id.asc()).limit(limit).offset(offset)
+    )
+    rows = (await session.execute(page_stmt)).scalars().all()
+    return list(rows), total
+
+
 async def resolve_function_by_address(
     session: AsyncSession, *, binary_id: int, address: int
 ) -> Function | None:
