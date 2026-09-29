@@ -31,17 +31,21 @@ class AsmLiteral:
 def iter_asm_literals(assembly: str) -> Iterator[AsmLiteral]:
     """Yield each candidate hex literal in ``assembly`` with its instruction."""
     for line in assembly.splitlines():
+        if "0x" not in line:  # cheap prefilter: most lines carry no literal
+            continue
         match = _LINE_RE.match(line.strip())
         if match is None:
             continue
-        instruction_address = int(match.group(1), 16)
         text = match.group(2)
+        instruction_address = -1
         seen: set[int] = set()
         for literal in _HEX_LITERAL_RE.finditer(text):
             value = int(literal.group(1), 16)
             if value < MIN_ADDRESS_LITERAL or value in seen:
                 continue
             seen.add(value)
+            if instruction_address < 0:
+                instruction_address = int(match.group(1), 16)
             yield AsmLiteral(
                 instruction_address=instruction_address,
                 instruction_text=text[:MAX_INSTRUCTION_TEXT],

@@ -114,6 +114,16 @@ async def _persist(
     result: ExtractionResult,
     report: PeDataReport,
 ) -> None:
+    items, refs = _build_values(result)
+    async with unit_of_work(session_factory) as session:
+        report.items_inserted, report.refs_inserted = await replace_binary_data(
+            session, binary_id=binary_id, items=items, refs=refs
+        )
+
+
+def _build_values(
+    result: ExtractionResult,
+) -> tuple[list[DataItemValues], list[DataRefValues]]:
     items = [
         DataItemValues(
             address=i.address,
@@ -137,9 +147,4 @@ async def _persist(
         )
         for r in result.refs
     ]
-    async with unit_of_work(session_factory) as session:
-        # Inserts are executemany-style (list of dicts), so they are not bound
-        # by SQLite's per-statement variable limit.
-        report.items_inserted, report.refs_inserted = await replace_binary_data(
-            session, binary_id=binary_id, items=items, refs=refs
-        )
+    return items, refs

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -28,6 +29,34 @@ from revaid_contracts.schemas.ingest import ImportJobAcceptedDto, ImportJobPhase
 logger = get_logger(__name__)
 
 _DECOMPILER_DIAGNOSTIC_LIMIT = 16 * 1024
+_RESERVED_CORES = 2
+
+
+def available_cores() -> int:
+    """Cores usable by this process right now (honors CPU affinity limits)."""
+    try:
+        return len(os.sched_getaffinity(0)) or 1
+    except AttributeError:  # not available on all platforms
+        return os.cpu_count() or 1
+
+
+def decompiler_command(
+    settings: Settings, executable: str, binary_path: Path, output_path: Path
+) -> list[str]:
+    """Kuna invocation; ``--jobs`` defaults to the core count at call time."""
+    # Leave some cores free so the system (and this server) stays responsive.
+    jobs = settings.decompiler_jobs or max(1, available_cores() - _RESERVED_CORES)
+    return [
+        executable,
+        "decompile-graph",
+        str(binary_path),
+        "-o",
+        str(output_path),
+        "--jobs",
+        str(jobs),
+        "--max-fn-seconds",
+        str(settings.decompiler_max_fn_seconds),
+    ]
 
 
 def _sha256_file(path: Path) -> str:
@@ -291,11 +320,7 @@ class ImportJobManager:
         assert job.output_path is not None
         try:
             job.process = await asyncio.create_subprocess_exec(
-                executable,
-                "decompile-graph",
-                str(job.path),
-                "-o",
-                str(job.output_path),
+                *decompiler_command(self._settings, executable, job.path, job.output_path),
                 stdout=asyncio.subprocess.DEVNULL,
                 stderr=asyncio.subprocess.PIPE,
             )

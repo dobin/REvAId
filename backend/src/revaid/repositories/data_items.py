@@ -10,11 +10,13 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from sqlalchemy import Select, String, cast, delete, func, insert, or_, select, update
+from sqlalchemy import Select, String, cast, delete, func, insert, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from revaid.db.models import DataItem, DataRef, Function
 from revaid_contracts.clock import utc_now_iso
+
+_INSERT_CHUNK = 5000
 
 
 @dataclass(frozen=True, slots=True)
@@ -75,26 +77,28 @@ async def replace_binary_data(
         return 0, 0
 
     now = utc_now_iso()
-    await session.execute(
-        insert(DataItem),
-        [
-            {
-                "binary_id": binary_id,
-                "address": i.address,
-                "rva": i.rva,
-                "section": i.section,
-                "kind": i.kind,
-                "size": i.size,
-                "value_text": i.value_text,
-                "target_address": i.target_address,
-                "preview_hex": i.preview_hex,
-                "is_writable": i.is_writable,
-                "ref_count": 0,
-                "created_at": now,
-            }
-            for i in items
-        ],
-    )
+    ref_counts: dict[int, int] = {}
+    for r in refs:
+        ref_counts[r.item_address] = ref_counts.get(r.item_address, 0) + 1
+    item_rows = [
+        {
+            "binary_id": binary_id,
+            "address": i.address,
+            "rva": i.rva,
+            "section": i.section,
+            "kind": i.kind,
+            "size": i.size,
+            "value_text": i.value_text,
+            "target_address": i.target_address,
+            "preview_hex": i.preview_hex,
+            "is_writable": i.is_writable,
+            "ref_count": ref_counts.get(i.address, 0),
+            "created_at": now,
+        }
+        for i in items
+    ]
+    for start in range(0, len(item_rows), _INSERT_CHUNK):
+        await session.execute(insert(DataItem), item_rows[start : start + _INSERT_CHUNK])
     rows = (
         await session.execute(
             select(DataItem.address, DataItem.id).where(DataItem.binary_id == binary_id)
@@ -114,18 +118,8 @@ async def replace_binary_data(
         for r in refs
         if r.item_address in item_ids
     ]
-    if ref_rows:
-        await session.execute(insert(DataRef), ref_rows)
-
-    counts = (
-        select(func.count(DataRef.id))
-        .where(DataRef.data_item_id == DataItem.id)
-        .correlate(DataItem)
-        .scalar_subquery()
-    )
-    await session.execute(
-        update(DataItem).where(DataItem.binary_id == binary_id).values(ref_count=counts)
-    )
+    for start in range(0, len(ref_rows), _INSERT_CHUNK):
+        await session.execute(insert(DataRef), ref_rows[start : start + _INSERT_CHUNK])
     return len(items), len(ref_rows)
 
 

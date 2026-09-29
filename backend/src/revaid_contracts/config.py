@@ -225,6 +225,10 @@ class Settings(BaseSettings):
     decompiler_executable: str | None = Field(default=None)
     decompiler_timeout_seconds: float = Field(default=3600.0, gt=0)
     decompiler_kill_grace_seconds: float = Field(default=5.0, gt=0)
+    #: Decompiler worker count (`--jobs`). Unset means the machine's CPU count.
+    decompiler_jobs: int | None = Field(default=None, gt=0)
+    #: Per-function decompilation budget (`--max-fn-seconds`).
+    decompiler_max_fn_seconds: int = Field(default=30, gt=0)
     import_staging_dir: str = Field(default="./.graphrev-imports")
     #: SQLite has one writer; a single import worker prevents competing large
     #: imports from turning its busy timeout into user-visible failures.

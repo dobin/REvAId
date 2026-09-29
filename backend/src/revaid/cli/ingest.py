@@ -21,6 +21,7 @@ from revaid.core.config import GhidraAdapterName, Settings, get_settings
 from revaid.db.engine import create_engine, create_session_factory, dispose_engine
 from revaid.db.revision import MigrationNotAppliedError, read_revision, require_revision
 from revaid.db.startup import ANALYSIS_MIGRATION_REVISION
+from revaid.ingestion.import_jobs import decompiler_command
 from revaid.ingestion.pe_data.enrich import enrich_binary_with_pe_data
 from revaid.ingestion.pipeline import run_ingestion
 from revaid.ingestion.report import print_report
@@ -125,13 +126,7 @@ def run_decompile(path: Path, name: str | None, version: str) -> None:
         staging_dir = Path(settings.import_staging_dir).resolve()
         staging_dir.mkdir(parents=True, exist_ok=True)
         output_path = staging_dir / f"{os.urandom(16).hex()}.json"
-        command = [
-            executable,
-            "decompile-graph",
-            str(binary_path),
-            "-o",
-            str(output_path),
-        ]
+        command = decompiler_command(settings, executable, binary_path, output_path)
         command_text = shlex.join(command)
         try:
             await _check_analysis_database(settings)

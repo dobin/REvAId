@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import Protocol
 
@@ -10,6 +11,8 @@ from revaid.ingestion.pe_data.pe_image import PeSection
 
 _MIN_STRING_CHARS = 3
 _PRINTABLE_WHITESPACE = {0x09, 0x0A, 0x0D}
+_ASCII_RUN = re.compile(rb"[\t\n\r\x20-\x7e]*")
+_UTF16_RUN = re.compile(rb"(?:[\t\n\r\x20-\x7e]\x00)*")
 
 
 class PeLike(Protocol):
@@ -39,41 +42,40 @@ def _is_printable(byte: int) -> bool:
 
 def read_ascii(data: bytes, max_chars: int) -> tuple[str, int] | None:
     """Return ``(text, size)`` for a printable string, cut off at ``max_chars``."""
-    chars = bytearray()
-    for index, byte in enumerate(data[:max_chars]):
-        if byte == 0:
-            if len(chars) >= _MIN_STRING_CHARS:
-                return chars.decode("ascii"), index + 1
-            return None
-        if not _is_printable(byte):
-            return None
-        chars.append(byte)
-    if len(chars) == max_chars and len(chars) >= _MIN_STRING_CHARS:
-        return chars.decode("ascii"), len(chars)  # cut off at the limit
+    window = data[:max_chars]
+    run = _ASCII_RUN.match(window).end()  # type: ignore[union-attr]
+    if run < len(window):
+        if window[run] == 0 and run >= _MIN_STRING_CHARS:
+            return window[:run].decode("ascii"), run + 1
+        return None
+    if run == max_chars and run >= _MIN_STRING_CHARS:
+        return window.decode("ascii"), run  # cut off at the limit
     return None
 
 
 def read_utf16(data: bytes, max_chars: int) -> tuple[str, int] | None:
     """Return ``(text, size_with_nul)`` for a printable UTF-16LE (ASCII range) string."""
-    chars: list[str] = []
     limit = min(len(data) - 1, max_chars * 2)
-    for index in range(0, limit, 2):
-        low, high = data[index], data[index + 1]
-        if low == 0 and high == 0:
-            if len(chars) >= _MIN_STRING_CHARS:
-                return "".join(chars), index + 2
-            return None
-        if high != 0 or not _is_printable(low):
-            return None
-        chars.append(chr(low))
-    if len(chars) == max_chars and len(chars) >= _MIN_STRING_CHARS:
-        return "".join(chars), len(chars) * 2  # cut off at the limit
+    if limit <= 0:
+        return None
+    pairs = (limit + 1) // 2
+    window = data[: pairs * 2]
+    end = _UTF16_RUN.match(window).end()  # type: ignore[union-attr]
+    chars = end // 2
+    if chars < pairs:
+        if window[end] == 0 and window[end + 1] == 0 and chars >= _MIN_STRING_CHARS:
+            return window[:end:2].decode("ascii"), end + 2
+        return None
+    if chars == max_chars and chars >= _MIN_STRING_CHARS:
+        return window[:end:2].decode("ascii"), chars * 2  # cut off at the limit
     return None
 
 
-def _string_at(image: PeLike, rva: int, max_bytes: int) -> tuple[DataItemKind, str, int] | None:
+def _string_at(
+    image: PeLike, rva: int, max_bytes: int, data: bytes | None = None
+) -> tuple[DataItemKind, str, int] | None:
     """Read a string, cut off at ``max_bytes`` bytes of its stored representation."""
-    data = image.read(rva, max_bytes + 2)
+    data = image.read(rva, max_bytes + 2) if data is None else data[: max_bytes + 2]
     if not data:
         return None
     ascii_string = read_ascii(data, max_bytes)
@@ -97,9 +99,12 @@ def classify_data(
     if slot is not None:
         return ClassifiedData(kind="import", size=image.pointer_size, value_text=slot)
 
-    head = image.read(rva, max(preview_bytes, image.pointer_size))
-    if head is None:
+    head_len = max(preview_bytes, image.pointer_size)
+    # One read serves the preview, pointer and string checks.
+    blob = image.read(rva, max(head_len, max_string_bytes + 2))
+    if blob is None:
         return ClassifiedData(kind="uninitialized", size=0)
+    head = blob[:head_len]
     preview = head[:preview_bytes].hex()
 
     pointer_size = image.pointer_size
@@ -112,7 +117,7 @@ def classify_data(
             if rva in image.relocation_rvas:
                 return _pointer(image, pointer_target, target_rva, preview, max_string_bytes)
 
-    text = _string_at(image, rva, max_string_bytes)
+    text = _string_at(image, rva, max_string_bytes, blob)
     if text is not None:
         kind, value_text, size = text
         return ClassifiedData(kind=kind, size=size, value_text=value_text)

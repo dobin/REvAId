@@ -62,6 +62,10 @@ class PeImage:
             )
             for s in pe.sections
         ]
+        # Precomputed (start, end, section) so lookups avoid property calls.
+        self._spans: list[tuple[int, int, PeSection]] = [
+            (s.rva, s.rva + s.span, s) for s in self.sections
+        ]
         self.import_slots: dict[int, str] = {}
         for attr in ("DIRECTORY_ENTRY_IMPORT", "DIRECTORY_ENTRY_DELAY_IMPORT"):
             for entry in getattr(pe, attr, []) or []:
@@ -83,8 +87,8 @@ class PeImage:
         pe.close()
 
     def section_at(self, rva: int) -> PeSection | None:
-        for section in self.sections:
-            if section.contains(rva):
+        for start, end, section in self._spans:
+            if start <= rva < end:
                 return section
         return None
 
