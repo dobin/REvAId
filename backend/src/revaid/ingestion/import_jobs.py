@@ -18,6 +18,7 @@ from uuid import uuid4
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from revaid.core.config import Settings
+from revaid.ingestion.pe_data.enrich import enrich_binary_with_pe_data
 from revaid.schemas.ingest import ImportJobStatusDto
 from revaid.services.binary_service import import_ghidra_export, load_ghidra_export_file
 from revaid_contracts.http_errors import AppError, ErrorCode
@@ -185,6 +186,22 @@ class ImportJobManager:
                 job.phase = ImportJobPhase.IMPORTING
                 job.result = self._status(job)
                 result = await import_ghidra_export(self._session_factory, self._settings, document)
+                if job.source_kind == "raw_binary":
+                    # The staged PE is deleted in `finally`; enrich while it exists.
+                    pe_report = await enrich_binary_with_pe_data(
+                        self._session_factory,
+                        self._settings,
+                        binary_name=result.name,
+                        binary_version=result.version,
+                        pe_path=job.path,
+                    )
+                    result = result.model_copy(
+                        update={
+                            "data_items_inserted": pe_report.items_inserted,
+                            "data_refs_inserted": pe_report.refs_inserted,
+                            "warnings": pe_report.warnings,
+                        }
+                    )
                 samples = result.failures[: self._settings.import_failure_sample_limit]
                 job.phase = ImportJobPhase.COMPLETED
                 job.result = ImportJobStatusDto(

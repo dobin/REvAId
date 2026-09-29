@@ -12,18 +12,28 @@ from revaid.db.uow import write_lock
 from revaid.schemas.mcp import (
     McpBinaryListDto,
     McpCodeSearchPageDto,
+    McpDataItemDetailDto,
+    McpDataItemSearchPageDto,
     McpDecompileManyDto,
+    McpFunctionDataDto,
     McpFunctionDetailDto,
+    McpFunctionsByDataPageDto,
     McpFunctionSearchPageDto,
     McpFunctionSelector,
     McpFunctionUpdateDto,
+    McpRelatedByDataPageDto,
 )
 from revaid.services.mcp_service import (
     decompile_mcp_functions,
     find_mcp_functions,
-    search_mcp_code,
+    find_mcp_functions_by_data,
+    find_mcp_related_by_data,
+    get_mcp_data_item,
     get_mcp_function,
+    get_mcp_function_data,
     list_mcp_binaries,
+    search_mcp_code,
+    search_mcp_data,
     set_mcp_function_info,
 )
 from revaid_contracts.http_errors import AppError
@@ -197,6 +207,205 @@ async def set_function_info(
                 name_llm=name_llm,
                 summary_short=summary_short,
                 summary_long=summary_long,
+            )
+    except AppError as exc:
+        raise _tool_error(exc) from exc
+
+
+
+
+
+
+@mcp.tool()
+async def search_data(
+    binary_name: str,
+    binary_version: str = "",
+    query: str | None = None,
+    kind: str | None = None,
+    section: str | None = None,
+    min_refs: int | None = None,
+    max_refs: int | None = None,
+    sort: str = "address",
+    limit: int = 50,
+    offset: int = 0,
+) -> McpDataItemSearchPageDto:
+    """Search PE data items (strings, imports, pointers, globals) of one binary.
+
+    query is a case-insensitive substring of the decoded value (string text,
+    up to 1024 bytes then cut off; import "DLL::Name"; pointed-to string), of
+    the address (hex or decimal), or a hex byte sequence ("de ad be ef",
+    "0xdeadbeef") matched against the first 128 bytes of raw data items.
+    kind: string, wstring, pointer, import, bytes, uninitialized. section: e.g.
+    .rdata, .data. min_refs/max_refs filter by number of referencing
+    instructions (use max_refs to skip common items). sort: address, refs_asc
+    (rarest first), refs_desc. Use get_data_item to see who references an item.
+
+    Coverage: data items exist only for binaries imported from a raw PE and only
+    when referenced by a literal address in a function's assembly; computed or
+    indirect references are not indexed.
+    """
+    settings = get_settings()
+    try:
+        async with _sessions()() as session:
+            return await search_mcp_data(
+                session,
+                binary_name=binary_name,
+                binary_version=binary_version,
+                query=query,
+                kind=kind,
+                section=section,
+                min_refs=min_refs,
+                max_refs=max_refs,
+                sort=sort,
+                limit=limit,
+                offset=offset,
+                max_limit=settings.function_search_max_limit,
+            )
+    except AppError as exc:
+        raise _tool_error(exc) from exc
+
+
+@mcp.tool()
+async def get_data_item(
+    binary_name: str,
+    binary_version: str = "",
+    data_item_id: int | None = None,
+    address: int | str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> McpDataItemDetailDto:
+    """Return one data item and every function/instruction that references it.
+
+    Specify exactly one of data_item_id or address (integer, decimal string, or
+    0x-hex string). """
+    settings = get_settings()
+    try:
+        async with _sessions()() as session:
+            return await get_mcp_data_item(
+                session,
+                binary_name=binary_name,
+                binary_version=binary_version,
+                data_item_id=data_item_id,
+                address=address,
+                limit=limit,
+                offset=offset,
+                max_limit=settings.function_search_max_limit,
+            )
+    except AppError as exc:
+        raise _tool_error(exc) from exc
+
+
+@mcp.tool()
+async def get_function_data(
+    binary_name: str,
+    binary_version: str = "",
+    function_id: int | None = None,
+    address: int | str | None = None,
+    name: str | None = None,
+    limit: int = 100,
+    offset: int = 0,
+) -> McpFunctionDataDto:
+    """List the data items (strings, imports, globals) one function references.
+
+    Specify exactly one selector: function_id, exact start address, or exact
+    name. """
+    settings = get_settings()
+    try:
+        async with _sessions()() as session:
+            return await get_mcp_function_data(
+                session,
+                binary_name=binary_name,
+                binary_version=binary_version,
+                function_id=function_id,
+                address=address,
+                name=name,
+                limit=limit,
+                offset=offset,
+                max_limit=settings.function_search_max_limit,
+            )
+    except AppError as exc:
+        raise _tool_error(exc) from exc
+
+
+@mcp.tool()
+async def find_functions_by_data(
+    binary_name: str,
+    binary_version: str = "",
+    query: str | None = None,
+    kind: str | None = None,
+    section: str | None = None,
+    min_refs: int | None = None,
+    max_refs: int | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> McpFunctionsByDataPageDto:
+    """Find functions that reference data items matching the same filters as search_data.
+
+    Each function is returned once with its matching items, e.g. query
+    "CreateRemoteThread" or "password". """
+    settings = get_settings()
+    try:
+        async with _sessions()() as session:
+            return await find_mcp_functions_by_data(
+                session,
+                binary_name=binary_name,
+                binary_version=binary_version,
+                query=query,
+                kind=kind,
+                section=section,
+                min_refs=min_refs,
+                max_refs=max_refs,
+                limit=limit,
+                offset=offset,
+                max_limit=settings.function_search_max_limit,
+            )
+    except AppError as exc:
+        raise _tool_error(exc) from exc
+
+
+@mcp.tool()
+async def find_related_functions(
+    binary_name: str,
+    binary_version: str = "",
+    function_id: int | None = None,
+    address: int | str | None = None,
+    name: str | None = None,
+    max_item_ref_count: int = 20,
+    limit: int = 20,
+) -> McpRelatedByDataPageDto:
+    """Rank other functions by data items shared with the given function.
+
+    Items referenced by more than max_item_ref_count instructions (security
+    cookie, common globals) are ignored; rarer shared items weigh more. Each
+    result lists the shared items as evidence. Specify exactly one selector.
+
+    Coverage: data items exist only for binaries imported from a raw PE and only
+    when referenced by a literal address in a function's assembly; computed or
+    indirect references are not indexed.
+
+    Coverage: data items exist only for binaries imported from a raw PE and only
+    when referenced by a literal address in a function's assembly; computed or
+    indirect references are not indexed.
+
+    Coverage: data items exist only for binaries imported from a raw PE and only
+    when referenced by a literal address in a function's assembly; computed or
+    indirect references are not indexed.
+
+    Coverage: data items exist only for binaries imported from a raw PE and only
+    when referenced by a literal address in a function's assembly; computed or
+    indirect references are not indexed.
+    """
+    try:
+        async with _sessions()() as session:
+            return await find_mcp_related_by_data(
+                session,
+                binary_name=binary_name,
+                binary_version=binary_version,
+                function_id=function_id,
+                address=address,
+                name=name,
+                max_item_ref_count=max_item_ref_count,
+                limit=limit,
             )
     except AppError as exc:
         raise _tool_error(exc) from exc

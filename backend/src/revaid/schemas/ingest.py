@@ -158,6 +158,10 @@ class ImportResultDto(ApiModel):
     edges_inserted: int
     placeholders_created: int
     failures: list[str] = Field(default_factory=list)
+    #: Raw-binary imports only: PE data items/references found in assembly.
+    data_items_inserted: int = 0
+    data_refs_inserted: int = 0
+    warnings: list[str] = Field(default_factory=list)
 
 
 class ImportJobStatusDto(ApiModel):

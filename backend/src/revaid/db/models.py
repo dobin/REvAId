@@ -28,6 +28,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from revaid.db.enums import (
+    DATA_ITEM_KIND_VALUES,
     EDGE_KIND_VALUES,
     FUNCTION_KIND_VALUES,
     LLM_WORKER_OUTCOME_VALUES,
@@ -189,6 +190,65 @@ class Edge(Base):
         Index("ix_edges_caller", "caller_id"),
         Index("ix_edges_callee", "callee_id"),
         Index("ix_edges_caller_callee_order", "caller_id", "callee_order"),
+    )
+
+
+class DataItem(Base):
+    """A PE data location (.data/.rdata/...) referenced from function assembly.
+
+    Populated only for binaries imported from a raw PE. References are
+    recovered opportunistically from literal addresses in assembly text.
+    """
+
+    __tablename__ = "data_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    binary_id: Mapped[int] = mapped_column(ForeignKey("binaries.id", ondelete="CASCADE"))
+    address: Mapped[int] = mapped_column()
+    rva: Mapped[int] = mapped_column()
+    section: Mapped[str] = mapped_column()
+    kind: Mapped[str] = mapped_column()
+    size: Mapped[int] = mapped_column(default=0)
+    # Decoded string, import name ("DLL::Name"), or pointed-to string.
+    value_text: Mapped[str | None] = mapped_column(default=None)
+    target_address: Mapped[int | None] = mapped_column(default=None)
+    preview_hex: Mapped[str | None] = mapped_column(default=None)
+    is_writable: Mapped[bool] = mapped_column(default=False)
+    ref_count: Mapped[int] = mapped_column(default=0)
+    created_at: Mapped[str] = mapped_column()
+
+    __table_args__ = (
+        UniqueConstraint("binary_id", "address", name="ux_data_items_binary_address"),
+        CheckConstraint(f"kind IN {_sql_in_list(DATA_ITEM_KIND_VALUES)}", name="kind_valid"),
+        Index("ix_data_items_binary_kind", "binary_id", "kind"),
+        Index("ix_data_items_binary_section", "binary_id", "section"),
+        Index("ix_data_items_binary_refcount", "binary_id", "ref_count"),
+    )
+
+
+class DataRef(Base):
+    """A function -> data item reference at one instruction (like an edge)."""
+
+    __tablename__ = "data_refs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    binary_id: Mapped[int] = mapped_column(ForeignKey("binaries.id", ondelete="CASCADE"))
+    function_id: Mapped[int] = mapped_column(ForeignKey("functions.id", ondelete="CASCADE"))
+    data_item_id: Mapped[int] = mapped_column(ForeignKey("data_items.id", ondelete="CASCADE"))
+    instruction_address: Mapped[int] = mapped_column()
+    instruction_text: Mapped[str] = mapped_column()
+    source: Mapped[str] = mapped_column(default="asm-parse")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "function_id",
+            "data_item_id",
+            "instruction_address",
+            name="ux_data_refs_function_item_instruction",
+        ),
+        Index("ix_data_refs_item", "data_item_id"),
+        Index("ix_data_refs_function", "function_id"),
+        Index("ix_data_refs_binary", "binary_id"),
     )
 
 

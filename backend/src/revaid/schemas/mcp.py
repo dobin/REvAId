@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from revaid.db.models import Function
+from revaid.db.models import DataItem, Function
 from revaid.repositories.edges import RelatedFunction
 from revaid.schemas.function import (
     FunctionParamDto,
@@ -225,4 +225,118 @@ def mcp_function_detail_from_row(
         summary=base.summary,
         callers=[mcp_related_function_from_row(row) for row in callers],
         callees=[mcp_related_function_from_row(row) for row in callees],
+    )
+
+
+# -- PE data items (raw-binary imports; references parsed from assembly) ----
+
+
+class McpDataItemDto(ApiModel):
+    id: int
+    address: int
+    address_hex: str
+    rva_hex: str
+    section: str
+    kind: str
+    size: int
+    value_text: str | None
+    target_address_hex: str | None
+    preview_hex: str | None
+    is_writable: bool
+    ref_count: int
+
+
+class McpDataItemSearchPageDto(ApiModel):
+    binary_name: str
+    binary_version: str
+    items: list[McpDataItemDto]
+    total: int
+    limit: int
+    offset: int
+    query: str | None
+
+
+class McpDataRefDto(ApiModel):
+    """One instruction referencing a data item (parsed from assembly text)."""
+
+    function_id: int
+    function_address_hex: str
+    function_display_name: str
+    instruction_address_hex: str
+    instruction_text: str
+
+
+class McpDataItemDetailDto(ApiModel):
+    binary_name: str
+    binary_version: str
+    item: McpDataItemDto
+    references: list[McpDataRefDto]
+    total_references: int
+    limit: int
+    offset: int
+
+
+class McpFunctionDataRefDto(ApiModel):
+    instruction_address_hex: str
+    instruction_text: str
+    item: McpDataItemDto
+
+
+class McpFunctionDataDto(ApiModel):
+    binary_name: str
+    binary_version: str
+    function_id: int
+    function_address_hex: str
+    function_display_name: str
+    references: list[McpFunctionDataRefDto]
+    total_references: int
+    limit: int
+    offset: int
+
+
+class McpFunctionWithDataDto(ApiModel):
+    function: McpFunctionSearchRowDto
+    matching_items: list[McpDataItemDto]
+
+
+class McpFunctionsByDataPageDto(ApiModel):
+    binary_name: str
+    binary_version: str
+    functions: list[McpFunctionWithDataDto]
+    total: int
+    limit: int
+    offset: int
+    query: str | None
+
+
+class McpRelatedByDataDto(ApiModel):
+    function: McpFunctionSearchRowDto
+    score: float
+    shared_items: list[McpDataItemDto]
+
+
+class McpRelatedByDataPageDto(ApiModel):
+    binary_name: str
+    binary_version: str
+    function_id: int
+    max_item_ref_count: int
+    related: list[McpRelatedByDataDto]
+
+
+def mcp_data_item_from_row(item: DataItem) -> McpDataItemDto:
+    return McpDataItemDto(
+        id=item.id,
+        address=item.address,
+        address_hex=f"0x{item.address:X}",
+        rva_hex=f"0x{item.rva:X}",
+        section=item.section,
+        kind=item.kind,
+        size=item.size,
+        value_text=item.value_text,
+        target_address_hex=(
+            f"0x{item.target_address:X}" if item.target_address is not None else None
+        ),
+        preview_hex=item.preview_hex,
+        is_writable=item.is_writable,
+        ref_count=item.ref_count,
     )

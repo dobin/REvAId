@@ -104,6 +104,40 @@ This tool cannot modify ingestion-owned ground truth (`assembly`, `code_c`, addr
 
 MCP writes are committed directly to SQLite. Since the MCP server is a separate process, writes do not publish events through the API's in-process SSE bus; clients see them on their next read or refresh.
 
+## Data items (strings, imports, globals)
+
+When a binary is imported from a **raw PE** (API `POST /api/v1/binaries/decompile` or `graphrev decompile`), the stored assembly of every function is scanned for literal addresses. Addresses that fall in a non-executable PE section (`.data`, `.rdata`, `.idata`, ...) become *data items* (classified with `pefile` as `string`, `wstring`, `pointer`, `import`, `bytes` or `uninitialized`), and each referencing instruction becomes a *data reference* from the function to the item, similar to the call graph.
+
+Limits to keep in mind:
+
+- JSON-only imports have no data items (the PE is not available).
+- References are parsed from assembly text. Computed or indirect addresses (`[RBX + 0x30]`, table lookups) are **not** found, so absence of a reference is not proof.
+- Only referenced locations are indexed; the PE is not scanned for unreferenced strings.
+- Extraction is best-effort: if it fails the import still succeeds and the result carries a warning (`warnings`, plus `dataItemsInserted` / `dataRefsInserted`).
+- The PE is not kept after import, so the data can only be rebuilt by re-importing.
+
+All data tools take `binary_name` and optional `binary_version`, and paginate with `limit`/`offset` (clamped to the function-search maximum).
+
+### `search_data`
+
+Searches a binary's data items. `query` is a case-insensitive substring of the decoded value (string text, import `DLL::Name`, pointed-to string), of the address (hex or decimal), or a hex byte sequence (`de ad be ef`, `0xdeadbeef`, `\xde\xad`) matched against the stored bytes. Strings are stored up to 1024 bytes and raw data (`bytes`, `pointer`) up to the first 128 bytes, both cut off (`pe_data_max_string_bytes`, `pe_data_preview_bytes`); matches beyond the cut-off are not found. A short hex-looking query such as `add` can also match byte previews; use `kind` to narrow. Filters: `kind`, `section`, `min_refs`, `max_refs`. `sort` is `address`, `refs_asc` (rarest first) or `refs_desc`. Items report address, RVA, section, kind, size, value, pointer target, a hex preview, writability and `refCount`.
+
+### `get_data_item`
+
+Returns one item (by `data_item_id` or `address`) and every referencing function and instruction, including the assembly line.
+
+### `get_function_data`
+
+Lists the data items one function references (selector: `function_id`, `address`, or `name`), in instruction order.
+
+### `find_functions_by_data`
+
+Same filters as `search_data`, but returns the *functions* that reference matching items, each once with its matching items. Use it for questions like "which functions use a string containing `password`" or "which import `CreateRemoteThread`".
+
+### `find_related_functions`
+
+Ranks other functions by data items shared with a given function. Items referenced by more than `max_item_ref_count` instructions (default 20; e.g. the security cookie) are ignored, and rarer items weigh more (score $\sum 1/\text{refCount}$). The shared items are returned as evidence.
+
 ## Errors
 
 Application errors are converted into MCP `ToolError` responses with GraphRev's machine-readable code, message, and optional details. Common cases are:
@@ -122,12 +156,14 @@ MCP transport → service → repositories → SQLAlchemy models / SQLite
 
 Important files:
 
-- `backend/src/graphrev/mcp/server.py` — MCP registration, Streamable HTTP startup, database session lifecycle, write locking, and error translation.
-- `backend/src/graphrev/services/mcp_service.py` — binary/function resolution, validation, result assembly, and update orchestration.
-- `backend/src/graphrev/schemas/mcp.py` — typed structured-output DTOs and ORM-to-output mapping.
-- `backend/src/graphrev/repositories/functions.py` — exact function lookup, search including optional C content, and the allowlisted LLM-field update.
-- `backend/src/graphrev/repositories/edges.py` — direct caller/callee queries and edge metadata.
-- `backend/src/graphrev/core/config.py` — `mcp_host`, `mcp_port`, and search-limit settings.
+- `backend/src/revaid_mcp/server.py` — MCP registration, Streamable HTTP startup, database session lifecycle, write locking, and error translation.
+- `backend/src/revaid/services/mcp_service.py` — binary/function resolution, validation, result assembly, and update orchestration.
+- `backend/src/revaid/schemas/mcp.py` — typed structured-output DTOs and ORM-to-output mapping.
+- `backend/src/revaid/repositories/functions.py` — exact function lookup, search including optional C content, and the allowlisted LLM-field update.
+- `backend/src/revaid/repositories/edges.py` — direct caller/callee queries and edge metadata.
+- `backend/src/revaid/repositories/data_items.py` — data item/reference storage and search queries.
+- `backend/src/revaid/ingestion/pe_data/` — assembly literal parsing, `pefile` wrapper, classification and post-import enrichment.
+- `backend/src/revaid_contracts/config.py` — `mcp_host`, `mcp_port`, search-limit and `pe_data_*` settings.
 - `backend/tests/services/test_mcp_service.py` and `backend/tests/repositories/test_functions_read.py` — service and search behavior.
 
 `MCPServer` derives each tool's input and structured-output schema from its Python type annotations. DTOs inherit GraphRev's `ApiModel`, so serialized field names use camelCase.

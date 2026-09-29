@@ -21,6 +21,7 @@ from revaid.core.config import GhidraAdapterName, Settings, get_settings
 from revaid.db.engine import create_engine, create_session_factory, dispose_engine
 from revaid.db.revision import MigrationNotAppliedError, read_revision, require_revision
 from revaid.db.startup import ANALYSIS_MIGRATION_REVISION
+from revaid.ingestion.pe_data.enrich import enrich_binary_with_pe_data
 from revaid.ingestion.pipeline import run_ingestion
 from revaid.ingestion.report import print_report
 from revaid.ingestion.seed_summaries import seed_mock_summaries
@@ -173,12 +174,22 @@ def run_decompile(path: Path, name: str | None, version: str) -> None:
             session_factory = create_session_factory(engine)
             try:
                 result = await import_ghidra_export(session_factory, settings, document)
+                pe_report = await enrich_binary_with_pe_data(
+                    session_factory,
+                    settings,
+                    binary_name=result.name,
+                    binary_version=result.version,
+                    pe_path=path,
+                )
             finally:
                 await dispose_engine(engine)
             typer.echo(
                 f"Analyzed and imported {result.name} ({result.version}): "
-                f"{result.functions_inserted} functions, {result.edges_inserted} edges."
+                f"{result.functions_inserted} functions, {result.edges_inserted} edges, "
+                f"{pe_report.items_inserted} data items, {pe_report.refs_inserted} data references."
             )
+            for warning in pe_report.warnings:
+                typer.echo(f"Warning: {warning}", err=True)
         except TimeoutError as exc:
             typer.echo(f"Kuna analysis timed out. Command: {command_text}", err=True)
             raise typer.Exit(code=1) from exc

@@ -165,6 +165,14 @@ class Settings(BaseSettings):
     function_search_default_limit: int = Field(default=50, gt=0, description="I3 / B11 / E1a.")
     function_search_max_limit: int = Field(default=200, gt=0, description="I3 / B11 / E1a.")
 
+    #: Raw-binary import: extract PE data items referenced from assembly.
+    pe_data_enabled: bool = Field(default=True)
+    #: Bytes kept (as hex, cut off) for non-string items; searchable.
+    pe_data_preview_bytes: int = Field(default=128, gt=0, le=4096)
+    #: Strings are stored up to this many bytes, then cut off; searchable.
+    pe_data_max_string_bytes: int = Field(default=1024, gt=0, le=65536)
+    pe_data_max_items: int = Field(default=200_000, gt=0)
+
     #: Local Streamable HTTP endpoint for the agent-facing GraphRev MCP server.
     mcp_host: str = Field(default="127.0.0.1")
     mcp_port: int = Field(default=8001, gt=0, le=65535)

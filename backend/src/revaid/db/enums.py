@@ -25,6 +25,17 @@ FUNCTION_KIND_VALUES: tuple[FunctionKind, ...] = (
 EdgeKind = Literal["call", "jump", "data"]
 EDGE_KIND_VALUES: tuple[EdgeKind, ...] = ("call", "jump", "data")
 
+#: How a PE data item (referenced from assembly) was classified.
+DataItemKind = Literal["string", "wstring", "pointer", "import", "bytes", "uninitialized"]
+DATA_ITEM_KIND_VALUES: tuple[DataItemKind, ...] = (
+    "string",
+    "wstring",
+    "pointer",
+    "import",
+    "bytes",
+    "uninitialized",
+)
+
 #: The lifecycle includes `stale` for summaries invalidated by source changes.
 SummaryStatus = Literal["none", "pending", "ready", "error", "stale"]
 SUMMARY_STATUS_VALUES: tuple[SummaryStatus, ...] = (

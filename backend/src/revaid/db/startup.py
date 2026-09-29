@@ -18,7 +18,7 @@ from revaid_contracts.logging import get_logger
 logger = get_logger(__name__)
 
 _UTILITY_THRESHOLD_KEY = "utility_fanin_threshold"
-ANALYSIS_MIGRATION_REVISION = "0015"
+ANALYSIS_MIGRATION_REVISION = "0016"
 
 
 async def recover_pending_summaries(session: AsyncSession, queue: SummaryQueue) -> int:

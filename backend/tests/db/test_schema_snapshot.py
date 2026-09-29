@@ -28,6 +28,8 @@ EXPECTED_TABLES = {
     "functions",
     "llm_worker_statuses",
     "edges",
+    "data_items",
+    "data_refs",
 }
 
 
