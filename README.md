@@ -81,6 +81,8 @@ The default MCP endpoint is:
 http://127.0.0.1:8001/mcp
 ```
 
+For detailed information, see [revaid-mcp](https://github.com/dobin/REvAId/blob/main/docs/revaid-mcp.md)
+
 
 ### Interace: REvAId-UI
 
