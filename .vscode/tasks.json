@@ -2,34 +2,12 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "dev:all",
-      "dependsOn": ["analysis", "viewer", "web"],
-      "dependsOrder": "parallel",
+      "label": "ui",
+      "type": "shell",
+      "isBackground": true,
+      "command": "just ui",
+      "options": { "cwd": "${workspaceFolder}" },
       "group": { "kind": "build", "isDefault": true },
-      "isBackground": true
-    },
-    {
-      "label": "analysis",
-      "type": "shell",
-      "isBackground": true,
-      "command": "just analysis",
-      "options": { "cwd": "${workspaceFolder}" },
-      "problemMatcher": []
-    },
-    {
-      "label": "viewer",
-      "type": "shell",
-      "isBackground": true,
-      "command": "just viewer",
-      "options": { "cwd": "${workspaceFolder}" },
-      "problemMatcher": []
-    },
-    {
-      "label": "web",
-      "type": "shell",
-      "isBackground": true,
-      "command": "just web",
-      "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": []
     },
     {

@@ -24,7 +24,7 @@ The analysis REST API also accepts streamed uploads at `POST
 
 ## From the viewer UI
 
-Start the UI stack with `just dev`, open <http://127.0.0.1:5173>, and choose
+Start the UI stack with `just ui`, open <http://127.0.0.1:5173>, and choose
 **Import or analyze binary**:
 
 - **Raw binary** (default): select the executable and choose **Analyze binary**.

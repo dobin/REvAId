@@ -247,7 +247,7 @@ class Settings(BaseSettings):
 
     #: Gates `MockLlmAdapter`'s latency/failure simulation (TAD §6.3's
     #: "1-8s latency, ~5% failures" spec). Off by default so `just test` and
-    #: everyday `just dev` usage get fast, reliable mock summaries; flip this
+    #: everyday `just ui` usage get fast, reliable mock summaries; flip this
     #: on (env `GRAPHREV_MOCK_LLM_SIMULATE_LATENCY=true`) for manual UI
     #: testing of the shimmer/queue-depth/pending-state experience under
     #: realistic timing. NOT exposed on `GET /config` — backend-only knob,

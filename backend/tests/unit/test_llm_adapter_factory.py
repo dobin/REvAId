@@ -41,7 +41,7 @@ def test_create_adapter_honours_latency_bounds_and_failure_rate() -> None:
 
 def test_default_settings_disable_latency_simulation() -> None:
     """Demo/test-friendliness default (per README): `just test` and everyday
-    `just dev` must not pay the 1-8s TAD-spec latency unless a developer
+    `just ui` must not pay the 1-8s TAD-spec latency unless a developer
     opts in via `GRAPHREV_MOCK_LLM_SIMULATE_LATENCY=true`."""
     settings = _settings()
     assert settings.mock_llm_simulate_latency is False

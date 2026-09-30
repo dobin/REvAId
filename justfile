@@ -7,19 +7,21 @@ default:
 
 # --- setup ---------------------------------------------------------------
 
-setup:
-    cd backend && uv sync
+setup: setup-noui
     cd frontend && npm install
+
+setup-noui:
+    cd backend && uv sync
 
 # --- dev -------------------------------------------------------------------
 
-dev:
+ui:
     #!/usr/bin/env bash
     set -euo pipefail
     trap 'kill 0' EXIT
-    just analysis &
-    just viewer &
-    just web &
+    just _analysis &
+    just _viewer &
+    just _web &
     wait
 
 # Build the SPA and serve it alongside the split backends without reloads.
@@ -29,14 +31,14 @@ prod domain="":
     set -euo pipefail
     trap 'kill 0' EXIT
     export GRAPHREV_WEB_DOMAIN="{{ domain }}"
-    just web-build
-    just analysis-prod &
-    just viewer-prod &
-    just web-prod &
+    just _web-build
+    just _analysis-prod &
+    just _viewer-prod &
+    just _web-prod &
     wait
 
 # Build only when the saved bundle is missing or a frontend input changed.
-web-build:
+_web-build:
     #!/usr/bin/env bash
     set -euo pipefail
     output="frontend/dist/index.html"
@@ -59,41 +61,29 @@ web-build:
     fi
 
 # Rebuild the SPA even when the saved bundle appears current.
-web-build-force:
+_web-build-force:
     cd frontend && npm run build
 
-api-prod:
-    cd backend && uv run uvicorn revaid.main:app \
-        --host "${GRAPHREV_ANALYSIS_HOST:-127.0.0.1}" \
-        --port "${GRAPHREV_ANALYSIS_PORT:-8000}" \
-        --workers 1
-
-analysis:
+_analysis:
     cd backend && uv run uvicorn revaid.main:app --reload \
         --host "${GRAPHREV_ANALYSIS_HOST:-${GRAPHREV_HOST:-127.0.0.1}}" \
         --port "${GRAPHREV_ANALYSIS_PORT:-${GRAPHREV_PORT:-8000}}"
 
-analysis-prod:
+_analysis-prod:
     cd backend && uv run uvicorn revaid.main:app --host "${GRAPHREV_ANALYSIS_HOST:-127.0.0.1}" --port "${GRAPHREV_ANALYSIS_PORT:-8000}" --workers 1
 
-viewer:
+_viewer:
     cd backend && uv run uvicorn revaid_ui.main:app --reload \
         --host "${GRAPHREV_VIEWER_HOST:-${GRAPHREV_HOST:-127.0.0.1}}" \
         --port "${GRAPHREV_VIEWER_PORT:-8002}"
 
-viewer-prod:
+_viewer-prod:
     cd backend && uv run uvicorn revaid_ui.main:app --host "${GRAPHREV_VIEWER_HOST:-127.0.0.1}" --port "${GRAPHREV_VIEWER_PORT:-8002}" --workers 1
 
-web-prod:
+_web-prod:
     cd frontend && npm run preview -- \
         --host "${GRAPHREV_WEB_HOST:-127.0.0.1}" \
         --port "${GRAPHREV_WEB_PORT:-4173}"
-
-api:
-    cd backend && uv run uvicorn revaid.main:app --reload --host 127.0.0.1 --port 8000
-
-dev-split:
-    just dev
 
 mcp:
     cd backend && GRAPHREV_MCP_HOST="${GRAPHREV_MCP_HOST:-${GRAPHREV_HOST:-127.0.0.1}}" uv run graphrev-mcp
@@ -101,7 +91,7 @@ mcp:
 viewer-stats:
     cd backend && uv run revaid-ui-db
 
-web:
+_web:
     cd frontend && npm run dev -- \
         --host "${GRAPHREV_WEB_HOST:-${GRAPHREV_HOST:-127.0.0.1}}" \
         --port "${GRAPHREV_WEB_PORT:-5173}"

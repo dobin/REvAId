@@ -33,7 +33,7 @@ which also runs in CI).
 
 `MockLlmAdapter`'s simulated latency (1-8s per TAD §6.3) is **off by
 default** (`GRAPHREV_MOCK_LLM_SIMULATE_LATENCY=false`) so `just test` and
-everyday `just dev` get fast, near-instant mock summaries. Set it to `true`
+everyday `just ui` get fast, near-instant mock summaries. Set it to `true`
 (plus optionally `GRAPHREV_MOCK_LLM_MIN_LATENCY_SECONDS` /
 `_MAX_LATENCY_SECONDS`) when you want to manually exercise the
 pending/shimmer/queue-depth UI under realistic timing. A small

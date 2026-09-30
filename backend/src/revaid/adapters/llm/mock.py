@@ -35,7 +35,7 @@ from revaid.adapters.mock_summaries import (
 #: TAD §6.3 mock spec. Overridable via `Settings.mock_llm_*` (see
 #: `adapters/llm/__init__.py::create_adapter`) so a demo/manual-UI-testing
 #: session can dial latency down (or failures to zero) without editing this
-#: module, while tests and normal `just dev` usage keep the original spec.
+#: module, while tests and normal `just ui` usage keep the original spec.
 _MIN_LATENCY_SECONDS = 1.0
 _MAX_LATENCY_SECONDS = 8.0
 _BASELINE_FAILURE_RATE = 0.05
