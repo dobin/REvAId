@@ -23,6 +23,36 @@ The bind address and port can be changed with `GRAPHREV_MCP_HOST` and `GRAPHREV_
 
 The server is also installed as the `graphrev-mcp` console command.
 
+
+## And
+
+GraphRev includes a local Streamable HTTP MCP server for agents that analyze
+the imported binary database. Start it after migration and ingestion:
+
+```sh
+just mcp
+```
+
+The endpoint defaults to `http://127.0.0.1:8001/mcp`. Configure it with
+`GRAPHREV_MCP_HOST` and `GRAPHREV_MCP_PORT`. Keep the default loopback binding
+unless authentication and TLS are provided by a trusted reverse proxy.
+
+The server exposes these tools:
+
+- `list_binaries`: list binary names, versions, function counts, and edge counts.
+- `find_functions`: search one binary by name, address, notes, or decompiled C.
+- `get_function`: retrieve assembly, decompiled C, metadata, callers, and callees.
+- `set_function_info`: write `name_llm`, `summary_short`, and/or `summary_long`.
+
+Every function tool requires `binary_name`; `binary_version` defaults to the
+empty version. Function reads and writes accept exactly one of `function_id`,
+the exact decimal start `address`, or an exact stored `name`. Prefer IDs or
+
+
+## Caddy
+
+
+
 ## Binary and function identity
 
 Every function tool requires `binary_name`. `binary_version` is optional and defaults to the empty string, but it is part of the binary's unique identity.

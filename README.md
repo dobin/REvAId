@@ -4,139 +4,139 @@
 
 > Cant read asm? dont understand C pointers? Dont know what a basic block is? Tired of having FUN_*? Have no PDBs? Or just being sick of it? Fear not, REvAId is here!
 
-REvAId is a semantic function graph explorer for binary reverse
-engineering: it renders a binary's call graph as interactive cards, lazily
-summarizes functions with an LLM, and lets an analyst annotate what they
-find.
+REvAId is a Reverse Engineering Aid for/with aI. 
 
-Purpose: 
-* Reverse engineer binaries without reading C/ASM code, only LLM summaries in a function call graph (ai-assited reversing)
-* Manually verify the results of your super duper next generation AI reversing analysis (ai-reversing verification)
-* Dont be dependent on PDB
+It stores functions (not basic blocks), including the following data:
+* Assembly source
+* Decompiled C source (kuna, ghidra)
+* Callees and callers of each function
+* Data references (.data, .rdata)
+* LLM function summaries
 
-Live at [REvAId.r00ted.ch](https://revaid.r00ted.ch)
+The idea is to provide a function based view to a binary, similarly to 
+source code. But heavily use AND enable AI.
 
-This is 100% vibe coded. See the maintained developer notes in `docs/DEV.md`.
+Integrated projects:
+* REvAId-UI: A graphical ui used to interactively explore unknown codebases
+* REvAId-mcp: A MCP server to enable AI agents to efficiently reverse engineer the functionality of binaries
 
-## Screenshots
+You can think of it mostly as ghidra-mcp (but not depending on ghidra, and not only supporting a single file). The full stack is completely free
+and open source (unlike IDA or BinaryNinja for example), and not from the NSA. 
 
-All function names are AI generated. The quick summary & function name is generated based on decompiled C. 
+The MCP server is mostly used to mass reverse-engineer many binaries, 
+e.g. for BYOVD. 
 
-Callees and callers can be fan-out to explore the binary (without reading any code). 
+AI data augmentation: Per-function AI purpose and summary of what
+the function is doing, via: 
+* REvAId-ui: on-view function LLM summaries
+* REvAId-mcp enables AI agents to also add its conclusions to the DB
 
-### Reversing MS Defender process injection detection
-
-![Function graph explorer](docs/img/REvAId-1.png)
-
-
-### Detailed AI Summary
-
-![Function summary view](docs/img/REvAId-2.png)
-
-
-## Usage
-
-1) Let Ghidra analyze your binary
-2) Export Ghidra data with the included script to JSON
-3) Import JSON into REvAId
-4) Explore the code base (find functions to add them to the canvas, like by their address)
-
-There are two AI providers available: 
-* LLM based: Simple. Queries the LLM with the disassembled function code
-* Agent based: Complex. Queries OpenCode agent (using Ghidra-MCP) for function analysis
+This is 100% vibe coded. 
 
 
 ## Prerequisites
 
+Make sure these are available:
+
 - [`uv`](https://docs.astral.sh/uv/) (Python 3.12 package/env manager)
-- Node.js 22+ and npm
 - [`just`](https://github.com/casey/just) (task runner)
+- Node.js 22+ and npm (for the UI only)
+- [`kuna`](https://github.com/noelo-lab/kuna)
 
 
-## Quickstart
+## Usage
+
+Setup:
+```
+$ just setup
+$ just migrate
+```
+
+Analyze a binary:
+```
+$ export GRAPHREV_DECOMPILER_EXECUTABLE=/opt/kuna/kuna
+$ uv run graphrev decompile data/redtest.exe
+```
+
+This stores the binary information in the sqlite database of 
+REvAId. 
+
+Use one of the following interface options to interact with the data: 
+* MCP: For AI agents (claude, opencode...)
+* UI: HTML interface
+* WEB: REST interface
+* SQL: Use the `backend/graphrev.db` by yourself
+
+
+### Interface: MCP
+
+MCP server for agent:
+```
+$ just mcp
+```
+
+The default MCP endpoint is:
+
+```text
+http://127.0.0.1:8001/mcp
+```
+
+
+### Interace: REvAId-UI
+
+Configure the LLM provider (optional, but recommended) in `backend/.env`, copy from `backend/.env.example`:
 
 ```sh
-just setup    # uv sync (backend) + npm install (frontend)
-just migrate  # migrate both the analysis and viewer databases
-just dev      # analysis (:8000), viewer (:8002), and SPA (:5173)
-just prod     # production-mode analysis, viewer, and SPA services
+# opencode go
+GRAPHREV_LLM_MODEL=openai/deepseek-v4-flash
+GRAPHREV_LLM_API_BASE=https://opencode.ai/zen/go/v1
+GRAPHREV_LLM_API_KEY=sk-
 ```
 
-Open http://127.0.0.1:5173. The frontend sends browser API requests to the
-viewer backend at `http://127.0.0.1:8002`; the viewer talks to the analysis
-backend at `http://127.0.0.1:8000` through its internal API.
-
-The two ASGI applications live in separate source packages: the analysis
-backend is `backend/src/revaid` (`revaid.main:app`), and the viewer backend is
-`backend/src/revaid_ui` (`revaid_ui.main:app`). They share lower-level domain
-and persistence contracts only through `backend/src/revaid_contracts`; the
-viewer obtains analysis facts through the authenticated internal HTTP API.
-Each service has its own models, repositories, services, routes and startup
-lifecycle. Start either independently with `just analysis` or `just viewer`.
-For production, use `just prod domain=graphrev.example.com`; it builds the SPA
-and starts both backends plus the static SPA preview.
-
-The React app talks only to the **viewer backend** in split mode. The viewer backend calls the **analysis
-backend** through an authenticated, fixed internal API. Upload bodies are streamed
-through the viewer backend with the same configured byte limits and staged/queued only by the analysis backend; job polling
-and cancellation are also forwarded to the analysis backend. Raw-binary decompilation therefore requires
-the analysis backend's configured local decompiler and staging directory. The viewer backend periodically emits
-a `reconcile` SSE invalidation because a cross-process event relay is not implemented yet;
-this causes clients to refetch, but does not forward the analysis backend's per-summary/queue events.
-Run exactly one Uvicorn worker for each analysis-backend process: import-job, summary-worker, and event
-state are process-local. To run the analysis backend without
-the optional UI, install the backend, apply only its schema, and start
-`uv run uvicorn revaid.main:app`; it does not require npm, a browser, or a
-viewer database. Start the viewer backend separately with
-`uv run uvicorn revaid_ui.main:app` and configure
-`GRAPHREV_ANALYSIS_INTERNAL_URL` plus the shared internal token.
-
-### Agent access via MCP
-
-GraphRev includes a local Streamable HTTP MCP server for agents that analyze
-the imported binary database. Start it after migration and ingestion:
-
-```sh
-just mcp
+start the REvAId-ui:
+```
+$ just ui
 ```
 
-The endpoint defaults to `http://127.0.0.1:8001/mcp`. Configure it with
-`GRAPHREV_MCP_HOST` and `GRAPHREV_MCP_PORT`. Keep the default loopback binding
-unless authentication and TLS are provided by a trusted reverse proxy.
+And open `http://localhost:5173`
 
-The server exposes these tools:
+For detailed information, see [revaid-ui](https://github.com/dobin/REvAId/blob/main/docs/revaid-ui.md)
 
-- `list_binaries`: list binary names, versions, function counts, and edge counts.
-- `find_functions`: search one binary by name, address, notes, or decompiled C.
-- `get_function`: retrieve assembly, decompiled C, metadata, callers, and callees.
-- `set_function_info`: write `name_llm`, `summary_short`, and/or `summary_long`.
 
-Every function tool requires `binary_name`; `binary_version` defaults to the
-empty version. Function reads and writes accept exactly one of `function_id`,
-the exact decimal start `address`, or an exact stored `name`. Prefer IDs or
-addresses after searching because names can be ambiguous.
 
-### Caddy / production
+## Other ingestion
 
-The recommended deployment uses one public origin and lets Caddy route API
-requests to the viewer backend, which calls the analysis backend on loopback. `just prod` binds services to
-loopback by default:
+Default usecase is just to use kuna with `graphrev decompile`, already integrated. 
 
-```caddyfile
-graphrev.example.com {
-	reverse_proxy /api/* 127.0.0.1:8002
-	reverse_proxy 127.0.0.1:4173
-}
+
+### Ingestion: Kuna
+
+If you want to use kuna manually (mostly for testing and development). Or to perform the decompilation somewhere else, as
+it can take some time for big files. 
+
+Decompile a binary and save to json:
+```
+$ ./kuna decompile-graph test.exe -o kuna.json
 ```
 
-Pass the public hostname so Vite accepts Caddy's forwarded `Host` header:
-
-```sh
-just prod domain=graphrev.example.com
+Import json: 
+```
+$ uv run graphrev import-export kuna.json --binary test.exe
 ```
 
+`--binary` is optional, but recommended. It records the source PE's path and
+SHA-256 and parses the PE to extract data items and references during ingestion.
 
-## Ghidra Export
+
+### Ingestion: Ghidra
+
+If you want to use ghidra.
+
+With ghidra we need to:
+
+1) Open binary in Ghidra and let it analyze it
+2) Export Ghidra data with the included script to JSON
+3) Import JSON into REvAId
 
 To analyze a binary, we first needs its data: function assembly, disassembly (c code), and callers/callees (xrefs). 
 
@@ -150,68 +150,10 @@ This is currently achieved with a ghidra script.
 5) If asked to skip disassembly, say NO (except if you want to use AI Agent, not AI LLM)
 6) Grab a cuppa and wait till the export is finished
 
-Then in REvAId, click "import binary", and select that JSON file. 
-
-
-## Everyday commands
-
-| Command | What it does |
-| --- | --- |
-| `just dev` | Run analysis backend + viewer backend + frontend separately |
-| `just dev-split` | Alias for `just dev` |
-| `just viewer-stats` | Print viewer database row counts only |
-| `just analysis` / `just viewer` / `just web` | Run one split service |
-| `just migrate` | Apply both database histories |
-| `just migrate-analysis` / `just migrate-viewer` | Apply one service's database history |
-| `just db-reset-analysis` / `just db-reset-viewer` | Recreate one database without touching the other |
-| `just revision name="add x"` | Autogenerate a new migration from `db/models.py` |
-| `just db-reset` | Delete the local SQLite file and re-migrate from scratch |
-| `just test` | Run backend (pytest) and frontend (vitest) test suites |
-| `just lint` | ruff, mypy --strict, import-linter, eslint, tsc, magic-number guard |
-| `just fmt` | Auto-format both backend and frontend |
-| `just gen-types` | Regenerate `frontend/src/api/generated.ts` from the live OpenAPI schema |
-
-
-## Config
-
-
-### LLM summaries
-
-Set `GRAPHREV_LLM_ADAPTER=litellm` to enable the LLM analysis. 
-
-
-| Variable | Meaning |
-| --- | --- |
-| `GRAPHREV_LLM_ADAPTER=litellm` | Select the litellm adapter |
-| `GRAPHREV_LLM_MODEL` | litellm router string, e.g. `anthropic/claude-sonnet-4-5`, `openai/gpt-4o`, `ollama/llama3` |
-| `GRAPHREV_LLM_API_KEY` | Provider API key (put it in `backend/.env`, not the shell) |
-| `GRAPHREV_LLM_API_BASE` | Base URL for self-hosted/proxied endpoints (Ollama, vLLM, an LLM gateway); leave unset for hosted providers |
-
-### Backend-Specific Environment Settings
-
-`GRAPHREV_DB_PATH` selects the analysis database (default `./graphrev.db`).
-`GRAPHREV_VIEWER_DB_PATH` selects the viewer database (default
-`./graphrev-viewer.db`). A standalone install may use `just migrate-analysis`
-without creating or opening the viewer database. `GRAPHREV_ANALYSIS_INTERNAL_URL` and
-`GRAPHREV_ANALYSIS_INTERNAL_TOKEN` configure the viewer backend's fixed connection to the analysis backend;
-set the same high-entropy token on the analysis and viewer backend processes.
-
-Examples:
-
-```sh
-# Anthropic (key from https://console.anthropic.com/)
-GRAPHREV_LLM_ADAPTER=litellm
-GRAPHREV_LLM_MODEL=anthropic/claude-sonnet-4-5
-GRAPHREV_LLM_API_KEY=sk-ant-...
-
-# Local Ollama — no key needed
-GRAPHREV_LLM_ADAPTER=litellm
-GRAPHREV_LLM_MODEL=ollama/llama3
-GRAPHREV_LLM_API_BASE=http://127.0.0.1:11434
+Import json: 
+```
+$ uv run graphrev import-export ghidra.json --binary test.exe
 ```
 
-
-### Public Mode
-
-Set `GRAPHREV_PUBLIC_MODE=true` when exposing an instance to anonymous
-visitors
+As with Kuna exports, `--binary` enables source-PE metadata and data-reference
+extraction.
