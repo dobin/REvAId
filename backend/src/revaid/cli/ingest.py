@@ -85,8 +85,13 @@ def run(adapter: str, seed: int, binary: str | None) -> None:
     asyncio.run(_run())
 
 
-def run_import(path: Path) -> None:
-    """Import a supported analysis-export JSON file directly."""
+def run_import(path: Path, binary: Path | None = None) -> None:
+    """Import an analysis export, optionally enriching it from its source PE."""
+    binary_path = binary.resolve() if binary is not None else None
+    if binary_path is not None and not binary_path.is_file():
+        typer.echo(f"Input binary does not exist: {binary_path}", err=True)
+        raise typer.Exit(code=1)
+
     settings = get_settings()
 
     async def _run() -> None:
@@ -95,15 +100,48 @@ def run_import(path: Path) -> None:
         session_factory = create_session_factory(engine)
         try:
             document = await load_ghidra_export_file(path)
+            if binary_path is not None:
+                digest = await asyncio.to_thread(_sha256_file, binary_path)
+                document = document.model_copy(
+                    update={
+                        "binary": document.binary.model_copy(
+                            update={
+                                "source_path": str(binary_path),
+                                "sha256": digest,
+                            }
+                        )
+                    }
+                )
             result = await import_ghidra_export(session_factory, settings, document)
+            pe_report = (
+                await enrich_binary_with_pe_data(
+                    session_factory,
+                    settings,
+                    binary_name=result.name,
+                    binary_version=result.version,
+                    pe_path=binary_path,
+                )
+                if binary_path is not None
+                else None
+            )
         finally:
             await dispose_engine(engine)
+        data_counts = (
+            f", {pe_report.items_inserted} data items, "
+            f"{pe_report.refs_inserted} data references"
+            if pe_report is not None
+            else ""
+        )
         typer.echo(
             f"Imported {result.name} ({result.version}): "
-            f"{result.functions_inserted} functions, {result.edges_inserted} edges."
+            f"{result.functions_inserted} functions, {result.edges_inserted} edges"
+            f"{data_counts}."
         )
         if result.failures:
             typer.echo(f"{len(result.failures)} per-item failures.", err=True)
+        if pe_report is not None:
+            for warning in pe_report.warnings:
+                typer.echo(f"Warning: {warning}", err=True)
 
     asyncio.run(_run())
 

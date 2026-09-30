@@ -5,6 +5,7 @@ analyst-field survival across re-ingestion, and a clean failure for
 
 from __future__ import annotations
 
+import hashlib
 import os
 import shlex
 import subprocess
@@ -14,6 +15,8 @@ from pathlib import Path
 import pytest
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
+
+from ingestion.pe_fixture import IMAGE_BASE, STRING_RVA, TEXT_RVA, build_pe
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 
@@ -164,6 +167,77 @@ def test_import_export_unmigrated_database_reports_migration_command(tmp_path: P
     assert "no such table: binaries" not in result.stderr
 
 
+@pytest.mark.asyncio
+async def test_import_export_binary_enriches_from_source_pe(
+    migrated_db: Path,
+    tmp_path: Path,
+    engine: AsyncEngine,
+) -> None:
+    binary_path = build_pe(tmp_path / "sample.exe")
+    function_address = IMAGE_BASE + TEXT_RVA
+    export_path = tmp_path / "export.json"
+    export_path.write_text(
+        '{"schemaVersion":4,"binary":{"name":"from-export","version":"1",'
+        f'"analysisImageBase":{IMAGE_BASE}}},'
+        f'"functions":[{{"address":{function_address},"name":"entry",'
+        f'"assembly":"{function_address:x}  LEA RCX,[0x{IMAGE_BASE + STRING_RVA:x}]"}}],'
+        '"edges":[]}',
+        encoding="utf-8",
+    )
+
+    result = _run_cli(
+        "import-export",
+        str(export_path),
+        "--binary",
+        str(binary_path),
+        db_path=str(migrated_db),
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "1 data items, 1 data references" in result.stdout
+    async with engine.connect() as conn:
+        binary = (
+            await conn.execute(
+                text("SELECT source_path, sha256 FROM binaries WHERE name = 'from-export'")
+            )
+        ).one()
+        item = (
+            await conn.execute(
+                text(
+                    "SELECT di.value_text, COUNT(dr.id) "
+                    "FROM data_items di LEFT JOIN data_refs dr ON dr.data_item_id = di.id "
+                    "GROUP BY di.id"
+                )
+            )
+        ).one()
+    assert binary.source_path == str(binary_path.resolve())
+    assert binary.sha256 == hashlib.sha256(binary_path.read_bytes()).hexdigest()
+    assert item == ("hello world", 1)
+
+
+def test_import_export_missing_binary_fails_before_import(
+    migrated_db: Path, tmp_path: Path
+) -> None:
+    export_path = tmp_path / "export.json"
+    export_path.write_text(
+        '{"schemaVersion":4,"binary":{"name":"not-imported"},'
+        '"functions":[],"edges":[]}',
+        encoding="utf-8",
+    )
+    missing_binary = tmp_path / "missing.exe"
+
+    result = _run_cli(
+        "import-export",
+        str(export_path),
+        "--binary",
+        str(missing_binary),
+        db_path=str(migrated_db),
+    )
+
+    assert result.returncode == 1
+    assert f"Input binary does not exist: {missing_binary}" in result.stderr
+
+
 def test_decompile_unmigrated_database_skips_kuna(tmp_path: Path) -> None:
     binary_path = tmp_path / "sample.exe"
     binary_path.write_bytes(b"MZ test binary")
@@ -243,11 +317,14 @@ async def test_headless_decompile_imports_kuna_export(
     engine: AsyncEngine,
     viewer_engine: AsyncEngine,
 ) -> None:
-    binary_path = tmp_path / "sample.exe"
-    binary_path.write_bytes(b"MZ test binary")
+    binary_path = build_pe(tmp_path / "sample.exe")
+    function_address = IMAGE_BASE + TEXT_RVA
     export = (
-        '{"schemaVersion":4,"binary":{"name":"from-kuna","version":""},'
-        '"functions":[{"address":4096,"name":"entry","isEntryPoint":true}],'
+        '{"schemaVersion":4,"binary":{"name":"from-kuna","version":"",'
+        f'"analysisImageBase":{IMAGE_BASE}}},'
+        f'"functions":[{{"address":{function_address},"name":"entry",'
+        f'"assembly":"{function_address:x}  LEA RCX,[0x{IMAGE_BASE + STRING_RVA:x}]",'
+        '"isEntryPoint":true}],'
         '"edges":[]}'
     )
     staging_dir = tmp_path / "staging"
@@ -279,6 +356,7 @@ async def test_headless_decompile_imports_kuna_export(
     )
     assert result.returncode == 0, result.stderr
     assert "Analyzed and imported sample.exe" in result.stdout
+    assert "1 data items, 1 data references" in result.stdout
 
     async with engine.connect() as conn:
         row = (
@@ -289,11 +367,20 @@ async def test_headless_decompile_imports_kuna_export(
                 )
             )
         ).one()
+        data_counts = (
+            await conn.execute(
+                text(
+                    "SELECT (SELECT COUNT(*) FROM data_items), "
+                    "(SELECT COUNT(*) FROM data_refs)"
+                )
+            )
+        ).one()
     async with viewer_engine.connect() as conn:
         view_count = (await conn.execute(text("SELECT COUNT(*) FROM views"))).scalar_one()
     assert row[0] == "sample.exe"
     assert row[1] is not None and len(row[1]) == 64
     assert row[2] == "entry"
+    assert data_counts == (1, 1)
     assert view_count == 0
 
 

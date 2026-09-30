@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Annotated
 
 import typer
 
@@ -33,9 +34,15 @@ def list() -> None:
 
 
 @app.command("import-export")
-def import_export(path: Path) -> None:
+def import_export(
+    path: Path,
+    binary: Annotated[
+        Path | None,
+        typer.Option(help="Source PE used for content identity and data-reference extraction."),
+    ] = None,
+) -> None:
     """Import a supported analysis-export JSON file."""
-    ingest_module.run_import(path)
+    ingest_module.run_import(path, binary)
 
 
 @app.command()
