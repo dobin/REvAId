@@ -148,7 +148,9 @@ def _apply_item_filters(
         if len(byte_needle) >= 2 and re.fullmatch(r"[0-9a-f]+", byte_needle):
             clauses.append(DataItem.preview_hex.contains(byte_needle, autoescape=True))
         stmt = stmt.where(or_(*clauses))
-    if kind:
+    if kind == "string":
+        stmt = stmt.where(DataItem.kind.in_(("string", "wstring")))
+    elif kind:
         stmt = stmt.where(DataItem.kind == kind)
     if section:
         stmt = stmt.where(DataItem.section.collate("NOCASE") == section)

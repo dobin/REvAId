@@ -464,7 +464,7 @@ async def _resolve_function(
 
 # -- PE data items -----------------------------------------------------------
 
-_DATA_KINDS = frozenset(DATA_ITEM_KIND_VALUES)
+_DATA_SEARCH_KINDS = frozenset({"string", "bytes", "import", "all"})
 _DATA_SORTS = frozenset({"address", "refs_asc", "refs_desc"})
 MAX_RELATED_BY_DATA = 50
 
@@ -478,11 +478,16 @@ def _page_args(limit: int, offset: int, max_limit: int) -> int:
 
 
 def _check_kind(kind: str | None) -> None:
-    if kind is not None and kind not in _DATA_KINDS:
+    if kind is not None and kind not in _DATA_SEARCH_KINDS:
         raise AppError(
             ErrorCode.VALIDATION_ERROR,
-            f"kind must be one of {sorted(_DATA_KINDS)}.",
+            f"kind must be one of {sorted(_DATA_SEARCH_KINDS)}.",
         )
+
+
+def _normalize_search_kind(kind: str | None) -> str | None:
+    """Map MCP kind categories to the stored item kinds they represent."""
+    return None if kind == "all" else kind
 
 
 def _parse_int_address(address: int | str) -> int:
@@ -528,7 +533,7 @@ async def search_mcp_data(
         session,
         binary_id=binary.id,
         query=query,
-        kind=kind,
+        kind=_normalize_search_kind(kind),
         section=section,
         min_refs=min_refs,
         max_refs=max_refs,
@@ -658,7 +663,7 @@ async def find_mcp_functions_by_data(
         session,
         binary_id=binary.id,
         query=query,
-        kind=kind,
+        kind=_normalize_search_kind(kind),
         section=section,
         min_refs=min_refs,
         max_refs=max_refs,

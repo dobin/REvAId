@@ -279,20 +279,19 @@ async def search_data(
     limit: int = 50,
     offset: int = 0,
 ) -> McpDataItemSearchPageDto:
-    """Search PE data items (strings, imports, pointers, globals) of one binary.
+    """Search referenced PE data items in one binary.
 
-    query is a case-insensitive substring of the decoded value (string text,
-    up to 1024 bytes then cut off; import "DLL::Name"; pointed-to string), of
-    the address (hex or decimal), or a hex byte sequence ("de ad be ef",
-    "0xdeadbeef") matched against the first 128 bytes of raw data items.
-    kind: string, wstring, pointer, import, bytes, uninitialized. section: e.g.
-    .rdata, .data. min_refs/max_refs filter by number of referencing
-    instructions (use max_refs to skip common items). sort: address, refs_asc
-    (rarest first), refs_desc. Use get_data_item to see who references an item.
+    query is a case-insensitive substring of decoded text/import names, address
+    (hex or decimal), or a hex byte sequence (for example "de ad be ef").
+    kind selects string, bytes, imports, or all
+    indexed data kinds (the default). min_refs/max_refs filter by referencing
+    instruction count; use max_refs to skip common items. 
+    sort: address,
+    refs_asc (rarest first), refs_desc. 
+    Use get_data_item to see references.
 
-    Coverage: data items exist only for binaries imported from a raw PE and only
-    when referenced by a literal address in a function's assembly; computed or
-    indirect references are not indexed.
+    Only data locations found through literal addresses in function assembly
+    are indexed; imports may be called or merely referenced.
     """
     settings = get_settings()
     try:
@@ -391,11 +390,11 @@ async def find_functions_by_data(
     limit: int = 50,
     offset: int = 0,
 ) -> McpFunctionsByDataPageDto:
-    """Find functions that reference data items matching the same filters as search_data.
+    """Find functions using data items matching search_data's filters.
 
     Each function is returned once with its matching items, e.g. query
-    "CreateRemoteThread" or "password". Usually the fastest way to locate code
-    implementing a behavior.
+    "CreateRemoteThread" or "password". kind accepts string,
+    bytes, imports, or all/None. Usually the fastest way to locate relevant code.
     """
     settings = get_settings()
     try:

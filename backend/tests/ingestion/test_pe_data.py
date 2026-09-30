@@ -266,7 +266,7 @@ async def test_mcp_data_tools(
         binary_name="pe.exe",
         binary_version="1",
         query=None,
-        kind="wstring",
+        kind="string",
         section=".rdata",
         min_refs=None,
         max_refs=2,
@@ -276,6 +276,38 @@ async def test_mcp_data_tools(
         max_limit=200,
     )
     assert [i.value_text for i in rare.items] == ["wide text"]
+
+    strings = await search_mcp_data(
+        session,
+        binary_name="pe.exe",
+        binary_version="1",
+        query=None,
+        kind="string",
+        section=None,
+        min_refs=None,
+        max_refs=None,
+        sort="address",
+        limit=10,
+        offset=0,
+        max_limit=200,
+    )
+    assert {i.kind for i in strings.items} == {"string", "wstring"}
+
+    all_items = await search_mcp_data(
+        session,
+        binary_name="pe.exe",
+        binary_version="1",
+        query=None,
+        kind="all",
+        section=None,
+        min_refs=None,
+        max_refs=None,
+        sort="address",
+        limit=10,
+        offset=0,
+        max_limit=200,
+    )
+    assert all_items.total == 5
 
     # Raw bytes are searchable by hex, in several spellings.
     for spelling in ("01 02 03 04", "0x01020304", "\\x01\\x02\\x03\\x04"):
