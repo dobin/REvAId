@@ -43,6 +43,7 @@ The server exposes these tools:
 - `find_functions`: search one binary by name, address, notes, or decompiled C.
 - `get_function`: retrieve assembly, decompiled C, metadata, callers, and callees.
 - `set_function_info`: write `name_llm`, `summary_short`, and/or `summary_long`.
+- `set_data_item_summary`: write or explicitly clear a data item's `summary_llm`.
 
 Every function tool requires `binary_name`; `binary_version` defaults to the
 empty version. Function reads and writes accept exactly one of `function_id`,
@@ -156,6 +157,21 @@ Searches a binary's data items. `query` is a case-insensitive substring of the d
 
 Returns one item (by `data_item_id` or `address`) and every referencing function and instruction, including the assembly line.
 
+Data items returned by every MCP data tool include the optional agent-authored
+`summaryLlm` field.
+
+### `set_data_item_summary`
+
+Sets or clears the AI summary for one indexed item. Supply exactly one selector
+(`data_item_id` or exact decimal/hex `address`) and exactly one action:
+
+- `summary_llm`: replace the summary with evidence-based text.
+- `clear_summary=true`: remove the existing summary; omit `summary_llm`.
+
+The tool is disabled in public mode. PE enrichment currently replaces all data
+items for a binary, so re-importing/re-enriching can erase summaries and change
+data-item IDs. Rediscover items by address after enrichment.
+
 ### `get_function_data`
 
 Lists the data items one function references (selector: `function_id`, `address`, or `name`), in instruction order.
@@ -174,7 +190,7 @@ Application errors are converted into MCP `ToolError` responses with GraphRev's 
 
 - `BINARY_NOT_FOUND`: the name/version pair does not exist.
 - `FUNCTION_NOT_FOUND`: the selector does not resolve within that binary.
-- `VALIDATION_ERROR`: invalid pagination, multiple/no selectors, an ambiguous name, or no update fields.
+- `VALIDATION_ERROR`: invalid pagination, multiple/no selectors, an ambiguous name, or invalid/conflicting update actions.
 
 ## Implementation overview
 
