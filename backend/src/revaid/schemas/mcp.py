@@ -256,6 +256,17 @@ class McpDataItemDto(ApiModel):
     preview_hex: str | None
     is_writable: bool
     ref_count: int
+    summary_llm: str | None
+
+
+class McpDataItemUpdateDto(ApiModel):
+    id: int
+    binary_name: str
+    binary_version: str
+    address: int
+    address_hex: str
+    summary_llm: str | None
+    updated_fields: list[str]
 
 
 class McpDataItemSearchPageDto(ApiModel):
@@ -351,4 +362,5 @@ def mcp_data_item_from_row(item: DataItem) -> McpDataItemDto:
         preview_hex=item.preview_hex,
         is_writable=item.is_writable,
         ref_count=item.ref_count,
+        summary_llm=item.summary_llm,
     )

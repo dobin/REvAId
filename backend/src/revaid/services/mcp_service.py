@@ -5,8 +5,7 @@ from __future__ import annotations
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from revaid.core.config import get_settings
-from revaid.db.enums import DATA_ITEM_KIND_VALUES
-from revaid.db.models import Binary, Function
+from revaid.db.models import Binary, DataItem, Function
 from revaid.repositories.binaries import get_binary_by_name_version, list_binaries
 from revaid.repositories.data_items import (
     find_functions_by_matching_items,
@@ -16,6 +15,7 @@ from revaid.repositories.data_items import (
     list_function_refs,
     list_item_refs,
     search_data_items,
+    update_data_item_summary,
 )
 from revaid.repositories.edges import list_callees, list_callers
 from revaid.repositories.functions import (
@@ -35,6 +35,7 @@ from revaid.schemas.mcp import (
     McpCodeSearchPageDto,
     McpDataItemDetailDto,
     McpDataItemSearchPageDto,
+    McpDataItemUpdateDto,
     McpDataRefDto,
     McpDecompiledFunctionDto,
     McpDecompileManyDto,
@@ -119,9 +120,7 @@ def _code_hunks(
     lines = code.splitlines()
     needle = query.lower() if case_insensitive else query
     hits = [
-        i
-        for i, text in enumerate(lines)
-        if needle in (text.lower() if case_insensitive else text)
+        i for i, text in enumerate(lines) if needle in (text.lower() if case_insensitive else text)
     ]
     hit_set = set(hits)
     ranges: list[list[int]] = []
@@ -526,9 +525,7 @@ async def search_mcp_data(
     clamped = _page_args(limit, offset, max_limit)
     _check_kind(kind)
     if sort not in _DATA_SORTS:
-        raise AppError(
-            ErrorCode.VALIDATION_ERROR, f"sort must be one of {sorted(_DATA_SORTS)}."
-        )
+        raise AppError(ErrorCode.VALIDATION_ERROR, f"sort must be one of {sorted(_DATA_SORTS)}.")
     rows, total = await search_data_items(
         session,
         binary_id=binary.id,
@@ -564,23 +561,10 @@ async def get_mcp_data_item(
     max_limit: int,
 ) -> McpDataItemDetailDto:
     binary = await _require_binary(session, binary_name, binary_version)
-    if (data_item_id is None) == (address is None):
-        raise AppError(
-            ErrorCode.VALIDATION_ERROR, "Specify exactly one of data_item_id or address."
-        )
     clamped = _page_args(limit, offset, max_limit)
-    if data_item_id is not None:
-        item = await get_data_item_by_id(session, binary_id=binary.id, data_item_id=data_item_id)
-    else:
-        assert address is not None
-        item = await get_data_item_by_address(
-            session, binary_id=binary.id, address=_parse_int_address(address)
-        )
-    if item is None:
-        raise AppError(
-            ErrorCode.VALIDATION_ERROR,
-            "No matching data item; only data referenced from assembly is indexed.",
-        )
+    item = await _resolve_data_item(
+        session, binary=binary, data_item_id=data_item_id, address=address
+    )
     refs, total = await list_item_refs(session, data_item_id=item.id, limit=clamped, offset=offset)
     return McpDataItemDetailDto(
         binary_name=binary.name,
@@ -602,6 +586,80 @@ async def get_mcp_data_item(
     )
 
 
+async def set_mcp_data_item_summary(
+    session: AsyncSession,
+    *,
+    binary_name: str,
+    binary_version: str,
+    data_item_id: int | None,
+    address: int | str | None,
+    summary_llm: str | None,
+    clear_summary: bool,
+) -> McpDataItemUpdateDto:
+    """Set or explicitly clear one data item's agent-authored summary."""
+    if get_settings().public_mode:
+        raise AppError(
+            ErrorCode.PUBLIC_MODE_FORBIDDEN,
+            "Data item updates are disabled (public mode).",
+        )
+    if clear_summary == (summary_llm is not None):
+        raise AppError(
+            ErrorCode.VALIDATION_ERROR,
+            "Supply exactly one update action: summary_llm or clear_summary=true.",
+        )
+
+    binary = await _require_binary(session, binary_name, binary_version)
+    item = await _resolve_data_item(
+        session, binary=binary, data_item_id=data_item_id, address=address
+    )
+    updated = await update_data_item_summary(
+        session,
+        data_item_id=item.id,
+        summary_llm=None if clear_summary else summary_llm,
+    )
+    if updated is None:
+        raise AppError(
+            ErrorCode.VALIDATION_ERROR,
+            "No matching data item; only data referenced from assembly is indexed.",
+        )
+    await session.commit()
+    return McpDataItemUpdateDto(
+        id=updated.id,
+        binary_name=binary.name,
+        binary_version=binary.version,
+        address=updated.address,
+        address_hex=f"0x{updated.address:X}",
+        summary_llm=updated.summary_llm,
+        updated_fields=["summary_llm"],
+    )
+
+
+async def _resolve_data_item(
+    session: AsyncSession,
+    *,
+    binary: Binary,
+    data_item_id: int | None,
+    address: int | str | None,
+) -> DataItem:
+    if (data_item_id is None) == (address is None):
+        raise AppError(
+            ErrorCode.VALIDATION_ERROR, "Specify exactly one of data_item_id or address."
+        )
+    if data_item_id is not None:
+        item = await get_data_item_by_id(session, binary_id=binary.id, data_item_id=data_item_id)
+    else:
+        assert address is not None
+        item = await get_data_item_by_address(
+            session, binary_id=binary.id, address=_parse_int_address(address)
+        )
+    if item is None:
+        raise AppError(
+            ErrorCode.VALIDATION_ERROR,
+            "No matching data item; only data referenced from assembly is indexed.",
+        )
+    return item
+
+
 async def get_mcp_function_data(
     session: AsyncSession,
     *,
@@ -619,9 +677,7 @@ async def get_mcp_function_data(
         session, binary=binary, function_id=function_id, address=address, name=name
     )
     clamped = _page_args(limit, offset, max_limit)
-    refs, total = await list_function_refs(
-        session, function_id=fn.id, limit=clamped, offset=offset
-    )
+    refs, total = await list_function_refs(session, function_id=fn.id, limit=clamped, offset=offset)
     return McpFunctionDataDto(
         binary_name=binary.name,
         binary_version=binary.version,

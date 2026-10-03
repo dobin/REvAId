@@ -215,6 +215,7 @@ class DataItem(Base):
     preview_hex: Mapped[str | None] = mapped_column(default=None)
     is_writable: Mapped[bool] = mapped_column(default=False)
     ref_count: Mapped[int] = mapped_column(default=0)
+    summary_llm: Mapped[str | None] = mapped_column(default=None)
     created_at: Mapped[str] = mapped_column()
 
     __table_args__ = (

@@ -96,6 +96,20 @@ async def test_binaries_columns_match_model(engine: AsyncEngine, migrated_db: Pa
 
 
 @pytest.mark.asyncio
+async def test_data_items_columns_match_model(engine: AsyncEngine, migrated_db: Path) -> None:
+    expected_columns = {c.name for c in Base.metadata.tables["data_items"].columns}
+    async with engine.connect() as conn:
+
+        def _columns(sync_conn: object) -> list[dict[str, object]]:
+            return inspect(sync_conn).get_columns("data_items")  # type: ignore[arg-type,return-value]
+
+        columns = await conn.run_sync(_columns)
+    assert {str(column["name"]) for column in columns} == expected_columns
+    summary = next(column for column in columns if column["name"] == "summary_llm")
+    assert summary["nullable"] is True
+
+
+@pytest.mark.asyncio
 async def test_analysis_database_excludes_viewer_state(
     engine: AsyncEngine, migrated_db: Path
 ) -> None:

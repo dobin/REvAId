@@ -10,7 +10,7 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 
-from sqlalchemy import Select, String, cast, delete, func, insert, or_, select
+from sqlalchemy import Select, String, cast, delete, func, insert, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from revaid.db.models import DataItem, DataRef, Function
@@ -212,6 +212,24 @@ async def get_data_item_by_address(
         select(DataItem).where(DataItem.binary_id == binary_id, DataItem.address == address)
     )
     return result
+
+
+async def update_data_item_summary(
+    session: AsyncSession,
+    *,
+    data_item_id: int,
+    summary_llm: str | None,
+) -> DataItem | None:
+    """Set or clear the agent-authored summary without committing."""
+    item = await session.get(DataItem, data_item_id)
+    if item is None:
+        return None
+    await session.execute(
+        update(DataItem).where(DataItem.id == data_item_id).values(summary_llm=summary_llm)
+    )
+    await session.flush()
+    await session.refresh(item)
+    return item
 
 
 async def list_item_refs(

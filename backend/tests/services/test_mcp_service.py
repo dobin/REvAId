@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from revaid.core.config import get_settings
-from revaid.db.models import Edge, Function
+from revaid.db.models import DataItem, Edge, Function
 from revaid.repositories.binaries import get_or_create_binary
 from revaid.schemas.mcp import McpFunctionSelector
 from revaid.services.mcp_service import (
@@ -14,6 +14,7 @@ from revaid.services.mcp_service import (
     get_mcp_function,
     get_mcp_functions,
     search_mcp_code,
+    set_mcp_data_item_summary,
     set_mcp_function_info,
 )
 from revaid_contracts.clock import utc_now_iso
@@ -34,6 +35,21 @@ async def _function(session: AsyncSession, *, binary_id: int, address: int, name
     session.add(fn)
     await session.flush()
     return fn
+
+
+async def _data_item(session: AsyncSession, *, binary_id: int, address: int) -> DataItem:
+    item = DataItem(
+        binary_id=binary_id,
+        address=address,
+        rva=address,
+        section=".rdata",
+        kind="string",
+        value_text="evidence",
+        created_at=utc_now_iso(),
+    )
+    session.add(item)
+    await session.flush()
+    return item
 
 
 @pytest.mark.asyncio
@@ -309,6 +325,108 @@ async def test_set_function_info_is_forbidden_in_public_mode(
     await session.refresh(fn)
     assert raised.value.code == ErrorCode.PUBLIC_MODE_FORBIDDEN
     assert fn.name_llm is None
+
+
+@pytest.mark.asyncio
+async def test_set_data_item_summary_writes_and_clears(session: AsyncSession) -> None:
+    binary, _ = await get_or_create_binary(session, name="agent.exe", version="")
+    item = await _data_item(session, binary_id=binary.id, address=0x402000)
+    await session.commit()
+
+    result = await set_mcp_data_item_summary(
+        session,
+        binary_name=binary.name,
+        binary_version=binary.version,
+        data_item_id=None,
+        address="0x402000",
+        summary_llm="Configuration path used by the loader.",
+        clear_summary=False,
+    )
+    assert result.summary_llm == "Configuration path used by the loader."
+    assert result.updated_fields == ["summary_llm"]
+
+    cleared = await set_mcp_data_item_summary(
+        session,
+        binary_name=binary.name,
+        binary_version=binary.version,
+        data_item_id=item.id,
+        address=None,
+        summary_llm=None,
+        clear_summary=True,
+    )
+    await session.refresh(item)
+    assert cleared.summary_llm is None
+    assert item.summary_llm is None
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("summary_llm", "clear_summary"),
+    [(None, False), ("conflict", True)],
+)
+async def test_set_data_item_summary_requires_exactly_one_action(
+    session: AsyncSession,
+    summary_llm: str | None,
+    clear_summary: bool,
+) -> None:
+    binary, _ = await get_or_create_binary(session, name="agent.exe", version="")
+    item = await _data_item(session, binary_id=binary.id, address=0x402000)
+    await session.commit()
+
+    with pytest.raises(AppError) as raised:
+        await set_mcp_data_item_summary(
+            session,
+            binary_name=binary.name,
+            binary_version=binary.version,
+            data_item_id=item.id,
+            address=None,
+            summary_llm=summary_llm,
+            clear_summary=clear_summary,
+        )
+
+    assert raised.value.code == ErrorCode.VALIDATION_ERROR
+
+
+@pytest.mark.asyncio
+async def test_set_data_item_summary_checks_binary_and_public_mode(
+    session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first, _ = await get_or_create_binary(session, name="first.exe", version="")
+    second, _ = await get_or_create_binary(session, name="second.exe", version="")
+    item = await _data_item(session, binary_id=first.id, address=0x402000)
+    await session.commit()
+
+    with pytest.raises(AppError) as wrong_binary:
+        await set_mcp_data_item_summary(
+            session,
+            binary_name=second.name,
+            binary_version=second.version,
+            data_item_id=item.id,
+            address=None,
+            summary_llm="wrong",
+            clear_summary=False,
+        )
+    assert wrong_binary.value.code == ErrorCode.VALIDATION_ERROR
+
+    monkeypatch.setenv("GRAPHREV_PUBLIC_MODE", "true")
+    get_settings.cache_clear()
+    try:
+        with pytest.raises(AppError) as public_mode:
+            await set_mcp_data_item_summary(
+                session,
+                binary_name=first.name,
+                binary_version=first.version,
+                data_item_id=item.id,
+                address=None,
+                summary_llm="blocked",
+                clear_summary=False,
+            )
+    finally:
+        get_settings.cache_clear()
+    await session.refresh(item)
+    assert public_mode.value.code == ErrorCode.PUBLIC_MODE_FORBIDDEN
+    assert item.summary_llm is None
 
 
 @pytest.mark.asyncio

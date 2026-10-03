@@ -14,6 +14,7 @@ from revaid.schemas.mcp import (
     McpCodeSearchPageDto,
     McpDataItemDetailDto,
     McpDataItemSearchPageDto,
+    McpDataItemUpdateDto,
     McpDecompileManyDto,
     McpFunctionDataDto,
     McpFunctionDetailDto,
@@ -36,6 +37,7 @@ from revaid.services.mcp_service import (
     list_mcp_binaries,
     search_mcp_code,
     search_mcp_data,
+    set_mcp_data_item_summary,
     set_mcp_function_info,
 )
 from revaid_contracts.http_errors import AppError
@@ -51,7 +53,8 @@ Typical workflow:
    code; find_functions for names/addresses; search_code to grep C patterns.
 * Read: get_function (C + callers/callees) to walk the call graph;
    decompile_many to read several functions cheaply.
-* Record findings with set_function_info so later work builds on them.
+* Record findings with set_function_info and set_data_item_summary so later
+    work builds on them.
 
 Names like FUN_xxxx / sub_xxxx are auto-generated and unanalyzed.
 """
@@ -153,7 +156,7 @@ async def decompile_many(
     """Return decompiled C for up to 20 functions in one call.
 
     Each entry in functions sets exactly one of function_id, address (integer,
-    decimal string, or 0x-hex string), or name. 
+    decimal string, or 0x-hex string), or name.
     Cheaper than get_functions when callers/callees are not needed.
     """
     try:
@@ -285,9 +288,9 @@ async def search_data(
     (hex or decimal), or a hex byte sequence (for example "de ad be ef").
     kind selects string, bytes, imports, or all
     indexed data kinds (the default). min_refs/max_refs filter by referencing
-    instruction count; use max_refs to skip common items. 
+    instruction count; use max_refs to skip common items.
     sort: address,
-    refs_asc (rarest first), refs_desc. 
+    refs_asc (rarest first), refs_desc.
     Use get_data_item to see references.
 
     Only data locations found through literal addresses in function assembly
@@ -340,6 +343,37 @@ async def get_data_item(
                 limit=limit,
                 offset=offset,
                 max_limit=settings.function_search_max_limit,
+            )
+    except AppError as exc:
+        raise _tool_error(exc) from exc
+
+
+@mcp.tool()
+async def set_data_item_summary(
+    binary_name: str,
+    binary_version: str = "",
+    data_item_id: int | None = None,
+    address: int | str | None = None,
+    summary_llm: str | None = None,
+    clear_summary: bool = False,
+) -> McpDataItemUpdateDto:
+    """Set or clear the AI summary for one indexed data item.
+
+    Specify exactly one of data_item_id or address. To write a summary, pass
+    summary_llm. To remove it, pass clear_summary=true without summary_llm.
+    Summaries should state only evidence supported by references and code.
+    Re-importing PE data can replace items and erase their summaries.
+    """
+    try:
+        async with write_lock(), _sessions()() as session:
+            return await set_mcp_data_item_summary(
+                session,
+                binary_name=binary_name,
+                binary_version=binary_version,
+                data_item_id=data_item_id,
+                address=address,
+                summary_llm=summary_llm,
+                clear_summary=clear_summary,
             )
     except AppError as exc:
         raise _tool_error(exc) from exc

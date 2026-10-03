@@ -71,6 +71,7 @@ async def test_standalone_mcp_starts_and_advertises_analysis_tools(migrated_db: 
             "set_function_info",
             "search_data",
             "get_data_item",
+            "set_data_item_summary",
             "get_function_data",
             "find_functions_by_data",
             "find_related_functions",

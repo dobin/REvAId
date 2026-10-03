@@ -193,11 +193,24 @@ async def test_enrich_persists_items_and_refs(
     assert items[_va(BSS_RVA)].kind == "uninitialized"
     assert _va(0x1000) not in items
 
-    # Idempotent re-run.
+    items[_va(STRING_RVA)].summary_llm = "Agent-authored interpretation."
+    await session.commit()
+
+    # Idempotent re-run. Data items are replacement-owned, so annotations may
+    # be erased (and callers must not rely on stable data item IDs).
     again = await enrich_binary_with_pe_data(
         session_factory, settings, binary_name="pe.exe", binary_version="1", pe_path=pe
     )
     assert (again.items_inserted, again.refs_inserted) == (5, 8)
+    session.expire_all()
+    replaced = await session.scalar(
+        select(DataItem).where(
+            DataItem.binary_id == binary_id,
+            DataItem.address == _va(STRING_RVA),
+        )
+    )
+    assert replaced is not None
+    assert replaced.summary_llm is None
 
     # Cascade on delete.
     session.expire_all()
@@ -244,6 +257,11 @@ async def test_mcp_data_tools(
     )
     session.expire_all()
 
+    item = await session.scalar(select(DataItem).where(DataItem.address == _va(STRING_RVA)))
+    assert item is not None
+    item.summary_llm = "Command-line text used by three functions."
+    await session.commit()
+
     page = await search_mcp_data(
         session,
         binary_name="pe.exe",
@@ -260,6 +278,9 @@ async def test_mcp_data_tools(
     )
     kinds = sorted(i.kind for i in page.items)
     assert kinds == ["pointer", "string"]  # pointer's target string also matches
+    assert next(i for i in page.items if i.kind == "string").summary_llm == (
+        "Command-line text used by three functions."
+    )
 
     rare = await search_mcp_data(
         session,
@@ -338,6 +359,7 @@ async def test_mcp_data_tools(
         max_limit=200,
     )
     assert detail.total_references == 3
+    assert detail.item.summary_llm == "Command-line text used by three functions."
     assert {r.function_display_name for r in detail.references} == {"func_a", "func_b", "func_c"}
 
     fdata = await get_mcp_function_data(
@@ -352,6 +374,7 @@ async def test_mcp_data_tools(
         max_limit=200,
     )
     assert [r.item.value_text for r in fdata.references] == ["hello world"]
+    assert fdata.references[0].item.summary_llm == "Command-line text used by three functions."
 
     by_data = await find_mcp_functions_by_data(
         session,
@@ -379,6 +402,11 @@ async def test_mcp_data_tools(
         limit=10,
     )
     assert related.related[0].function.name == "func_c"  # shares two items
+    assert any(
+        item.summary_llm == "Command-line text used by three functions."
+        for result in related.related
+        for item in result.shared_items
+    )
 
     with pytest.raises(AppError):
         await get_mcp_data_item(
