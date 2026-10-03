@@ -81,10 +81,22 @@ The default MCP endpoint is:
 http://127.0.0.1:8001/mcp
 ```
 
+OpenCode config: 
+```
+  "mcp": {
+    "servers": {
+      "revaid": {
+        "type": "remote",
+        "url": "http://10.30.86.63:8001/mcp"
+      }
+ 	}
+  }
+```
+
 For detailed information, see [revaid-mcp](https://github.com/dobin/REvAId/blob/main/docs/revaid-mcp.md)
 
 
-### Interace: REvAId-UI
+### Interface: REvAId-UI
 
 Configure the LLM provider (optional, but recommended) in `backend/.env`, copy from `backend/.env.example`:
 
